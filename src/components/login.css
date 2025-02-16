@@ -1,0 +1,90 @@
+/* Full-screen container */
+.login-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Background blur styling */
+.background-blur {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url("../images/logo4.png"); /* Replace with your image path */
+  background-size: cover;
+  background-position: center;
+  filter: blur(2px);
+  z-index: 1;
+}
+
+.logo-container {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Center align the logo and text */
+  justify-content: center;
+  margin-top: -10px;
+  margin-bottom: 10px;
+}
+.logo {
+  width: 120px; /* Set width to 120px */
+  height: 120px; /* Set height to 120px */
+  object-fit: cover; /* Ensure the logo fits within the dimensions */
+  margin-bottom: 10px; /* Add spacing between logo and heading */
+}
+.logo-container h1 {
+  color: white; /* Set text color to white */
+  font-family: "Times New Roman", serif; /* Set font family */
+  font-size: 22px; /* Set font size */
+  text-align: center; /* Center-align the text */
+  line-height: 1.2; /* Adjust line height for better spacing */
+}
+
+/* Login form wrapper */
+.login-form-wrapper {
+  position: relative;
+  z-index: 2;
+  background-color: rgba(255, 255, 255, 0.9); /* Semi-transparent background */
+  padding: 40px;
+  border-radius: 8px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  width: 300px;
+}
+
+/* Login form title */
+.login-title {
+  font-size: 24px;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+/* Input styling */
+.login-form .ant-input,
+.login-form .ant-input-password {
+  height: 40px;
+  border-radius: 4px;
+}
+
+/* Button styling */
+.login-button {
+  width: 100%;
+  height: 40px;
+  border-radius: 4px;
+  background-color: #6a9c89;
+  border-color: #6a9c89;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.login-button:hover {
+  background-color: #ffff;
+  border-color: #57826d;
+}

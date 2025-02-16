@@ -1,0 +1,152 @@
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 20px;
+  color: #fff;
+  height: 60px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 10px;
+}
+
+/* Default logo image */
+.logo-img {
+  width: 30px; /* Adjust the size of the logo image */
+  height: 30px; /* Adjust the size of the logo image */
+  margin-right: 10px;
+  border-radius: 0; /* No circular effect on expanded sidebar */
+  transition: all 0.3s ease;
+}
+
+/* Logo text */
+.logo-text {
+  font-weight: bold;
+  font-size: 1.2em;
+  transition: all 0.3s ease;
+}
+
+/* Toggle button styles */
+.toggle-btn {
+  background-color: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 18px;
+  display: block;
+}
+
+/* Change size when collapsed */
+.toggle-btn.collapsed {
+  font-size: 20px;
+}
+
+.toggle-btn:hover {
+  color: #1890ff;
+}
+
+/* Profile section */
+.profile {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: #fff;
+}
+.profile-text,
+.profile-icon {
+  color: black;
+  transition: color 0.3s ease;
+}
+
+.profile-text:hover,
+.profile-icon:hover {
+  color: #1890ff;
+}
+
+.profile span {
+  margin-left: 10px;
+}
+
+/* Menu items and hover effect */
+.menu ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.menu ul li {
+  display: flex;
+  align-items: center;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.menu ul li:hover {
+  background-color: #444444;
+}
+
+.menu-item {
+  margin-left: 10px;
+  display: inline-block;
+  transition: opacity 0.3s;
+}
+
+/* Collapsed menu item text */
+.sidebar.collapsed .menu-item {
+  opacity: 0;
+}
+
+/* Hide the logo and profile text when collapsed */
+.sidebar.collapsed .logo,
+.sidebar.collapsed .profile-text {
+  display: none;
+}
+
+/* Collapse behavior for logo */
+.sidebar.collapsed .logo-text {
+  display: none; /* Hide the text when collapsed */
+}
+
+/* Hide the toggle button in expanded state */
+.sidebar .toggle-btn {
+  display: none;
+}
+
+/* Only show the button to expand when collapsed */
+.sidebar.collapsed .toggle-btn {
+  display: block;
+}
+
+/* Welcome Section */
+.welcome-container {
+  text-align: center;
+  margin: 20px 0;
+  color: #fff;
+}
+
+.welcome-text {
+  font-size: 1.2em;
+  font-weight: bold;
+  margin: 0;
+  color: #ffffff;
+}
+
+.welcome-text .username {
+  color: #16423c;
+  text-shadow: 0px 0px 5px #ffffff;
+  font-style: italic;
+  transition: all 0.3s ease-in-out;
+}
+
+.welcome-text .username:hover {
+  color: #ffc107;
+  text-shadow: 0px 0px 10px #ffc107;
+  transform: scale(1.1);
+}
