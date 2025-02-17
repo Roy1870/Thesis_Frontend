@@ -33,7 +33,7 @@ const AnimalDataGroupedTable = ({ currentComponent, setCurrentComponent }) => {
   // Format the data for the table
   const formatData = (data) => {
     const formatted = [];
-    const years = [2021, 2022, 2023, 2024]; // The years we want to handle
+    const years = [2021, 2022, 2023, 2024, 2025]; // The years we want to handle
 
     data.forEach((animal) => {
       animal["Kinds of Animals"].forEach((kind) => {
@@ -117,6 +117,12 @@ const AnimalDataGroupedTable = ({ currentComponent, setCurrentComponent }) => {
           key: "commercial_2024",
           align: "center",
         },
+        {
+          title: "2025",
+          dataIndex: "commercial_2025",
+          key: "commercial_2025",
+          align: "center",
+        },
       ],
     },
     {
@@ -144,6 +150,12 @@ const AnimalDataGroupedTable = ({ currentComponent, setCurrentComponent }) => {
           title: "2024",
           dataIndex: "backyard_2024",
           key: "backyard_2024",
+          align: "center",
+        },
+        {
+          title: "2025",
+          dataIndex: "backyard_2025",
+          key: "backyard_2025",
           align: "center",
         },
       ],

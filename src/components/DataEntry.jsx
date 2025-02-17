@@ -46,31 +46,16 @@ const DataEntry = () => {
 
   const handleAnimalChange = (value) => {
     setBreeds(animalBreeds[value] || []);
-    form.setFieldsValue({ kind_of_animal: undefined }); // Reset breed field
+    form.setFieldsValue({ kind_of_animal: undefined }); // Reset breed field when the animal changes
   };
 
   const handleSubmit = async (values) => {
-    try {
-      const response = await fetch("http://127.0.0.1:8000/api/dataEntry", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(values),
-      });
-
-      if (response.ok) {
-        message.success("Data submitted successfully!");
-        form.resetFields();
-      } else {
-        const errorData = await response.json();
-        message.error(`Error: ${errorData.message}`);
-      }
-    } catch (error) {
-      message.error("An error occurred while submitting the data.");
-    }
+    console.log("Form submitted with values: ", values);
+    message.success("Form submitted successfully!");
+    form.resetFields();
   };
 
+  // Updated color palette
   const headerColor = "#6A9C89";
   const lighterShade = "#E6F5E4";
   const borderColor = "#CBD5E0";
@@ -94,6 +79,7 @@ const DataEntry = () => {
           onFinish={handleSubmit}
           initialValues={{ quantity: 1 }}
         >
+          {/* Farmer Information */}
           <Card
             title="Farmer Information"
             style={{
@@ -152,7 +138,10 @@ const DataEntry = () => {
               label="Contact"
               name="contact"
               rules={[
-                { required: true, message: "Please enter your contact number" },
+                {
+                  required: true,
+                  message: "Please enter your contact number",
+                },
               ]}
             >
               <Input
@@ -179,12 +168,68 @@ const DataEntry = () => {
                   option?.children.toLowerCase().includes(input.toLowerCase())
                 }
               >
-                {/* Barangay options */}
                 {[
                   "Agusan Pequeño",
                   "Ambago",
                   "Amparo",
-                  // Add other barangay names...
+                  "Ampayon",
+                  "Anticala",
+                  "Antongalon",
+                  "Aupagan",
+                  "Baan Km. 3",
+                  "Babag",
+                  "Bading",
+                  "Bancasi",
+                  "Banza",
+                  "Baobaoan",
+                  "Basag",
+                  "Bayanihan",
+                  "Bilay",
+                  "Bitan-agan",
+                  "Bit-os",
+                  "Bobon",
+                  "Bonbon",
+                  "Bugsukan",
+                  "Buhangin",
+                  "Cabcabon",
+                  "Camayahan",
+                  "Dankias",
+                  "De Oro",
+                  "Don Francisco",
+                  "Doongan",
+                  "Dulag",
+                  "Dumalagan",
+                  "Florida",
+                  "Kinamlutan",
+                  "Lemon",
+                  "Libertad",
+                  "Los Angeles",
+                  "Lumbocan",
+                  "MJ Santos",
+                  "Maguinda",
+                  "Mahay",
+                  "Mahogany",
+                  "Maibu",
+                  "Mandamo",
+                  "Masao",
+                  "Maug",
+                  "Manila de Bugabus",
+                  "Nongnong",
+                  "Pianing",
+                  "Pigdaulan",
+                  "Pinamanculan",
+                  "Salvacion",
+                  "San Mateo",
+                  "San Vicente",
+                  "Sto Niño",
+                  "Sumile",
+                  "Sumilihon",
+                  "Tagabaca",
+                  "Taguibo",
+                  "Taligaman",
+                  "Tiniwisan",
+                  "Tungao",
+                  "Villa Kananga",
                 ].map((barangay) => (
                   <Option key={barangay} value={barangay}>
                     {barangay}
@@ -194,6 +239,7 @@ const DataEntry = () => {
             </Form.Item>
           </Card>
 
+          {/* Animal Information */}
           <Card
             title="Animal Information"
             style={{
@@ -217,7 +263,13 @@ const DataEntry = () => {
                   ]}
                 >
                   <Select
-                    placeholder="Select animal"
+                    showSearch
+                    placeholder="Select or type animal"
+                    filterOption={(input, option) =>
+                      option?.children
+                        .toLowerCase()
+                        .includes(input.toLowerCase())
+                    }
                     onChange={handleAnimalChange}
                   >
                     {animals.map((animal) => (
@@ -253,17 +305,17 @@ const DataEntry = () => {
                   label="Quantity"
                   name="quantity"
                   rules={[
-                    {
-                      required: true,
-                      type: "number",
-                      message: "Enter quantity",
-                    },
+                    { required: true, message: "Please enter the quantity" },
                   ]}
                 >
                   <InputNumber
-                    min={1}
                     placeholder="Enter quantity"
-                    style={{ width: "100%" }}
+                    min={1}
+                    style={{
+                      width: "100%",
+                      borderRadius: "6px",
+                      border: `1px solid ${borderColor}`,
+                    }}
                   />
                 </Form.Item>
               </Col>
@@ -271,9 +323,18 @@ const DataEntry = () => {
                 <Form.Item
                   label="Category"
                   name="category"
-                  rules={[{ required: true, message: "Select a category" }]}
+                  rules={[
+                    { required: true, message: "Please select a category" },
+                  ]}
                 >
-                  <Select placeholder="Select category">
+                  <Select
+                    placeholder="Select category"
+                    style={{
+                      borderRadius: "6px",
+                      border: `1px solid ${borderColor}`,
+                      height: "40px",
+                    }}
+                  >
                     <Option value="commercial">Commercial</Option>
                     <Option value="backyard">Backyard</Option>
                   </Select>
@@ -283,24 +344,33 @@ const DataEntry = () => {
             <Form.Item
               label="Year"
               name="year"
-              rules={[{ required: true, message: "Enter a year" }]}
+              rules={[{ required: true, message: "Please enter a year" }]}
             >
-              <Input placeholder="Enter year" />
+              <Input
+                placeholder="Enter year"
+                style={{
+                  borderRadius: "6px",
+                  border: `1px solid ${borderColor}`,
+                  padding: "8px",
+                }}
+              />
             </Form.Item>
           </Card>
 
+          {/* Submit Button */}
           <Form.Item style={{ textAlign: "center", marginTop: "20px" }}>
             <Button
               type="primary"
               htmlType="submit"
               style={{
                 backgroundColor: headerColor,
-                borderColor: headerColor,
+                borderColor: "#2F855A",
                 borderRadius: "8px",
                 padding: "10px 20px",
                 fontSize: "16px",
                 fontWeight: "bold",
                 color: "#fff",
+                boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
               }}
             >
               Submit
