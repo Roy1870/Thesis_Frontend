@@ -68,7 +68,7 @@ export default function Dashboard() {
                 color: "#fff",
               }}
             >
-              Total Animals
+              Total Grower
             </Text>
             <div>
               {loadingAnimals ? (
@@ -123,7 +123,7 @@ export default function Dashboard() {
                 color: "#fff",
               }}
             >
-              Total Livestock
+              Total Raiser
             </Text>
             <div>
               {loadingLivestock ? (
@@ -176,7 +176,7 @@ export default function Dashboard() {
                 color: "#fff",
               }}
             >
-              Current Year Livestock
+              Total Operator
             </Text>
             <div>
               {loadingCurrent ? (
@@ -224,14 +224,14 @@ export default function Dashboard() {
                 <AreaChart data={yearlyLivestockData}>
                   {/* Chart Title */}
                   <Title level={3} style={{ textAlign: "center" }}>
-                    Yearly Total Livestock Count
+                    Yearly Total Livestock COunt
                   </Title>
 
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="year" />
                   <YAxis
                     label={{
-                      value: "Total Livestock Count", // Y-axis label text
+                      value: "Total Farmers", // Y-axis label text
                       angle: -90, // Rotate label
                       position: "insideLeft", // Position it inside the chart
                       style: { fontSize: "14px", fontWeight: "bold" }, // Style the label

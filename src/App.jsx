@@ -24,15 +24,21 @@ function App() {
   return (
     <Router>
       {isAuthenticated ? (
-        <Layout style={{ minHeight: "100vh", display: "flex" }}>
+        <Layout style={{ height: "100vh", overflow: "hidden", display: "flex" }}>
+          {/* Sidebar */}
           <Sidebar />
-          <Layout style={{ flex: 1 }}>
+
+          {/* Main Content */}
+          <Layout style={{ flex: 1, overflow: "hidden" }}>
             <Content
               style={{
-                padding: 16,
                 background: "#fff",
                 margin: 0,
                 flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                height: "100vh",
+                overflow: "hidden", // Prevent scrolling
               }}
             >
               <Routes>
