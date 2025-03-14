@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import axios from "axios";
 import {
   Form,
   Input,
@@ -19,98 +20,120 @@ const DataEntry = () => {
   const [farmerType, setFarmerType] = useState(null);
 
   const handleSubmit = async (values) => {
+    const token = localStorage.getItem("authToken");
+
+    if (!token) {
+      message.error("No authentication token found. Please log in again.");
+      return;
+    }
+
+    // Log the form values before sending
+    console.log("Form Values:", values);
+
+    const farmerData = {
+      fname: values.fname,
+      lname: values.lname,
+      email: values.email,
+      home_address: values.home_address,
+      farm_address: values.farm_address,
+    };
+
+    // Log the formatted farmer data
+    console.log("Formatted Farmer Data:", farmerData);
+
     try {
-      const farmerData = {
-        first_name: values.first_name,
-        last_name: values.last_name,
-        email: values.email,
-        contact: values.contact,
-        home_address: values.home_address,
-        farm_address: values.farm_address,
-      };
-
-      console.log("Farmer Data:", farmerData); // Debugging log
-
-      const farmerResponse = await fetch("http://localhost:8000/api/farmers/data", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(farmerData),
-      });
-
-      if (!farmerResponse.ok) {
-        const errorData = await farmerResponse.json();
-        console.error("Farmer Response Error:", errorData); // Log the error
-        message.error(`Error submitting farmer data: ${errorData.message}`);
-        return;
-      }
-
-      if (farmerType) {
-        let apiUrl = "";
-        let specificData = {};
-
-        switch (farmerType) {
-          case "grower":
-            apiUrl = "http://localhost:8000/api/growers/data";
-            specificData = {
-              crop_name: values.crop_name,
-              area: values.area,
-              yield: values.yield,
-              season: values.season,
-              market_outlet: values.market_outlet,
-              buyer: values.buyer,
-              association: values.association,
-            };
-            break;
-          case "raiser":
-            apiUrl = "http://localhost:8000/api/raisers/data";
-            specificData = {
-              species: values.species,
-              remarks: values.remarks,
-            };
-            break;
-          case "operator":
-            apiUrl = "http://localhost:8000/api/operators/data";
-            specificData = {
-              fishpond_location: values.fishpond_location,
-              cultured_species: values.cultured_species,
-              productive_area: values.productive_area,
-              stocking_density: values.stocking_density,
-              production: values.production,
-              harvest_date: values.harvest_date,
-              month: values.month,
-              year: values.year,
-            };
-            break;
-          default:
-            message.error("Please select a farmer type.");
-            return;
-        }
-
-        console.log("Specific Data:", specificData); // Debugging log
-
-        const specificResponse = await fetch(apiUrl, {
-          method: "POST",
+      const farmerResponse = await axios.post(
+        "http://localhost:8000/api/farmers/data",
+        farmerData,
+        {
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(specificData),
-        });
-
-        if (specificResponse.ok) {
-          message.success("Data submitted successfully!");
-          form.resetFields();
-          setFarmerType(null);
-        } else {
-          const errorData = await specificResponse.json();
-          console.error("Specific Response Error:", errorData); // Log the error
-          message.error(`Error submitting specific data: ${errorData.message}`);
         }
+      );
+
+      // Log the response from the server
+      console.log("Server Response:", farmerResponse);
+
+      if (farmerResponse.status !== 200 && farmerResponse.status !== 201) {
+        throw new Error("Failed to submit farmer data");
       }
+
+      message.success("Farmer data submitted successfully!");
+
+      if (farmerType) {
+        console.log("Submitting specific data for farmer type:", farmerType);
+        await submitSpecificData(values, farmerType, token);
+      }
+
+      form.resetFields();
+      setFarmerType(null);
     } catch (error) {
-      console.error("Submission Error:", error); // Log the error
-      message.error("An error occurred while submitting the data.");
+      console.error("Submission Error:", error);
+      message.error(error.response?.data?.message || "An error occurred while submitting the data.");
+    }
+};
+
+
+  const submitSpecificData = async (values, farmerType, token) => {
+    let apiUrl = "";
+    let specificData = {};
+
+    switch (farmerType) {
+      case "grower":
+        apiUrl = "http://localhost:8000/api/growers/data";
+        specificData = {
+          crop_name: values.crop_name,
+          area: values.area,
+          yield: values.yield,
+          season: values.season,
+          market_outlet: values.market_outlet,
+          buyer: values.buyer,
+          association: values.association,
+        };
+        break;
+      case "raiser":
+        apiUrl = "http://localhost:8000/api/raisers/data";
+        specificData = {
+          species: values.species,
+          remarks: values.remarks,
+        };
+        break;
+      case "operator":
+        apiUrl = "http://localhost:8000/api/operators/data";
+        specificData = {
+          fishpond_location: values.fishpond_location,
+          cultured_species: values.cultured_species,
+          productive_area: values.productive_area,
+          stocking_density: values.stocking_density,
+          production: values.production,
+          harvest_date: values.harvest_date,
+          month: values.month,
+          year: values.year,
+        };
+        break;
+      default:
+        message.error("Please select a farmer type.");
+        return;
+    }
+
+    try {
+      const specificResponse = await axios.post(apiUrl, specificData, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (specificResponse.status !== 200) {
+        throw new Error("Failed to submit specific data");
+      }
+
+      message.success("Specific data submitted successfully!");
+    } catch (error) {
+      console.error("Specific Submission Error:", error);
+      message.error(error.response?.data?.message || "An error occurred while submitting specific data.");
     }
   };
 
@@ -152,7 +175,7 @@ const DataEntry = () => {
               <Col span={12}>
                 <Form.Item
                   label="First Name"
-                  name="first_name"
+                  name="fname"
                   rules={[{ required: true, message: "Please enter first name" }]}
                 >
                   <Input
@@ -165,7 +188,7 @@ const DataEntry = () => {
               <Col span={12}>
                 <Form.Item
                   label="Last Name"
-                  name="last_name"
+                  name="lname"
                   rules={[{ required: true, message: "Please enter last name" }]}
                 >
                   <Input

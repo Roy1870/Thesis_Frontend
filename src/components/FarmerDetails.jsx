@@ -25,7 +25,7 @@ const FarmerDetails = ({ currentComponent, setCurrentComponent }) => {
         }
 
         const response = await axios.get(
-          "http://localhost:8000/api/farmers/details",
+          "http://localhost:8000/api/farmers/data",
           {
             headers: {
               Authorization: `Bearer ${authToken}`,
@@ -46,24 +46,29 @@ const FarmerDetails = ({ currentComponent, setCurrentComponent }) => {
 
   const columns = [
     {
-      title: "Farmer Name",
-      dataIndex: "farmer_name",
-      key: "farmer_name",
+      title: "First Name",
+      dataIndex: "fname",
+      key: "fname",
     },
     {
-      title: "Barangay",
-      dataIndex: "barangay",
-      key: "barangay",
+      title: "Last Name",
+      dataIndex: "lname",
+      key: "lname",
     },
     {
-      title: "Contact",
-      dataIndex: "contact",
-      key: "contact",
+      title: "Email",
+      dataIndex: "email",
+      key: "email",
     },
     {
-      title: "Date Added",
-      dataIndex: "added_date",
-      key: "added_date",
+      title: "Home Address",
+      dataIndex: "home_address",
+      key: "home_address",
+    },
+    {
+      title: "Farm Address",
+      dataIndex: "farm_address",
+      key: "farm_address",
     },
   ];
 
@@ -72,7 +77,7 @@ const FarmerDetails = ({ currentComponent, setCurrentComponent }) => {
   };
 
   const filteredData = farmerData.filter((farmer) =>
-    farmer.farmer_name.toLowerCase().includes(searchText.toLowerCase())
+    farmer.fname.toLowerCase().includes(searchText.toLowerCase())
   );
 
   const handleExport = () => {
