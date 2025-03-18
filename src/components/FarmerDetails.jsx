@@ -1,38 +1,31 @@
 import { useState, useEffect } from "react";
 import { Table, Spin, Alert, Input, Space, Button, Modal } from "antd";
-import { SearchOutlined, PlusOutlined } from "@ant-design/icons"; // Import icons
+import { SearchOutlined, PlusOutlined, ClockCircleOutlined } from "@ant-design/icons";
 import axios from "axios";
 import * as XLSX from "xlsx";
 import FilterSelect from "./FilterSelect";
-import DataEntry from "./DataEntry"; // Import the DataEntry component
+import DataEntry from "./DataEntry";
+
 
 const FarmerDetails = ({ currentComponent, setCurrentComponent }) => {
   const [farmerData, setFarmerData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchText, setSearchText] = useState(""); // For search functionality
-  const [isModalVisible, setIsModalVisible] = useState(false); // State for modal visibility
+  const [searchText, setSearchText] = useState("");
+  const [isModalVisible, setIsModalVisible] = useState(false);
 
   useEffect(() => {
     const fetchFarmerData = async () => {
       try {
         const authToken = localStorage.getItem("authToken");
-
         if (!authToken) {
           setError("Authorization token not found.");
           setLoading(false);
           return;
         }
-
-        const response = await axios.get(
-          "http://localhost:8000/api/farmers/data",
-          {
-            headers: {
-              Authorization: `Bearer ${authToken}`,
-            },
-          }
-        );
-
+        const response = await axios.get("http://localhost:8000/api/farmers/details", {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
         setFarmerData(response.data);
         setLoading(false);
       } catch (err) {
@@ -40,36 +33,14 @@ const FarmerDetails = ({ currentComponent, setCurrentComponent }) => {
         setLoading(false);
       }
     };
-
     fetchFarmerData();
   }, []);
 
   const columns = [
-    {
-      title: "First Name",
-      dataIndex: "fname",
-      key: "fname",
-    },
-    {
-      title: "Last Name",
-      dataIndex: "lname",
-      key: "lname",
-    },
-    {
-      title: "Email",
-      dataIndex: "email",
-      key: "email",
-    },
-    {
-      title: "Home Address",
-      dataIndex: "home_address",
-      key: "home_address",
-    },
-    {
-      title: "Farm Address",
-      dataIndex: "farm_address",
-      key: "farm_address",
-    },
+    { title: "Farmer Name", dataIndex: "farmer_name", key: "farmer_name" },
+    { title: "Barangay", dataIndex: "barangay", key: "barangay" },
+    { title: "Contact", dataIndex: "contact", key: "contact" },
+    { title: "Date Added", dataIndex: "added_date", key: "added_date" },
   ];
 
   const handleSearchChange = (e) => {
@@ -77,7 +48,7 @@ const FarmerDetails = ({ currentComponent, setCurrentComponent }) => {
   };
 
   const filteredData = farmerData.filter((farmer) =>
-    farmer.fname.toLowerCase().includes(searchText.toLowerCase())
+    farmer.farmer_name.toLowerCase().includes(searchText.toLowerCase())
   );
 
   const handleExport = () => {
@@ -97,76 +68,42 @@ const FarmerDetails = ({ currentComponent, setCurrentComponent }) => {
 
   return (
     <div style={{ margin: "10px" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          margin: 0,
-        }}
-      >
-        <h2
-          style={{
-            fontWeight: "bold",
-            margin: 0,
-            lineHeight: "1",
-          }}
-        >
-          Inventory
-        </h2>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: 0 }}>
+        <h2 style={{ fontWeight: "bold", margin: 0, lineHeight: "1" }}>Inventory</h2>
         <Space>
           <Input
             placeholder="Search by Farmer Name"
             value={searchText}
             onChange={handleSearchChange}
-            style={{
-              width: 400,
-              height: 35,
-              display: "flex",
-              alignItems: "center",
-            }}
+            style={{ width: 400, height: 35, display: "flex", alignItems: "center" }}
             suffix={<SearchOutlined style={{ color: "#6A9C89" }} />}
           />
         </Space>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginTop: "15px",
-          marginBottom: "20px",
-          gap: "10px",
-        }}
-      >
-        {/* Add New Entry Button */}
-        <Button
-          type="primary"
-          onClick={showModal}
-          style={{
-            backgroundColor: "#6A9C89",
-            borderColor: "#6A9C89",
-          }}
-          icon={<PlusOutlined />}
-        >
-          Add New Entry
-        </Button>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "15px", marginBottom: "20px", gap: "10px" }}>
+  <div style={{ display: "flex", gap: "10px" }}>
+    {/* Switch to Recently Added component */}
+    <Button
+      type="default"
+      icon={<ClockCircleOutlined />}
+      style={{ borderColor: "#6A9C89", color: "#6A9C89" }}
+      onClick={() => setCurrentComponent("RecentlyAdded")} // Handle button click
+    >
+      Recently Added
+    </Button>
 
-        {/* Export and Filter Options */}
-        <div style={{ display: "flex", gap: "10px" }}>
-          <FilterSelect
-            currentComponent={currentComponent}
-            setCurrentComponent={setCurrentComponent}
-          />
-          <Button
-            type="primary"
-            onClick={handleExport}
-            style={{ backgroundColor: "#6A9C89", borderColor: "#6A9C89" }}
-          >
-            Export to Excel
-          </Button>
-        </div>
-      </div>
+    {/* Show the Add New Entry modal */}
+    <Button
+      type="primary"
+      onClick={showModal}
+      style={{ backgroundColor: "#6A9C89", borderColor: "#6A9C89" }}
+      icon={<PlusOutlined />}
+    >
+      Add New Entry
+    </Button>
+  </div>
+</div>
 
       {loading && <Spin size="large" />}
       {error && <Alert message={error} type="error" />}
@@ -176,34 +113,18 @@ const FarmerDetails = ({ currentComponent, setCurrentComponent }) => {
           dataSource={filteredData}
           rowKey="farmer_name"
           pagination={false}
-          style={{
-            marginTop: "20px",
-          }}
+          style={{ marginTop: "20px" }}
           components={{
             header: {
-              cell: (props) => {
-                return (
-                  <th
-                    {...props}
-                    style={{
-                      backgroundColor: "#6A9C89",
-                      color: "white",
-                    }}
-                  />
-                );
-              },
+              cell: (props) => (
+                <th {...props} style={{ backgroundColor: "#6A9C89", color: "white" }} />
+              ),
             },
           }}
         />
       )}
 
-      {/* Modal for Data Entry */}
-      <Modal
-        visible={isModalVisible}
-        onCancel={handleModalClose}
-        footer={null} // Remove default footer buttons
-        width={800} // Optional: Adjust modal width
-      >
+      <Modal visible={isModalVisible} onCancel={handleModalClose} footer={null} width={800}>
         <DataEntry />
       </Modal>
     </div>
