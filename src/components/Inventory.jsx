@@ -125,8 +125,14 @@ const Inventory = ({ currentComponent, setCurrentComponent }) => {
 
       {error && <Alert message={error} type="error" showIcon style={{ marginTop: "15px" }} />}
 
-      <Modal visible={isModalVisible} onCancel={handleModalClose} footer={null} width={800}>
-        <DataEntry />
+      <Modal
+        visible={isModalVisible}
+        onCancel={handleModalClose}
+        footer={null}
+        width={800}
+        style={{ top: 20, overflow: 'hidden' }} // Added overflow: 'hidden'
+      >
+        <DataEntry handleCancel={handleModalClose} />
       </Modal>
     </div>
   );
