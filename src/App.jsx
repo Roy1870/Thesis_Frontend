@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
 import DataEntry from "./components/DataEntry";
+import AddData from "./components/AddData"; 
 import Inventory from "./components/Inventory";
 import Analytics from "./components/Analytics";
 import Settings from "./components/Settings";
@@ -48,6 +49,7 @@ function App() {
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/add-data" element={<AddData />} />
                 <Route path="/user-management" element={<UserManagement />} />
                 <Route path="*" element={<Navigate to="/" />} />{" "}
                 {/* Redirect unknown paths to Dashboard */}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Layout, Menu, Button, Dropdown, Space, message } from "antd";
 import {
   DashboardOutlined,
@@ -12,7 +12,7 @@ import {
   CheckCircleOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import "./sidebar.css";
 import logo from "../images/logo.png";
 
@@ -20,7 +20,7 @@ const { Sider } = Layout;
 
 const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
-  const [selectedKey, setSelectedKey] = useState(window.location.pathname); // Track the active menu item
+  const [selectedKey, setSelectedKey] = useState(window.location.pathname);
   const navigate = useNavigate();
 
   const toggleSidebar = () => {
@@ -68,7 +68,6 @@ const Sidebar = () => {
       width={250}
       style={{ backgroundColor: "#6A9C89" }}
     >
-      {/* Sidebar header */}
       <div className="sidebar-header">
         {!collapsed && (
           <div className="logo">
@@ -77,13 +76,12 @@ const Sidebar = () => {
           </div>
         )}
         <Button
-          className={`toggle-btn ${collapsed ? "collapsed" : ""}`}
+          className={"toggle-btn " + (collapsed ? "collapsed" : "")}
           icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
           onClick={toggleSidebar}
         />
       </div>
 
-      {/* Welcome User */}
       {!collapsed && (
         <div className="welcome-container">
           <h3 className="welcome-text">
@@ -92,7 +90,6 @@ const Sidebar = () => {
         </div>
       )}
 
-      {/* Menu Items */}
       <Menu
         style={{ backgroundColor: "#6A9C89" }}
         selectedKeys={[selectedKey]}
@@ -107,6 +104,16 @@ const Sidebar = () => {
           }}
         >
           Dashboard
+        </Menu.Item>
+        <Menu.Item
+          key="/add-data"
+          icon={<FormOutlined />}
+          onClick={() => {
+            setSelectedKey("/add-data");
+            navigate("/add-data");
+          }}
+        >
+          Add Data
         </Menu.Item>
         <Menu.Item
           key="/inventory"
@@ -153,10 +160,7 @@ const Sidebar = () => {
         )}
       </Menu>
 
-      {/* Profile Section with Dropdown */}
-      <div
-        className={`profile ${selectedKey === "/profile" ? "selected" : ""}`}
-      >
+      <div className={"profile " + (selectedKey === "/profile" ? "selected" : "")}>
         <Dropdown overlay={profileMenu} trigger={["click"]}>
           <a onClick={(e) => e.preventDefault()}>
             <Space>
