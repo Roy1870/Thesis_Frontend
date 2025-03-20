@@ -114,7 +114,7 @@ const DataEntry = () => {
 
   const handleSubmit = async (values) => {
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/dataEntry", {
+      const response = await fetch("http://localhost:8000/api/farmers/data", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -150,6 +150,10 @@ const DataEntry = () => {
     setFarmerType(value);
   };
 
+  const onFinish = (values) => {
+    console.log("Form Values:", values);
+  };
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = 0;
@@ -160,7 +164,10 @@ const DataEntry = () => {
     <div style={{ margin: "10px" }}>
       <h2 style={{ fontWeight: "bold", margin: 0, lineHeight: "1" }}>Data Entry</h2>
       <div style={{ padding: "20px", backgroundColor: "#FFFFFF" }}>
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+        <Form form={form} layout="vertical" onFinish={(values) => { 
+    onFinish(values); 
+    handleSubmit(values);
+}}>
           <div style={{ maxHeight: "500px", overflowY: "auto", overflowX: "hidden" }}>
             <Card
               title="Farmer Information"
@@ -208,11 +215,11 @@ const DataEntry = () => {
                     <Input placeholder="Enter Facebook or Email" style={inputStyle} />
                   </Form.Item>
                 </Col>
-                <Col span={12}>
+              {/*  <Col span={12}>
                   <Form.Item label="Barangay" name="barangay">
                     <Input placeholder="Enter barangay" style={inputStyle} />
                   </Form.Item>
-                </Col>
+                </Col>*/}
               </Row>
 
               <Row gutter={24}>
@@ -230,12 +237,12 @@ const DataEntry = () => {
 
               <Row gutter={24}>
                 <Col span={12}>
-                  <Form.Item label="Farm Location Longitude" name="farm_longitude">
+                  <Form.Item label="Farm Location Longitude" name="farm_location_longitude">
                     <Input placeholder="Enter longitude" style={inputStyle} />
                   </Form.Item>
                 </Col>
                 <Col span={12}>
-                  <Form.Item label="Farm Location Latitude" name="farm_latitude">
+                  <Form.Item label="Farm Location Latitude" name="farm_location_latitude">
                     <Input placeholder="Enter latitude" style={inputStyle} />
                   </Form.Item>
                 </Col>
@@ -243,7 +250,7 @@ const DataEntry = () => {
 
               <Row gutter={24}>
                 <Col span={12}>
-                  <Form.Item label="Market Outlet Location" name="market_outlet">
+                  <Form.Item label="Market Outlet Location" name="market_outlet_location">
                     <Input placeholder="Enter market outlet location" style={inputStyle} />
                   </Form.Item>
                 </Col>
@@ -256,11 +263,11 @@ const DataEntry = () => {
 
               <Row gutter={24}>
                 <Col span={12}>
-                  <Form.Item label="Association/Organization" name="association">
+                  <Form.Item label="Association/Organization" name="association_organization">
                     <Input placeholder="Enter association/organization" style={inputStyle} />
                   </Form.Item>
                 </Col>
-                <Col span={12}>
+                {/*<Col span={12}>
                   <Form.Item label="Farmer Type" name="farmer_type">
                     <Select
                       placeholder="Select Farmer Type"
@@ -272,7 +279,7 @@ const DataEntry = () => {
                       <Option value="Grower">Grower</Option>
                     </Select>
                   </Form.Item>
-                </Col>
+                </Col> */} 
               </Row>
 
               {/* Conditionally Render Specific Fields */}

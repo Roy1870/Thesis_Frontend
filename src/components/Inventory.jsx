@@ -55,9 +55,10 @@ const Inventory = ({ currentComponent, setCurrentComponent }) => {
 
   const filteredData = farmerData.filter(
     (item) =>
-      item.fname.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.lname.toLowerCase().includes(searchText.toLowerCase())
+      item.fname?.toLowerCase().includes(searchText.toLowerCase()) ||
+      item.lname?.toLowerCase().includes(searchText.toLowerCase())
   );
+  
 
   const paginatedData = filteredData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
