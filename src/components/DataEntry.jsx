@@ -10,6 +10,9 @@ import {
   message,
 } from "antd";
 import { PhoneOutlined, UserOutlined } from "@ant-design/icons";
+import axios from "axios";
+
+const token = localStorage.getItem("authToken");
 
 const { Option } = Select;
 
@@ -114,13 +117,13 @@ const DataEntry = () => {
 
   const handleSubmit = async (values) => {
     try {
-      const response = await fetch("http://localhost:8000/api/farmers/data", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(values),
-      });
+      const response = await axios.post("http://localhost:8000/api/farmers/data", values, {
+       headers: {
+            "Content-Type": "application/json",
+            Authorization:` Bearer ${token}`, // Add token if needed
+        }, 
+    });
+    
 
       if (response.ok) {
         message.success("Data submitted successfully!");
@@ -164,10 +167,13 @@ const DataEntry = () => {
     <div style={{ margin: "10px" }}>
       <h2 style={{ fontWeight: "bold", margin: 0, lineHeight: "1" }}>Data Entry</h2>
       <div style={{ padding: "20px", backgroundColor: "#FFFFFF" }}>
-        <Form form={form} layout="vertical" onFinish={(values) => { 
-    onFinish(values); 
-    handleSubmit(values);
-}}>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={(values) => {
+            handleSubmit(values);
+          }}
+        >
           <div style={{ maxHeight: "500px", overflowY: "auto", overflowX: "hidden" }}>
             <Card
               title="Farmer Information"
