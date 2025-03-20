@@ -42,8 +42,8 @@ const Inventory = ({ currentComponent, setCurrentComponent }) => {
   }, []);
 
   const columns = [
-    { title: "First Name", dataIndex: "fname", key: "fname" },
-    { title: "Last Name", dataIndex: "lname", key: "lname" },
+    { title: "Name", dataIndex: "name", key: "name" },
+    { title: "Contact Number", dataIndex: "contact_number", key: "contact_number" },
     { title: "Email", dataIndex: "email", key: "email" },
     { title: "Home Address", dataIndex: "home_address", key: "home_address" },
     { title: "Farm Address", dataIndex: "farm_address", key: "farm_address" },
