@@ -384,115 +384,78 @@ const AddData = () => {
             </Card>
           )}
 
-{farmerType === "Grower" && (
-        <Card
-          title="Grower Details"
-          style={{
-            marginBottom: "20px",
-            borderRadius: "8px",
-            backgroundColor: lighterShade,
-            border: `1px solid ${borderColor}`,
-          }}
-          headStyle={{
-            background: headerColor,
-            color: "#ffffff",
-            borderRadius: "8px 8px 0 0",
-          }}
-        >
-          <Row gutter={24}>
-            <Col span={12}>
-              <Form.Item label="Crop Type" name="crop_type">
-                <Select
-                  placeholder="Select Crop Type"
-                  onChange={(value) => setSelectedCrop(value)}
-                >
-                  <Option value="Rice">Rice</Option>
-                  <Option value="Spices">Spices</Option>
-                  <Option value="Legumes">Legumes</Option>
-                  <Option value="Vegetable">Vegetable</Option>
-                  <Option value="Cacoa">Cacoa</Option>
-                  <Option value="Banana">Banana</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-                {/* Removed Area Category */}
-            </Col>
-          </Row>
-          <Row gutter={24}>
-            <Col span={12}>
-              <Form.Item label="Seed Type" name="seed_type">
-                <Select placeholder="Select Seed Type">
-                    {selectedCrop === "Rice" && (
-                        <>
-                            <Option value="Hybrid Rice Seeds">Hybrid Rice Seeds</Option>
-                            <Option value="Inbred Rice Seeds">Inbred Rice Seeds</Option>
-                        </>
-                    )}
-                    {selectedCrop === "Spices" && (
-                        <>
-                            <Option value="Turmeric Seeds">Turmeric Seeds</Option>
-                            <Option value="Ginger Seeds">Ginger Seeds</Option>
-                            <Option value="Pepper Seeds">Pepper Seeds</Option>
-                        </>
-                    )}
-                      {selectedCrop === "Legumes" && (
-                        <>
-                            <Option value="Beans">Beans</Option>
-                            <Option value="Peas">Peas</Option>
-                            <Option value="Lentils">Lentils</Option>
-                        </>
-                    )}
-                      {selectedCrop === "Vegetable" && (
-                        <>
-                            <Option value="Tomato">Tomato</Option>
-                            <Option value="Okra">Okra</Option>
-                            <Option value="Eggplant">Eggplant</Option>
-                        </>
-                    )}
-                      {selectedCrop === "Cacoa" && (
-                        <>
-                            <Option value="Forastero">Forastero</Option>
-                            <Option value="Criollo">Criollo</Option>
-                            <Option value="Trinitario">Trinitario</Option>
-                        </>
-                    )}
-                      {selectedCrop === "Banana" && (
-                        <>
-                            <Option value="Cavendish">Cavendish</Option>
-                            <Option value="Lakatan">Lakatan</Option>
-                            <Option value="Saba">Saba</Option>
-                        </>
-                    )}
-                     {(!selectedCrop || !["Rice", "Spices", "Legumes", "Vegetable", "Cacoa", "Banana"].includes(selectedCrop)) && (
-                        <>
-                            <Option value="Hybrid Seeds">Hybrid Seeds</Option>
-                            <Option value="Certified Seeds ">Certified Seeds</Option>
-                            <Option value="Good Seeds">Good Seeds</Option>
-                        </>
-                    )}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label="Area Harvested" name="Area Harvested">
-                <Input placeholder="Enter Area Harvested"  />
-              </Form.Item>
-            </Col>
-            </Row>
+          {farmerType === "Grower" && (
+            <Card
+              title="Grower Details"
+              style={{
+                marginBottom: "20px",
+                borderRadius: "8px",
+                backgroundColor: lighterShade,
+                border: `1px solid ${borderColor}`,
+              }}
+              headStyle={{
+                background: headerColor,
+                color: "#ffffff",
+                borderRadius: "8px 8px 0 0",
+              }}
+            >
+              <Row gutter={24}>
+              <Col span={12}>
+                   <Form.Item label="Crop Type" name="crop_type">
+                     <Select
+                       placeholder="Select Crop Type"
 
-            <Row gutter={24}>
-            <Col span={12}>
-              <Form.Item label="Production" name="Production">
-                <Input placeholder="Enter Production"  />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label="Average Yield" name="Average Yield">
-                <Input placeholder="Enter Average Yield"  />
-              </Form.Item>
-            </Col>
-           </Row>
+                     >
+                       <Option value="Rice">Rice</Option>
+                       <Option value="Spices">Spices</Option>
+                       <Option value="Legumes">Legumes</Option>
+                       <Option value="Vegetable">Vegetable</Option>
+                       <Option value="Cacoa">Cacoa</Option>
+                       <Option value="Banana">Banana</Option>
+                     </Select>
+                   </Form.Item>
+                 </Col>
+                 <Col span={12}>
+                   <Form.Item label="Area Category" name="area_category">
+                     <Select
+                       placeholder="Select Area Category"
+                   
+                     >
+                       <Option value="Irrigated">Irrigated</Option>
+                       <Option value="Rainfed">Rainfed</Option>
+                     </Select>
+                   </Form.Item>
+                 </Col>
+              </Row>
+              <Row gutter={24}>
+              <Col span={12}>
+                   <Form.Item label="Seed Type" name="seed_type">
+                     <Select
+                       placeholder="Select Seed Type"
+                    
+                     >
+                       <Option value="Hybrid Seeds">Hybrid Seeds</Option>
+                       <Option value="Certified Seeds ">Certified Seeds</Option>
+                       <Option value="Good Seeds">Good Seeds</Option>
+                     </Select>
+                   </Form.Item>
+                 </Col>
+                <Col span={12}>
+                  <Form.Item label="Area Harvested" name="Area Harvested">
+                    <Input placeholder="Enter Area Harvested" style={inputStyle} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item label="Production" name="Production">
+                    <Input placeholder="Enter Production" style={inputStyle} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item label="Average Yield" name="Average Yield">
+                    <Input placeholder="Enter Area Harvested" style={inputStyle} />
+                  </Form.Item>
+                </Col>
+              </Row>
             </Card>
           )}
 
