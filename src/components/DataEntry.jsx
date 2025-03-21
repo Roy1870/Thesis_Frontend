@@ -92,23 +92,52 @@ const OperatorFields = () => (
         <Input placeholder="Enter Production Data" />
       </Form.Item>
     </Col>
+    
   </Row>
+  
 );
-
-const GrowerFields = () => (
+const GrowerFields = ({ handleFarmerTypeChange, inputStyle }) => (
   <Row gutter={24}>
+    {/* Grower Specific Field */}
     <Col span={12}>
-      <Form.Item label="Grower Specific Field 1" name="grower_field1">
+      <Form.Item label="Farm Address" name="grower_field1">
         <Input placeholder="Enter Grower Specific Field 1" />
       </Form.Item>
     </Col>
+
+    {/* Buyer Name */}
     <Col span={12}>
-      <Form.Item label="Grower Specific Field 2" name="grower_field2">
-        <Input placeholder="Enter Grower Specific Field 2" />
+      <Form.Item label="Buyer Name" name="buyer_name">
+        <Input placeholder="Enter name of the buyer" />
       </Form.Item>
     </Col>
-  </Row>
+
+    {/* Association/Organization */}
+    <Col span={12}>
+      <Form.Item label="Association/Organization" name="association_organization">
+        <Input placeholder="Enter association/organization" />
+      </Form.Item>
+    </Col>
+  
+  
+     {/* Farmer Type Dropdown */}
+     <Col span={12}>
+     <Form.Item label="Crop Type" name="crop_type">
+       <Select
+         placeholder="Select Crop Type"
+         onChange={handleFarmerTypeChange}
+         style={inputStyle}
+       >
+         <Option value="Raiser">Raiser</Option>
+         <Option value="Operator">Operator</Option>
+         <Option value="Grower">Grower</Option>
+       </Select>
+     </Form.Item>
+   </Col>
+   </Row>
 );
+
+
 
 const DataEntry = () => {
   const [form] = Form.useForm();
@@ -234,15 +263,7 @@ const DataEntry = () => {
                     <Input placeholder="Enter home address" style={inputStyle} />
                   </Form.Item>
                 </Col>
-                <Col span={12}>
-                  <Form.Item label="Farm Address" name="farm_address">
-                    <Input placeholder="Enter farm address" style={inputStyle} />
-                  </Form.Item>
-                </Col>
-              </Row>
 
-              <Row gutter={24}>
-    
                 <Col span={12}>
                   <Form.Item label="Farmer Type" name="farmer_type">
                     <Select
@@ -256,6 +277,10 @@ const DataEntry = () => {
                     </Select>
                   </Form.Item>
                 </Col> 
+              </Row>
+
+              <Row gutter={24}>
+
               </Row>
 
               {/* Conditionally Render Specific Fields */}
