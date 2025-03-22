@@ -11,6 +11,17 @@ const AddData = () => {
   const [form] = Form.useForm();
   const [farmerType, setFarmerType] = useState(null);
   const [animals, setAnimals] = useState([{ animal_type: "", subcategory: "", quantity: "" }]);
+  const [selectedCrop, setSelectedCrop] = useState(null); // New state for selected crop
+  const [selectedVegetable, setSelectedVegetable] = useState(null); // State to track selected vegetable
+
+  const cropConfigurations = {
+    Rice: ['Area Category', 'Seed Type', 'Production', 'Average Yield (mt/ha)'],
+    Spices: ['Name of Buyer', 'Spice Type', 'Quantity', 'Association/Organization', 'Area (hectare)', 'Farm Location Coordinates(longitude)', 'Farm Location Coordinates(latitude)'],
+    Legumes: ['Name of Buyer', 'Legume Type', 'Quantity', 'Association/Organization', 'Area (hectare)', 'Farm Location Coordinates(longitude)', 'Farm Location Coordinates(latitude)'],
+    Vegetable: ['Name of Buyer', 'Vegetable Type', 'Quantity', 'Association/Organization', 'Area (hectare)', 'Farm Location Coordinates(longitude)', 'Farm Location Coordinates(latitude)', 'Other Vegetable'],
+    Cacoa: ['Market Outlet Location', 'Name of Buyer', 'Association/Organization', 'Area (hectare)', 'Longitude', 'Latitude'],
+    Banana: ['Name of Buyer', 'Banana Type', 'Quantity', 'Association/Organization', 'Area (hectare)', 'Farm Location Coordinates(longitude)', 'Farm Location Coordinates(latitude)'],
+  };
 
   const handleSubmit = async (values) => {
     try {
@@ -26,6 +37,8 @@ const AddData = () => {
         form.resetFields();
         setFarmerType(null);
         setAnimals([{ animal_type: "", subcategory: "", quantity: "" }]);
+        setSelectedCrop(null); // Reset selected crop
+        setSelectedVegetable(null); // Reset selected vegetable
       } else {
         message.error("Failed to submit data.");
       }
@@ -45,6 +58,7 @@ const AddData = () => {
     width: "100%",
   };
 
+
   const addAnimal = () => {
     setAnimals([...animals, { animal_type: "", subcategory: "", quantity: "" }]);
   };
@@ -52,7 +66,7 @@ const AddData = () => {
   return (
     <div style={{ margin: "10px" }}>
       <h2 style={{ fontWeight: "bold", margin: 0, lineHeight: "1" }}>Add Data</h2>
-      <div style={{ padding: "20px", backgroundColor: "#FFFFFF", maxHeight: "600px", overflowY: "auto" }}>
+      <div style={{ padding: "20px", backgroundColor: "#FFFFFF", maxHeight: "750px", overflowY: "auto" }}>
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Card
             title="Farmer Information"
@@ -68,6 +82,7 @@ const AddData = () => {
               borderRadius: "8px 8px 0 0",
             }}
           >
+            {/* Farmer Information Form Fields */}
             <Row gutter={24}>
               <Col span={12}>
                 <Form.Item label="Name" name="name" rules={[{ required: true }]}>
@@ -117,18 +132,17 @@ const AddData = () => {
 
             <Row gutter={24}>
               <Col span={12}>
-                   <Form.Item label="Farmer Type" name="farmer_type">
-                     <Select
-                       placeholder="Select Farmer Type"
-                     onChange={(value) => setFarmerType(value)}
-                     >
-                       <Option value="Raiser">Raiser</Option>
-                       <Option value="Operator">Operator</Option>
-                       <Option value="Grower">Grower</Option>
-                     </Select>
-                   </Form.Item>
-                 </Col>
-             
+                <Form.Item label="Farmer Type" name="farmer_type">
+                  <Select
+                    placeholder="Select Farmer Type"
+                    onChange={(value) => setFarmerType(value)}
+                  >
+                    <Option value="Raiser">Raiser</Option>
+                    <Option value="Operator">Operator</Option>
+                    <Option value="Grower">Grower</Option>
+                  </Select>
+                </Form.Item>
+              </Col>
             </Row>
           </Card>
 
@@ -147,157 +161,155 @@ const AddData = () => {
                 borderRadius: "8px 8px 0 0",
               }}
             >
-                  {animals.map((animal, index) => (
+              {/* Raiser Details Form Fields */}
+              {animals.map((animal, index) => (
                 <Row gutter={24} key={index}>
-                    <Col span={6}>
-                        <Form.Item label="Animal Type" name={`animal_type_${index}`}>
-                            <Select
-                                placeholder="Select Animal Type"
-                                value={animal.animal_type}
-                                onChange={(value) => {
-                                    const newAnimals = [...animals];
-                                    newAnimals[index].animal_type = value;
+                  <Col span={6}>
+                    <Form.Item label="Animal Type" name={`animal_type_${index}`}>
+                      <Select
+                        placeholder="Select Animal Type"
+                        value={animal.animal_type}
+                        onChange={(value) => {
+                          const newAnimals = [...animals];
+                          newAnimals[index].animal_type = value;
 
-                                    if (value === "CATTLE") {
-                                        newAnimals[index].subcategory = "Carabull";
-                                    } else if (value === "CARABAO") {
-                                        newAnimals[index].subcategory = "Caracow";
-                                    } else {
-                                        newAnimals[index].subcategory = undefined;
-                                    }
+                          if (value === "CATTLE") {
+                            newAnimals[index].subcategory = "Carabull";
+                          } else if (value === "CARABAO") {
+                            newAnimals[index].subcategory = "Caracow";
+                          } else {
+                            newAnimals[index].subcategory = undefined;
+                          }
 
-                                    setAnimals(newAnimals);
-                                }}
-                                
-                            >
-                                <Option value="CATTLE">Cattle</Option>
-                                <Option value="CARABAO">Carabao</Option>
-                                <Option value="GOAT">Goat</Option>
-                                <Option value="SHEEP">Sheep</Option>
-                                <Option value="SWINE">Swine</Option>
-                                <Option value="CHICKEN">Chicken</Option>
-                                <Option value="DUCK">Duck</Option>
-                                <Option value="QUAIL">Quail</Option>
-                                <Option value="TURKEY">Turkey</Option>
-                                <Option value="RABBIT">Rabbit</Option>
-                            </Select>
-                        </Form.Item>
-                    </Col>
-                    <Col span={6}>
-                        <Form.Item label="Subcategory" name={`subcategory_${index}`}>
-                            <Select
-                                placeholder="Select Subcategory"
-                                value={animal.subcategory}
-                                onChange={(value) => {
-                                    const newAnimals = [...animals];
-                                    newAnimals[index].subcategory = value;
-                                    setAnimals(newAnimals);
-                                }}
-                                
-                            >
-                                {animal.animal_type === "CATTLE" && (
-                                    <>
-                                        <Option value="Carabull">Carabull</Option>
-                                        <Option value="Caracow">Caracow</Option>
-                                    </>
-                                )}
-                                {animal.animal_type === "CARABAO" && (
-                                    <>
-                                        <Option value="Carabull">Carabull</Option>
-                                        <Option value="Caracow">Caracow</Option>
-                                    </>
-                                )}
-                                {animal.animal_type === "GOAT" && (
-                                    <>
-                                        <Option value="Buck">Buck</Option>
-                                        <Option value="Doe">Doe</Option>
-                                    </>
-                                )}
-                                {animal.animal_type === "SHEEP" && (
-                                    <>
-                                        <Option value="Ran">Ram</Option>
-                                        <Option value="Ewe">Ewe</Option>
-                                    </>
-                                )}
-                                {animal.animal_type === "SWINE" && (
-                                    <>
-                                        <Option value="Sow">Sow</Option>
-                                        <Option value="Piglet">Piglet</Option>
-                                        <Option value="Boar">Boar</Option>
-                                        <Option value="Fatteners">Fatteners</Option>
-                                    </>
-                                )}
-                                {animal.animal_type === "CHICKEN" && (
-                                    <>
-                                        <Option value="Broiler">Broiler</Option>
-                                        <Option value="Layer">Layer</Option>
-                                        <Option value="Freerange">Freerange</Option>
-                                        <Option value="Gamefowl">Gamefowl</Option>
-                                        <Option value="Fighting Cocks">Fighting Cocks</Option>
-                                    </>
-                                )}
-                                {animal.animal_type === "DUCK" && (
-                                    <>
-                                        <Option value="Drake">Drake</Option>
-                                        <Option value="Hen">Hen</Option>
-                                    </>
-                                )}
-                                 {animal.animal_type === "QUAIL" && (
-                                    <>
-                                        <Option value="Cock">Cock</Option>
-                                        <Option value="Hen">Hen</Option>
-                                    </>
-                                )}
-                                 {animal.animal_type === "TURKEY" && (
-                                    <>
-                                        <Option value="Gobbler">Gobbler</Option>
-                                        <Option value="Hen">Hen</Option>
-                                    </>
-                                )}
-                                 {animal.animal_type === "RABBIT" && (
-                                    <>
-                                        <Option value="Buck">Buck</Option>
-                                        <Option value="Doe">Doe</Option>
-                                    </>
-                                )}
-
-                            </Select>
-                        </Form.Item>
-                    </Col>
-                    <Col span={6}>
-                        <Form.Item label="Quantity" name={`quantity_${index}`}>
-                            <Input
-                                placeholder="Enter Quantity"
-                                type="number"
-                                value={animal.quantity}
-                                onChange={(e) => {
-                                    const newAnimals = [...animals];
-                                    newAnimals[index].quantity = e.target.value;
-                                    setAnimals(newAnimals);
-                                }}
-                                style={inputStyle}
-                            />
-                        </Form.Item>
-                    </Col>
-                    <Col span={2}>
-                        {/* Use Form.Item with label=" " (a space) for alignment */}
-                        <Form.Item label=" "> {/* Add a label with a space */}
-                            <Button
-                                type="primary"
-                                danger
-                                onClick={() => {
-                                    const newAnimals = [...animals];
-                                    newAnimals.splice(index, 1);
-                                    setAnimals(newAnimals);
-                                }}
-                            >
-                                Remove
-                            </Button>
-                        </Form.Item>
-                    </Col>
+                          setAnimals(newAnimals);
+                        }}
+                      >
+                        <Option value="CATTLE">Cattle</Option>
+                        <Option value="CARABAO">Carabao</Option>
+                        <Option value="GOAT">Goat</Option>
+                        <Option value="SHEEP">Sheep</Option>
+                        <Option value="SWINE">Swine</Option>
+                        <Option value="CHICKEN">Chicken</Option>
+                        <Option value="DUCK">Duck</Option>
+                        <Option value="QUAIL">Quail</Option>
+                        <Option value="TURKEY">Turkey</Option>
+                        <Option value="RABBIT">Rabbit</Option>
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                  <Col span={6}>
+                    <Form.Item label="Subcategory" name={`subcategory_${index}`}>
+                      <Select
+                        placeholder="Select Subcategory"
+                        value={animal.subcategory}
+                        onChange={(value) => {
+                          const newAnimals = [...animals];
+                          newAnimals[index].subcategory = value;
+                          setAnimals(newAnimals);
+                        }}
+                      >
+                        {animal.animal_type === "CATTLE" && (
+                          <>
+                            <Option value="Carabull">Carabull</Option>
+                            <Option value="Caracow">Caracow</Option>
+                          </>
+                        )}
+                        {animal.animal_type === "CARABAO" && (
+                          <>
+                            <Option value="Carabull">Carabull</Option>
+                            <Option value="Caracow">Caracow</Option>
+                          </>
+                        )}
+                        {animal.animal_type === "GOAT" && (
+                          <>
+                            <Option value="Buck">Buck</Option>
+                            <Option value="Doe">Doe</Option>
+                          </>
+                        )}
+                        {animal.animal_type === "SHEEP" && (
+                          <>
+                            <Option value="Ran">Ram</Option>
+                            <Option value="Ewe">Ewe</Option>
+                          </>
+                        )}
+                        {animal.animal_type === "SWINE" && (
+                          <>
+                            <Option value="Sow">Sow</Option>
+                            <Option value="Piglet">Piglet</Option>
+                            <Option value="Boar">Boar</Option>
+                            <Option value="Fatteners">Fatteners</Option>
+                          </>
+                        )}
+                        {animal.animal_type === "CHICKEN" && (
+                          <>
+                            <Option value="Broiler">Broiler</Option>
+                            <Option value="Layer">Layer</Option>
+                            <Option value="Freerange">Freerange</Option>
+                            <Option value="Gamefowl">Gamefowl</Option>
+                            <Option value="Fighting Cocks">Fighting Cocks</Option>
+                          </>
+                        )}
+                        {animal.animal_type === "DUCK" && (
+                          <>
+                            <Option value="Drake">Drake</Option>
+                            <Option value="Hen">Hen</Option>
+                          </>
+                        )}
+                        {animal.animal_type === "QUAIL" && (
+                          <>
+                            <Option value="Cock">Cock</Option>
+                            <Option value="Hen">Hen</Option>
+                          </>
+                        )}
+                        {animal.animal_type === "TURKEY" && (
+                          <>
+                            <Option value="Gobbler">Gobbler</Option>
+                            <Option value="Hen">Hen</Option>
+                          </>
+                        )}
+                        {animal.animal_type === "RABBIT" && (
+                          <>
+                            <Option value="Buck">Buck</Option>
+                            <Option value="Doe">Doe</Option>
+                          </>
+                        )}
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                  <Col span={6}>
+                    <Form.Item label="Quantity" name={`quantity_${index}`}>
+                      <Input
+                        placeholder="Enter Quantity"
+                        type="number"
+                        value={animal.quantity}
+                        onChange={(e) => {
+                          const newAnimals = [...animals];
+                          newAnimals[index].quantity = e.target.value;
+                          setAnimals(newAnimals);
+                        }}
+                        style={inputStyle}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col span={2}>
+                    {/* Use Form.Item with label=" " (a space) for alignment */}
+                    <Form.Item label=" "> {/* Add a label with a space */}
+                      <Button
+                        type="primary"
+                        danger
+                        onClick={() => {
+                          const newAnimals = [...animals];
+                          newAnimals.splice(index, 1);
+                          setAnimals(newAnimals);
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </Form.Item>
+                  </Col>
                 </Row>
-            ))}
-                          <Button type="dashed" onClick={addAnimal} style={{ width: "100%", marginBottom: "20px" }}>
+              ))}
+              <Button type="dashed" onClick={addAnimal} style={{ width: "100%", marginBottom: "20px" }}>
                 ADD ANOTHER ANIMAL
               </Button>
             </Card>
@@ -318,6 +330,7 @@ const AddData = () => {
                 borderRadius: "8px 8px 0 0",
               }}
             >
+              {/* Operator Details Form Fields */}
               <Row gutter={24}>
                 <Col span={12}>
                   <Form.Item label="Fishpond Location" name="fishpond_location">
@@ -400,61 +413,209 @@ const AddData = () => {
               }}
             >
               <Row gutter={24}>
-              <Col span={12}>
-                   <Form.Item label="Crop Type" name="crop_type">
-                     <Select
-                       placeholder="Select Crop Type"
-
-                     >
-                       <Option value="Rice">Rice</Option>
-                       <Option value="Spices">Spices</Option>
-                       <Option value="Legumes">Legumes</Option>
-                       <Option value="Vegetable">Vegetable</Option>
-                       <Option value="Cacoa">Cacoa</Option>
-                       <Option value="Banana">Banana</Option>
-                     </Select>
-                   </Form.Item>
-                 </Col>
-                 <Col span={12}>
-                   <Form.Item label="Area Category" name="area_category">
-                     <Select
-                       placeholder="Select Area Category"
-                   
-                     >
-                       <Option value="Irrigated">Irrigated</Option>
-                       <Option value="Rainfed">Rainfed</Option>
-                     </Select>
-                   </Form.Item>
-                 </Col>
-              </Row>
-              <Row gutter={24}>
-              <Col span={12}>
-                   <Form.Item label="Seed Type" name="seed_type">
-                     <Select
-                       placeholder="Select Seed Type"
-                    
-                     >
-                       <Option value="Hybrid Seeds">Hybrid Seeds</Option>
-                       <Option value="Certified Seeds ">Certified Seeds</Option>
-                       <Option value="Good Seeds">Good Seeds</Option>
-                     </Select>
-                   </Form.Item>
-                 </Col>
                 <Col span={12}>
-                  <Form.Item label="Area Harvested" name="Area Harvested">
-                    <Input placeholder="Enter Area Harvested" style={inputStyle} />
+                  <Form.Item label="Crop Type" name="crop_type">
+                    <Select
+                      placeholder="Select Crop Type"
+                      onChange={(value) => setSelectedCrop(value)} // Update selectedCrop state
+                    >
+                      <Option value="Rice">Rice</Option>
+                      <Option value="Spices">Spices</Option>
+                      <Option value="Legumes">Legumes</Option>
+                      <Option value="Vegetable">Vegetable</Option>
+                      <Option value="Cacoa">Cacoa</Option>
+                      <Option value="Banana">Banana</Option>
+                    </Select>
                   </Form.Item>
                 </Col>
-                <Col span={12}>
-                  <Form.Item label="Production" name="Production">
-                    <Input placeholder="Enter Production" style={inputStyle} />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item label="Average Yield" name="Average Yield">
-                    <Input placeholder="Enter Area Harvested" style={inputStyle} />
-                  </Form.Item>
-                </Col>
+                {selectedCrop && cropConfigurations[selectedCrop] && (
+                  cropConfigurations[selectedCrop].map((field) => {
+                    let formItem;
+                    switch (field) {
+                      case 'Name of Buyer':
+                        formItem = (
+                          <Col span={12} key={field}>
+                            <Form.Item label="Name of Buyer" name="name_of_buyer">
+                              <Input placeholder="Enter Name of Buyer" style={inputStyle} />
+                            </Form.Item>
+                          </Col>
+                        );
+                        break;
+                      case 'Spice Type':
+                        if (selectedCrop === 'Spices') {
+                          formItem = (
+                            <Col span={12} key={field}>
+                              <Form.Item label="Spice Type" name="spice_type">
+                                <Select placeholder="Select Spice Type">
+                                  <Option value="Ginger">Ginger</Option>
+                                  <Option value="Onion">Onion</Option>
+                                  <Option value="Hotpepper">Hotpepper</Option>
+                                  <Option value="Sweet Pepper">Sweet Pepper</Option>
+                                  <Option value="Turmeric">Turmeric</Option>
+                                </Select>
+                              </Form.Item>
+                            </Col>
+                          );
+                        }
+                        break;
+                      case 'Legume Type':
+                        if (selectedCrop === 'Legumes') {
+                          formItem = (
+                            <Col span={12} key={field}>
+                              <Form.Item label="Legume Type" name="legume_type">
+                                <Select placeholder="Select Legume Type">
+                                  <Option value="Peanut">Peanut</Option>
+                                  <Option value="Mungbean">Mungbean</Option>
+                                  <Option value="Soybean">Soybean</Option>
+                                </Select>
+                              </Form.Item>
+                            </Col>
+                          );
+                        }
+                        break;
+                      case 'Vegetable Type':
+                        if (selectedCrop === 'Vegetable') {
+                          formItem = (
+                            <Col span={12} key={field}>
+                              <Form.Item label="Vegetable Type" name="vegetable_type">
+                                <Select
+                                  placeholder="Select Vegetable Type"
+                                  onChange={(value) => setSelectedVegetable(value)}
+                                >
+                                  <Option value="Eggplant">Eggplant</Option>
+                                  <Option value="Ampalaya">Ampalaya</Option>
+                                  <Option value="Okra">Okra</Option>
+                                  <Option value="Pole Sitao">Pole Sitao</Option>
+                                  <Option value="Squash">Squash</Option>
+                                  <Option value="Tomato">Tomato</Option>
+                                  <Option value="Other Crop (specify)">Other Crop (specify)</Option>
+                                </Select>
+                              </Form.Item>
+                            </Col>
+                          );
+                        }
+                        break;
+                      case 'Banana Type':
+                        if (selectedCrop === 'Banana') {
+                          formItem = (
+                            <Col span={12} key={field}>
+                              <Form.Item label="Banana Type" name="banana_type">
+                                <Select placeholder="Select Banana Type">
+                                  <Option value="LAKATAN">LAKATAN</Option>
+                                  <Option value="LATUNDAN">LATUNDAN</Option>
+                                  <Option value="CARDAVA">CARDAVA</Option>
+                                </Select>
+                              </Form.Item>
+                            </Col>
+                          );
+                        }
+                        break;
+                      case 'Quantity':
+                        formItem = (
+                          <Col span={12} key={field}>
+                            <Form.Item label="Quantity" name="quantity">
+                              <Input placeholder="Enter Quantity" style={inputStyle} />
+                            </Form.Item>
+                          </Col>
+                        );
+                        break;
+                      case 'Association/Organization':
+                        formItem = (
+                          <Col span={12} key={field}>
+                            <Form.Item label="Association/Organization" name="association_organization">
+                              <Input placeholder="Enter Association/Organization" style={inputStyle} />
+                            </Form.Item>
+                          </Col>
+                        );
+                        break;
+                      case 'Area (hectare)':
+                        formItem = (
+                          <Col span={12} key={field}>
+                            <Form.Item label="Area (hectare)" name="area_hectare">
+                              <Input placeholder="Enter Area (hectare)" style={inputStyle} />
+                            </Form.Item>
+                          </Col>
+                        );
+                        break;
+                      case 'Farm Location Coordinates(longitude)':
+                        formItem = (
+                          <Col span={12} key={field}>
+                            <Form.Item label="Farm Location Coordinates(longitude)" name="farm_location_coordinates_longitude">
+                              <Input placeholder="Enter Longitude" style={inputStyle} />
+                            </Form.Item>
+                          </Col>
+                        );
+                        break;
+                      case 'Farm Location Coordinates(latitude)':
+                        formItem = (
+                          <Col span={12} key={field}>
+                            <Form.Item label="Farm Location Coordinates(latitude)" name="farm_location_coordinates_latitude">
+                              <Input placeholder="Enter Latitude" style={inputStyle} />
+                            </Form.Item>
+                          </Col>
+                        );
+                        break;
+                      case 'Other Vegetable':
+                        if (selectedCrop === 'Vegetable') {
+                          formItem = (
+                            <Col span={12} key={field}>
+                              {selectedVegetable === 'Other Crop (specify)' && (
+                                <Form.Item label="Other Crop (specify)" name="other_vegetable">
+                                  <Input placeholder="Specify Other Vegetable" style={inputStyle} />
+                                </Form.Item>
+                              )}
+                            </Col>
+                          );
+                        }
+                        break;
+                      case 'Area Category':
+                        formItem = (
+                          <Col span={12} key={field}>
+                            <Form.Item label={field} name={field.toLowerCase().replace(/ /g, '_')}>
+                              <Select placeholder={`Select ${field}`}>
+                                <Option value="Irrigated">Irrigated</Option>
+                                <Option value="Rainfed">Rainfed</Option>
+                              </Select>
+                            </Form.Item>
+                          </Col>
+                        );
+                        break;
+                      case 'Seed Type':
+                        formItem = (
+                          <Col span={12} key={field}>
+                            <Form.Item label={field} name={field.toLowerCase().replace(/ /g, '_')}>
+                              <Select placeholder={`Select ${field}`}>
+                                <Option value="Hybrid Seeds">Hybrid Seeds</Option>
+                                <Option value="Certified Seeds ">Certified Seeds</Option>
+                                <Option value="Good Seeds">Good Seeds</Option>
+                              </Select>
+                            </Form.Item>
+                          </Col>
+                        );
+                        break;
+                      case 'Production':
+                      case 'Average Yield (mt/ha)':
+                        formItem = (
+                          <Col span={12} key={field}>
+                            <Form.Item label={field} name={field.toLowerCase().replace(/ /g, '_')}>
+                              <Input placeholder={`Enter ${field}`} style={inputStyle} />
+                            </Form.Item>
+                          </Col>
+                        );
+                        break;
+                      default:
+                        formItem = (
+                          <Col span={12} key={field}>
+                            <Form.Item label={field} name={field.toLowerCase().replace(/ /g, '_')}>
+                              <Input placeholder={`Enter ${field}`} style={inputStyle} />
+                            </Form.Item>
+                          </Col>
+                        );
+                        break;
+                    }
+                    return formItem;
+                  })
+                )}
               </Row>
             </Card>
           )}
