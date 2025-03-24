@@ -36,30 +36,36 @@ const AddData = () => {
     ],
     Spices: [
       "Name of Buyer",
+      "Market Outlet Location",
       "Spice Type",
       "Quantity",
       "Association/Organization",
       "Production Type",
+      "Farm Address",
       "Area (hectare)",
       "Farm Location Coordinates(longitude)",
       "Farm Location Coordinates(latitude)",
     ],
     Legumes: [
       "Name of Buyer",
+      "Market Outlet Location",
       "Legume Type",
       "Quantity",
       "Association/Organization",
       "Production Type",
+      "Farm Address",
       "Area (hectare)",
       "Farm Location Coordinates(longitude)",
       "Farm Location Coordinates(latitude)",
     ],
     Vegetable: [
       "Name of Buyer",
+      "Market Outlet Location",
       "Vegetable Type",
       "Quantity",
       "Association/Organization",
       "Production Type",
+      "Farm Address",
       "Area (hectare)",
       "Farm Location Coordinates(longitude)",
       "Farm Location Coordinates(latitude)",
@@ -70,6 +76,7 @@ const AddData = () => {
       "Month",
       "Quantity",
       "Name of Buyer",
+      "Farm Address",
       "Association/Organization",
       "Production Type",
       "Variety Clone",
@@ -79,8 +86,10 @@ const AddData = () => {
     ],
     Banana: [
       "Name of Buyer",
+      "Market Outlet Location",
       "Banana Type",
       "Quantity",
+      "Farm Address",
       "Association/Organization",
       "Production Type",
       "Area (hectare)",
@@ -95,8 +104,16 @@ const AddData = () => {
       const formattedData = {
         farmer: {
           name: values.name,
-          address: values.address,
+          home_address: values.home_address,
           contact_number: values.contact_number,
+          facebook_email: values.facebook_email,
+          farm_address: values.farm_address,
+          farm_location_latitude: values.farm_location_latitude,
+          farm_location_longitude: values.farm_location_longitude,
+          market_outlet_location: values.market_outlet_location,
+          buyer_name: values.buyer_name,
+          association_organization: values.association_organization,
+          barangay: values.barangay,
         },
       };
 
@@ -202,13 +219,10 @@ const AddData = () => {
   };
 
   return (
-    <div style={{ margin: "10px" }}>
-      <h2 style={{ fontWeight: "bold", margin: 0, lineHeight: "1" }}>
-        Add Data
-      </h2>
+    <div style={{ margin: "px" }}>
       <div
         style={{
-          padding: "20px",
+          padding: "40px",
           backgroundColor: "#FFFFFF",
           maxHeight: "750px",
           overflowY: "auto",
@@ -619,10 +633,7 @@ const AddData = () => {
                       case "Name of Buyer":
                         formItem = (
                           <Col span={12} key={field}>
-                            <Form.Item
-                              label="Name of Buyer"
-                              name="name_of_buyer"
-                            >
+                            <Form.Item label="Name of Buyer" name="buyer_name">
                               <Input
                                 placeholder="Enter Name of Buyer"
                                 style={inputStyle}
@@ -745,6 +756,36 @@ const AddData = () => {
                           </Col>
                         );
                         break;
+                      case "Farm Address":
+                        formItem = (
+                          <Col span={12} key={field}>
+                            <Form.Item
+                              label={field}
+                              name={field.toLowerCase().replace(/ /g, "_")}
+                            >
+                              <Input
+                                placeholder="Enter Farm Address"
+                                style={inputStyle}
+                              />
+                            </Form.Item>
+                          </Col>
+                        );
+                        break;
+                      case "Market Outlet Location":
+                        formItem = (
+                          <Col span={12} key={field}>
+                            <Form.Item
+                              label={field}
+                              name="market_outlet_location"
+                            >
+                              <Input
+                                placeholder="Enter Market Outlet Location"
+                                style={inputStyle}
+                              />
+                            </Form.Item>
+                          </Col>
+                        );
+                        break;
                       case "Association/Organization":
                         formItem = (
                           <Col span={12} key={field}>
@@ -795,7 +836,7 @@ const AddData = () => {
                           <Col span={12} key={field}>
                             <Form.Item
                               label="Farm Location Coordinates(longitude)"
-                              name="farm_location_coordinates_longitude"
+                              name="farm_location_longitude"
                             >
                               <Input
                                 placeholder="Enter Longitude"
@@ -810,7 +851,7 @@ const AddData = () => {
                           <Col span={12} key={field}>
                             <Form.Item
                               label="Farm Location Coordinates(latitude)"
-                              name="farm_location_coordinates_latitude"
+                              name="farm_location_latitude"
                             >
                               <Input
                                 placeholder="Enter Latitude"
