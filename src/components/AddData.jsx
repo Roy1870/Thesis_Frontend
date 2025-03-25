@@ -25,26 +25,22 @@ const AddData = () => {
   ]);
   const [selectedCrop, setSelectedCrop] = useState(null); // New state for selected crop
   const [selectedVegetable, setSelectedVegetable] = useState(null); // State to track selected vegetable
+  const [additionalRiceDetails, setAdditionalRiceDetails] = useState([{ areaType: '', seedType: '', production: '' }]);
+
 
   const cropConfigurations = {
-    Rice: [
-      "Area Type",
-      "Seed Type",
-      "Area Harvested",
-      "Production",
-      "Average Yield (mt/ha)",
-    ],
+   
     Spices: [
       "Name of Buyer",
       "Market Outlet Location",
-      "Spice Type",
-      "Quantity",
       "Association/Organization",
-      "Production Type",
+      "Cropping Intensity",
       "Farm Address",
       "Area (hectare)",
       "Farm Location Coordinates(longitude)",
       "Farm Location Coordinates(latitude)",
+      "Spice Type",
+      "Quantity",
     ],
     Legumes: [
       "Name of Buyer",
@@ -52,7 +48,7 @@ const AddData = () => {
       "Legume Type",
       "Quantity",
       "Association/Organization",
-      "Production Type",
+      "Cropping Intensity",
       "Farm Address",
       "Area (hectare)",
       "Farm Location Coordinates(longitude)",
@@ -64,7 +60,7 @@ const AddData = () => {
       "Vegetable Type",
       "Quantity",
       "Association/Organization",
-      "Production Type",
+      "Cropping Intensity",
       "Farm Address",
       "Area (hectare)",
       "Farm Location Coordinates(longitude)",
@@ -78,7 +74,7 @@ const AddData = () => {
       "Name of Buyer",
       "Farm Address",
       "Association/Organization",
-      "Production Type",
+      "Cropping Intensity",
       "Variety Clone",
       "Area (hectare)",
       "Longitude",
@@ -91,13 +87,26 @@ const AddData = () => {
       "Quantity",
       "Farm Address",
       "Association/Organization",
-      "Production Type",
+      "Cropping Intensity",
       "Area (hectare)",
       "Farm Location Coordinates(longitude)",
       "Farm Location Coordinates(latitude)",
     ],
   };
+  const handleFarmerTypeChange = (value) => {
+    setFarmerType(value);
+    setSelectedCrop(null); // Reset selected crop when farmer type changes
+  };
 
+  const handleAddAdditionalRice = () => {
+    setAdditionalRiceDetails([...additionalRiceDetails, { areaType: '', seedType: '', production: '' }]);
+  };
+
+  const handleRemoveAdditionalRice = (index) => {
+    const newAdditionalRiceDetails = [...additionalRiceDetails];
+    newAdditionalRiceDetails.splice(index, 1);
+    setAdditionalRiceDetails(newAdditionalRiceDetails);
+  };
   const handleSubmit = async (values) => {
     try {
       // Construct base JSON structure
@@ -217,6 +226,7 @@ const AddData = () => {
       { animal_type: "", subcategory: "", quantity: "" },
     ]);
   };
+  
 
   return (
     <div style={{ margin: "px" }}>
@@ -280,7 +290,72 @@ const AddData = () => {
               </Col>
               <Col span={12}>
                 <Form.Item label="Barangay" name="barangay">
-                  <Input placeholder="Enter barangay" style={inputStyle} />
+                  <Select
+                    placeholder="Select a Barangay"
+                  >
+                    <Option value="Agusan Pequeño">Agusan Pequeño</Option>
+                    <Option value="Ambago">Ambago</Option>
+                    <Option value="Amparo">Amparo</Option>
+                    <Option value="Ampayon">Ampayon</Option>
+                    <Option value="Anticala">Anticala</Option>
+                    <Option value="Antongalon">Antongalon</Option>
+                    <Option value="Aupagan">Aupagan</Option>
+                    <Option value="Baan Km. 3">Baan Km. 3</Option>
+                    <Option value="Babag">Babag</Option>
+                    <Option value="Bading">Bading</Option>
+                    <Option value="Bancasi">Bancasi</Option>
+                    <Option value="Banza">Banza</Option>
+                    <Option value="Baobaoan">Baobaoan</Option>
+                    <Option value="Basag">Basag</Option>
+                    <Option value="Bayanihan">Bayanihan</Option>
+                    <Option value="Bilay">Bilay</Option>
+                    <Option value="Bitan-agan">Bitan-agan</Option>
+                    <Option value="Bit-os">Bit-os</Option>
+                    <Option value="Bobon">Bobon</Option>
+                    <Option value="Bonbon">Bonbon</Option>
+                    <Option value="Bugsukan">Bugsukan</Option>
+                    <Option value="Buhangin">Buhangin</Option>
+                    <Option value="Cabcabon">Cabcabon</Option>
+                    <Option value="Camayahan">Camayahan</Option>
+                    <Option value="Dankias">Dankias</Option>
+                    <Option value="De Oro">De Oro</Option>
+                    <Option value="Don Francisco">Don Francisco</Option>
+                    <Option value="Doongan">Doongan</Option>
+                    <Option value="Dulag">Dulag</Option>
+                    <Option value="Dumalagan">Dumalagan</Option>
+                    <Option value="Florida">Florida</Option>
+                    <Option value="Kinamlutan">Kinamlutan</Option>
+                    <Option value="Lemon">Lemon</Option>
+                    <Option value="Libertad">Libertad</Option>
+                    <Option value="Los Angeles">Los Angeles</Option>
+                    <Option value="Lumbocan">Lumbocan</Option>
+                    <Option value="MJ Santos">MJ Santos</Option>
+                    <Option value="Maguinda">Maguinda</Option>
+                    <Option value="Mahay">Mahay</Option>
+                    <Option value="Mahogany">Mahogany</Option>
+                    <Option value="Maibu">Maibu</Option>
+                    <Option value="Mandamo">Mandamo</Option>
+                    <Option value="Masao">Masao</Option>
+                    <Option value="Maug">Maug</Option>
+                    <Option value="Manila de Bugabus">Manila de Bugabus</Option>
+                    <Option value="Nongnong">Nongnong</Option>
+                    <Option value="Pianing">Pianing</Option>
+                    <Option value="Pigdaulan">Pigdaulan</Option>
+                    <Option value="Pinamanculan">Pinamanculan</Option>
+                    <Option value="Salvacion">Salvacion</Option>
+                    <Option value="San Mateo">San Mateo</Option>
+                    <Option value="San Vicente">San Vicente</Option>
+                    <Option value="Sto Niño">Sto Niño</Option>
+                    <Option value="Sumile">Sumile</Option>
+                    <Option value="Sumilihon">Sumilihon</Option>
+                    <Option value="Tagabaca">Tagabaca</Option>
+                    <Option value="Taguibo">Taguibo</Option>
+                    <Option value="Taligaman">Taligaman</Option>
+                    <Option value="Tiniwisan">Tiniwisan</Option>
+                    <Option value="Tungao">Tungao</Option>
+                    <Option value="Villa Kananga">Villa Kananga</Option>
+                  </Select>
+         
                 </Form.Item>
               </Col>
             </Row>
@@ -291,14 +366,7 @@ const AddData = () => {
                   <Input placeholder="Enter home address" style={inputStyle} />
                 </Form.Item>
               </Col>
-              <Col span={12}>
-                <Form.Item label="Date" name="date">
-                  <DatePicker style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-            </Row>
 
-            <Row gutter={24}>
               <Col span={12}>
                 <Form.Item label="Farmer Type" name="farmer_type">
                   <Select
@@ -600,14 +668,18 @@ const AddData = () => {
 
           {farmerType === "Grower" && (
             <Card
-              title=""
+              title="Grower Details"
               style={{
                 marginBottom: "20px",
                 borderRadius: "8px",
                 backgroundColor: lighterShade,
                 border: `1px solid ${borderColor}`,
               }}
-              headStyle={{}}
+              headStyle={{
+                background: headerColor,
+                color: "#ffffff",
+                borderRadius: "8px 8px 0 0",
+              }}
             >
               <Row gutter={24}>
                 <Col span={12}>
@@ -625,6 +697,80 @@ const AddData = () => {
                     </Select>
                   </Form.Item>
                 </Col>
+                {selectedCrop === "Rice" && (
+              <>
+                
+            
+                <Col span={12}>
+                  <Form.Item label="Average Yield (mt/ha)" name="ave_yield">
+                    <Input
+                      placeholder="Enter Average Yield (mt/ha)"
+                      style={inputStyle}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item label="Area Harvested " name="area_harvested">
+                    <Input
+                      placeholder="Enter Area Harvested "
+                      style={inputStyle}
+                    />
+                  </Form.Item>
+                </Col>
+                {/* Removed Raiser Details section */}
+                <Col span={24}>
+                  {additionalRiceDetails.map((riceDetail, index) => (
+                    <Row gutter={12} key={index} style={{ marginBottom: '10px' }}>
+                      <Col span={8}>
+                        <Form.Item
+                          label="Area Type"
+                          name={`additionalRice[${index}].areaType`}
+                         
+                        >
+                          <Select placeholder="Select Area Type">
+                            <Option value="Irrigated">Irrigated</Option>
+                            <Option value="Rainfed">Rainfed</Option>
+                          </Select>
+                        </Form.Item>
+                      </Col>
+                      <Col span={8}>
+                        <Form.Item
+                          label="Seed Type"
+                          name={`additionalRice[${index}].seedType`}
+                        >
+                          <Select placeholder="Select Seed Type">
+                            <Option value="Hybrid Seeds">Hybrid Seeds</Option>
+                            <Option value="Certified Seeds">Certified Seeds</Option>
+                            <Option value="Good Seeds">Good Seeds</Option>
+                            {/* Add more seed types as needed */}
+                          </Select>
+                        </Form.Item>
+                      </Col>
+                      <Col span={6}>
+                        <Form.Item
+                          label="Production"
+                          name={`additionalRice[${index}].production`}
+                          
+                        >
+                          <Input type="number" placeholder="Enter Production" style={inputStyle} />
+                        </Form.Item>
+                      </Col>
+                      {additionalRiceDetails.length > 1 && (
+                        <Col span={2} style={{ textAlign: 'right', marginTop: '30px' }}>
+                          <Button type="primary" danger onClick={() => handleRemoveAdditionalRice(index)}>
+                            
+                            Remove
+                          </Button>
+                        </Col>
+                      )}
+                    </Row>
+                  ))}
+                  <Button type="dashed" onClick={handleAddAdditionalRice} style={{ width: '100%', marginTop: '10px' }}>
+                    ADD ANOTHER RICE
+                  </Button>
+                </Col>
+              </>
+            )}
                 {selectedCrop &&
                   cropConfigurations[selectedCrop] &&
                   cropConfigurations[selectedCrop].map((field) => {
@@ -816,20 +962,23 @@ const AddData = () => {
                           </Col>
                         );
                         break;
-                      case "Production Type":
+                      case "Cropping Intensity":
                         formItem = (
-                          <Col span={12} key={field}>
-                            <Form.Item
-                              label="Production Type"
-                              name="production_type"
-                            >
-                              <Input
-                                placeholder="Enter Area (hectare)"
-                                style={inputStyle}
-                              />
-                            </Form.Item>
-                          </Col>
-                        );
+                          <Col span={12} key="cropping_intensity">
+                          <Form.Item
+                            label="Cropping Intensity"
+                            name="cropping_intensity"
+                          >
+                            <Select placeholder="Select Cropping Intensity">
+                              <Select.Option value="year_round">Year Round</Select.Option>
+                              <Select.Option value="quarterly">Quarterly</Select.Option>
+                              <Select.Option value="seasonal">Seasonal</Select.Option>
+                              <Select.Option value="annually">Annually</Select.Option>
+                              <Select.Option value="twice_a_month">Twice a Month</Select.Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                                           );
                         break;
                       case "Farm Location Coordinates(longitude)":
                         formItem = (
