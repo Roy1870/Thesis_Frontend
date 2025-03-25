@@ -25,11 +25,11 @@ const AddData = () => {
   ]);
   const [selectedCrop, setSelectedCrop] = useState(null); // New state for selected crop
   const [selectedVegetable, setSelectedVegetable] = useState(null); // State to track selected vegetable
-  const [additionalRiceDetails, setAdditionalRiceDetails] = useState([{ areaType: '', seedType: '', production: '' }]);
-
+  const [additionalRiceDetails, setAdditionalRiceDetails] = useState([
+    { area_type: "", seed_type: "", production: "" },
+  ]);
 
   const cropConfigurations = {
-   
     Spices: [
       "Name of Buyer",
       "Market Outlet Location",
@@ -99,7 +99,10 @@ const AddData = () => {
   };
 
   const handleAddAdditionalRice = () => {
-    setAdditionalRiceDetails([...additionalRiceDetails, { areaType: '', seedType: '', production: '' }]);
+    setAdditionalRiceDetails([
+      ...additionalRiceDetails,
+      { area_type: "", seed_type: "", production: "" },
+    ]);
   };
 
   const handleRemoveAdditionalRice = (index) => {
@@ -109,21 +112,12 @@ const AddData = () => {
   };
   const handleSubmit = async (values) => {
     try {
-      // Construct base JSON structure
       const formattedData = {
-        farmer: {
-          name: values.name,
-          home_address: values.home_address,
-          contact_number: values.contact_number,
-          facebook_email: values.facebook_email,
-          farm_address: values.farm_address,
-          farm_location_latitude: values.farm_location_latitude,
-          farm_location_longitude: values.farm_location_longitude,
-          market_outlet_location: values.market_outlet_location,
-          buyer_name: values.buyer_name,
-          association_organization: values.association_organization,
-          barangay: values.barangay,
-        },
+        name: values.name,
+        home_address: values.home_address,
+        contact_number: values.contact_number,
+        facebook_email: values.facebook_email,
+        barangay: values.barangay,
       };
 
       // Conditionally add crops if it's NOT "Rice"
@@ -149,40 +143,70 @@ const AddData = () => {
             area_hectare: values.area_hectare
               ? parseFloat(values.area_hectare)
               : undefined,
-            production_type: values.production_type,
+            production_type: values.cropping_intensity,
             production_data: JSON.stringify(productionData), // Convert to JSON
           },
         ];
       }
 
-      // Conditionally add rice if "Rice" is selected
+      let riceEntries = [];
+
+      // ✅ Ensure all values exist before adding to rice array
       if (values.crop_type === "Rice") {
-        formattedData.rice = [
-          {
-            area_type: values.area_type || undefined,
-            seed_type: values.seed_type || undefined,
-            area_harvested: values.area_harvested
-              ? parseFloat(values.area_harvested)
-              : undefined,
-            production: values.production
-              ? parseFloat(values.production)
-              : undefined,
-            ave_yield: values.ave_yield
-              ? parseFloat(values.ave_yield)
-              : undefined,
-          },
-        ];
+        const mainRiceEntry = {
+          area_type: values.area_type || undefined,
+          seed_type: values.seed_type || undefined,
+          area_harvested: values.area_harvested
+            ? parseFloat(values.area_harvested)
+            : undefined,
+          production: values.production
+            ? parseFloat(values.production)
+            : undefined,
+          ave_yield: values.ave_yield
+            ? parseFloat(values.ave_yield)
+            : undefined,
+        };
+
+        // 🚨 Prevent empty rice object from being added
+        if (Object.values(mainRiceEntry).some((val) => val !== undefined)) {
+          riceEntries.push(mainRiceEntry);
+        }
       }
 
-      // Debugging: Print formatted JSON
+      // ✅ Handle additional rice entries correctly
+      if (Array.isArray(values.additionalRice)) {
+        values.additionalRice.forEach((rice, index) => {
+          const riceEntry = {
+            area_type: rice.area_type || undefined,
+            seed_type: rice.seed_type || undefined,
+            area_harvested: rice.area_harvested
+              ? parseFloat(rice.area_harvested)
+              : undefined,
+            production: rice.production
+              ? parseFloat(rice.production)
+              : undefined,
+            ave_yield: rice.ave_yield ? parseFloat(rice.ave_yield) : undefined,
+          };
+
+          // 🚨 Prevent empty objects from being added
+          if (Object.values(riceEntry).some((val) => val !== undefined)) {
+            riceEntries.push(riceEntry);
+          }
+        });
+      }
+
+      // ✅ Only include `rice` key if there are valid entries
+      if (riceEntries.length > 0) {
+        formattedData.rice = riceEntries;
+      }
+
       console.log(
         "Formatted JSON Data:",
         JSON.stringify(formattedData, null, 2)
       );
 
-      // Send data to API
       const response = await axios.post(
-        "http://localhost:8000/api/growers",
+        "http://localhost:8000/api/farmers",
         formattedData,
         {
           headers: {
@@ -192,14 +216,14 @@ const AddData = () => {
         }
       );
 
-      // Handle response
       if (response.status === 200) {
         message.success("Data submitted successfully!");
         form.resetFields();
         setFarmerType(null);
         setAnimals([{ animal_type: "", subcategory: "", quantity: "" }]);
-        setSelectedCrop(null); // Reset selected crop
-        setSelectedVegetable(null); // Reset selected vegetable
+        setSelectedCrop(null);
+        setSelectedVegetable(null);
+        setAdditionalRiceDetails([]);
       } else {
         message.error("Failed to submit data.");
       }
@@ -226,7 +250,6 @@ const AddData = () => {
       { animal_type: "", subcategory: "", quantity: "" },
     ]);
   };
-  
 
   return (
     <div style={{ margin: "px" }}>
@@ -290,9 +313,7 @@ const AddData = () => {
               </Col>
               <Col span={12}>
                 <Form.Item label="Barangay" name="barangay">
-                  <Select
-                    placeholder="Select a Barangay"
-                  >
+                  <Select placeholder="Select a Barangay">
                     <Option value="Agusan Pequeño">Agusan Pequeño</Option>
                     <Option value="Ambago">Ambago</Option>
                     <Option value="Amparo">Amparo</Option>
@@ -355,7 +376,6 @@ const AddData = () => {
                     <Option value="Tungao">Tungao</Option>
                     <Option value="Villa Kananga">Villa Kananga</Option>
                   </Select>
-         
                 </Form.Item>
               </Col>
             </Row>
@@ -698,79 +718,112 @@ const AddData = () => {
                   </Form.Item>
                 </Col>
                 {selectedCrop === "Rice" && (
-              <>
-                
-            
-                <Col span={12}>
-                  <Form.Item label="Average Yield (mt/ha)" name="ave_yield">
-                    <Input
-                      placeholder="Enter Average Yield (mt/ha)"
-                      style={inputStyle}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item label="Area Harvested " name="area_harvested">
-                    <Input
-                      placeholder="Enter Area Harvested "
-                      style={inputStyle}
-                    />
-                  </Form.Item>
-                </Col>
-                {/* Removed Raiser Details section */}
-                <Col span={24}>
-                  {additionalRiceDetails.map((riceDetail, index) => (
-                    <Row gutter={12} key={index} style={{ marginBottom: '10px' }}>
-                      <Col span={8}>
-                        <Form.Item
-                          label="Area Type"
-                          name={`additionalRice[${index}].areaType`}
-                         
-                        >
-                          <Select placeholder="Select Area Type">
-                            <Option value="Irrigated">Irrigated</Option>
-                            <Option value="Rainfed">Rainfed</Option>
-                          </Select>
-                        </Form.Item>
-                      </Col>
-                      <Col span={8}>
-                        <Form.Item
-                          label="Seed Type"
-                          name={`additionalRice[${index}].seedType`}
-                        >
-                          <Select placeholder="Select Seed Type">
-                            <Option value="Hybrid Seeds">Hybrid Seeds</Option>
-                            <Option value="Certified Seeds">Certified Seeds</Option>
-                            <Option value="Good Seeds">Good Seeds</Option>
-                            {/* Add more seed types as needed */}
-                          </Select>
-                        </Form.Item>
-                      </Col>
-                      <Col span={6}>
-                        <Form.Item
-                          label="Production"
-                          name={`additionalRice[${index}].production`}
-                          
-                        >
-                          <Input type="number" placeholder="Enter Production" style={inputStyle} />
-                        </Form.Item>
-                      </Col>
-                      {additionalRiceDetails.length > 1 && (
-                        <Col span={2} style={{ textAlign: 'right', marginTop: '30px' }}>
-                          <Button type="primary" danger onClick={() => handleRemoveAdditionalRice(index)}>
-                            
-                            Remove
-                          </Button>
+                  <>
+                    <Button
+                      type="dashed"
+                      onClick={handleAddAdditionalRice}
+                      style={{ width: "100%", marginBottom: "10px" }}
+                    >
+                      ADD ANOTHER RICE ENTRY
+                    </Button>
+
+                    {additionalRiceDetails.map((riceDetail, index) => (
+                      <Row
+                        gutter={12}
+                        key={index}
+                        style={{ marginBottom: "10px" }}
+                      >
+                        {/* Area Type */}
+                        <Col span={4}>
+                          <Form.Item
+                            label="Area Type"
+                            name={["additionalRice", index, "area_type"]}
+                          >
+                            <Select placeholder="Select Area Type">
+                              <Option value="Irrigated">Irrigated</Option>
+                              <Option value="Rainfed">Rainfed</Option>
+                            </Select>
+                          </Form.Item>
                         </Col>
-                      )}
-                    </Row>
-                  ))}
-                  <Button type="dashed" onClick={handleAddAdditionalRice} style={{ width: '100%', marginTop: '10px' }}>
-                    ADD ANOTHER RICE
-                  </Button>
-                </Col>
-              </>
-            )}
+
+                        {/* Seed Type */}
+                        <Col span={4}>
+                          <Form.Item
+                            label="Seed Type"
+                            name={["additionalRice", index, "seed_type"]}
+                          >
+                            <Select placeholder="Select Seed Type">
+                              <Option value="Hybrid Seeds">Hybrid Seeds</Option>
+                              <Option value="Certified Seeds">
+                                Certified Seeds
+                              </Option>
+                              <Option value="Good Seeds">Good Seeds</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+
+                        {/* Area Harvested */}
+                        <Col span={4}>
+                          <Form.Item
+                            label="Area Harvested"
+                            name={["additionalRice", index, "area_harvested"]}
+                          >
+                            <Input
+                              type="number"
+                              placeholder="Enter Area Harvested"
+                              style={inputStyle}
+                            />
+                          </Form.Item>
+                        </Col>
+
+                        {/* Production */}
+                        <Col span={4}>
+                          <Form.Item
+                            label="Production"
+                            name={["additionalRice", index, "production"]}
+                          >
+                            <Input
+                              type="number"
+                              placeholder="Enter Production"
+                              style={inputStyle}
+                            />
+                          </Form.Item>
+                        </Col>
+
+                        {/* Average Yield */}
+                        <Col span={4}>
+                          <Form.Item
+                            label="Average Yield (mt/ha)"
+                            name={["additionalRice", index, "ave_yield"]}
+                          >
+                            <Input
+                              type="number"
+                              placeholder="Enter Average Yield"
+                              style={inputStyle}
+                            />
+                          </Form.Item>
+                        </Col>
+
+                        {/* Remove Button */}
+                        {additionalRiceDetails.length > 1 && (
+                          <Col
+                            span={2}
+                            style={{ textAlign: "right", marginTop: "30px" }}
+                          >
+                            <Button
+                              type="primary"
+                              danger
+                              onClick={() => handleRemoveAdditionalRice(index)}
+                            >
+                              Remove
+                            </Button>
+                          </Col>
+                        )}
+                      </Row>
+                    ))}
+                  </>
+                )}
+
                 {selectedCrop &&
                   cropConfigurations[selectedCrop] &&
                   cropConfigurations[selectedCrop].map((field) => {
@@ -965,20 +1018,30 @@ const AddData = () => {
                       case "Cropping Intensity":
                         formItem = (
                           <Col span={12} key="cropping_intensity">
-                          <Form.Item
-                            label="Cropping Intensity"
-                            name="cropping_intensity"
-                          >
-                            <Select placeholder="Select Cropping Intensity">
-                              <Select.Option value="year_round">Year Round</Select.Option>
-                              <Select.Option value="quarterly">Quarterly</Select.Option>
-                              <Select.Option value="seasonal">Seasonal</Select.Option>
-                              <Select.Option value="annually">Annually</Select.Option>
-                              <Select.Option value="twice_a_month">Twice a Month</Select.Option>
-                            </Select>
-                          </Form.Item>
-                        </Col>
-                                           );
+                            <Form.Item
+                              label="Cropping Intensity"
+                              name="cropping_intensity"
+                            >
+                              <Select placeholder="Select Cropping Intensity">
+                                <Select.Option value="year_round">
+                                  Year Round
+                                </Select.Option>
+                                <Select.Option value="quarterly">
+                                  Quarterly
+                                </Select.Option>
+                                <Select.Option value="seasonal">
+                                  Seasonal
+                                </Select.Option>
+                                <Select.Option value="annually">
+                                  Annually
+                                </Select.Option>
+                                <Select.Option value="twice_a_month">
+                                  Twice a Month
+                                </Select.Option>
+                              </Select>
+                            </Form.Item>
+                          </Col>
+                        );
                         break;
                       case "Farm Location Coordinates(longitude)":
                         formItem = (

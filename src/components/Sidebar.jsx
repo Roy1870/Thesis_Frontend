@@ -160,7 +160,9 @@ const Sidebar = () => {
         )}
       </Menu>
 
-      <div className={"profile " + (selectedKey === "/profile" ? "selected" : "")}>
+      <div
+        className={"profile " + (selectedKey === "/profile" ? "selected" : "")}
+      >
         <Dropdown overlay={profileMenu} trigger={["click"]}>
           <a onClick={(e) => e.preventDefault()}>
             <Space>
