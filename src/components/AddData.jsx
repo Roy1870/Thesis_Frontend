@@ -29,44 +29,25 @@ const AddData = () => {
     { area_type: "", seed_type: "", production: "" },
   ]);
 
+  const [additionalSpiceDetails, setAdditionalSpiceDetails] = useState([
+    { spices_type: "", quantity: "",  },
+  ]);
+
+  const [additionalLegumesDetails, setAdditionalLegumesDetails] = useState([
+    { legumes_type: "", quantity: "",  },
+  ]);
+
+  const [additionalBananaDetails, setAdditionalBananaDetails] = useState([
+    { banana_type: "", quantity: "",  },
+  ]);
+
+  
+  const [additionalVegetableDetails, setAdditionalVegetableDetails] = useState([
+    { vegetable_type: "", quantity: "", other_vegetable: "" },
+  ]);
+
   const cropConfigurations = {
-    Spices: [
-      "Name of Buyer",
-      "Market Outlet Location",
-      "Association/Organization",
-      "Cropping Intensity",
-      "Farm Address",
-      "Area (hectare)",
-      "Farm Location Coordinates(longitude)",
-      "Farm Location Coordinates(latitude)",
-      "Spice Type",
-      "Quantity",
-    ],
-    Legumes: [
-      "Name of Buyer",
-      "Market Outlet Location",
-      "Legume Type",
-      "Quantity",
-      "Association/Organization",
-      "Cropping Intensity",
-      "Farm Address",
-      "Area (hectare)",
-      "Farm Location Coordinates(longitude)",
-      "Farm Location Coordinates(latitude)",
-    ],
-    Vegetable: [
-      "Name of Buyer",
-      "Market Outlet Location",
-      "Vegetable Type",
-      "Quantity",
-      "Association/Organization",
-      "Cropping Intensity",
-      "Farm Address",
-      "Area (hectare)",
-      "Farm Location Coordinates(longitude)",
-      "Farm Location Coordinates(latitude)",
-      "Other Vegetable",
-    ],
+    
     Cacao: [
       "Market Outlet Location",
       "Month",
@@ -77,21 +58,10 @@ const AddData = () => {
       "Cropping Intensity",
       "Variety Clone",
       "Area (hectare)",
-      "Longitude",
-      "Latitude",
-    ],
-    Banana: [
-      "Name of Buyer",
-      "Market Outlet Location",
-      "Banana Type",
-      "Quantity",
-      "Farm Address",
-      "Association/Organization",
-      "Cropping Intensity",
-      "Area (hectare)",
       "Farm Location Coordinates(longitude)",
       "Farm Location Coordinates(latitude)",
     ],
+   
   };
   const handleFarmerTypeChange = (value) => {
     setFarmerType(value);
@@ -110,6 +80,61 @@ const AddData = () => {
     newAdditionalRiceDetails.splice(index, 1);
     setAdditionalRiceDetails(newAdditionalRiceDetails);
   };
+
+  const handleAddAdditionalSpice = () => {
+    setAdditionalSpiceDetails([
+      ...additionalSpiceDetails,
+      { spices_type: "", quantity: "" },
+    ]);
+  };
+
+  const handleRemoveAdditionalSpice = (index) => {
+    const newAdditionalSpiceDetails = [...additionalSpiceDetails];
+    newAdditionalSpiceDetails.splice(index, 1);
+    setAdditionalSpiceDetails(newAdditionalSpiceDetails);
+  };
+
+
+  const handleRemoveAdditionalLegumes = (index) => {
+    const newAdditionalLegumesDetails = [...additionalLegumesDetails];
+    newAdditionalLegumesDetails.splice(index, 1);
+    setAdditionalLegumesDetails(newAdditionalLegumesDetails);
+  };
+
+  const handleAddAdditionalLegumes= () => {
+    setAdditionalLegumesDetails([
+      ...additionalLegumesDetails,
+      { legumes_type: "", quantity: "" },
+    ]);
+  };
+
+  const handleRemoveAdditionalBanana = (index) => {
+    const newAdditionalBananaDetails = [...additionalBananaDetails];
+    newAdditionalBananaDetails.splice(index, 1);
+    setAdditionalBananaDetails(newAdditionalBananaDetails);
+  };
+
+  const handleAddAdditionalBanana= () => {
+    setAdditionalBananaDetails([
+      ...additionalBananaDetails,
+      { banana_type: "", quantity: "" },
+    ]);
+  };
+
+  const handleRemoveAdditionalVegetable = (index) => {
+    const newAdditionalVegetableDetails = [...additionalVegetableDetails];
+    newAdditionalVegetableDetails.splice(index, 1);
+    setAdditionalVegetableDetails(newAdditionalVegetableDetails);
+  };
+
+  const handleAddAdditionalVegetable= () => {
+    setAdditionalVegetableDetails([
+      ...additionalVegetableDetails,
+      { vegetable_type: "", quantity: "", other_vegetable: "", },
+    ]);
+  };
+  
+  
   const handleSubmit = async (values) => {
     try {
       const formattedData = {
@@ -292,7 +317,7 @@ const AddData = () => {
                 </Form.Item>
               </Col>
               <Col span={12}>
-                <Form.Item label="Contact Number" name="contact_number">
+                <Form.Item  rules={[{ required: true }]} label="Contact Number" name="contact number">
                   <Input
                     prefix={<PhoneOutlined style={{ color: headerColor }} />}
                     placeholder="Enter contact number"
@@ -304,7 +329,7 @@ const AddData = () => {
 
             <Row gutter={24}>
               <Col span={12}>
-                <Form.Item label="Facebook/Email" name="facebook_email">
+                <Form.Item  rules={[{ required: true }]} label="Facebook/Email" name="facebook_email">
                   <Input
                     placeholder="Enter Facebook or Email"
                     style={inputStyle}
@@ -312,7 +337,7 @@ const AddData = () => {
                 </Form.Item>
               </Col>
               <Col span={12}>
-                <Form.Item label="Barangay" name="barangay">
+                <Form.Item  rules={[{ required: true }]} label="Barangay" name="barangay">
                   <Select placeholder="Select a Barangay">
                     <Option value="Agusan Pequeño">Agusan Pequeño</Option>
                     <Option value="Ambago">Ambago</Option>
@@ -382,7 +407,7 @@ const AddData = () => {
 
             <Row gutter={24}>
               <Col span={12}>
-                <Form.Item label="Home Address" name="home_address">
+                <Form.Item rules={[{ required: true }]} label="Home Address" name="home_address">
                   <Input placeholder="Enter home address" style={inputStyle} />
                 </Form.Item>
               </Col>
@@ -423,6 +448,7 @@ const AddData = () => {
                   <Col span={6}>
                     <Form.Item
                       label="Animal Type"
+                      rules={[{ required: true }]}
                       name={`animal_type_${index}`}
                     >
                       <Select
@@ -459,6 +485,7 @@ const AddData = () => {
                   <Col span={6}>
                     <Form.Item
                       label="Subcategory"
+                      rules={[{ required: true }]}
                       name={`subcategory_${index}`}
                     >
                       <Select
@@ -541,9 +568,10 @@ const AddData = () => {
                     </Form.Item>
                   </Col>
                   <Col span={6}>
-                    <Form.Item label="Quantity" name={`quantity_${index}`}>
+                    <Form.Item rules={[{ required: true }]} label="Quantity" name={`quantity_${index}`}>
                       <Input
                         placeholder="Enter Quantity"
+                        
                         type="number"
                         value={animal.quantity}
                         onChange={(e) => {
@@ -717,6 +745,7 @@ const AddData = () => {
                     </Select>
                   </Form.Item>
                 </Col>
+
                 {selectedCrop === "Rice" && (
                   <>
                     <Button
@@ -729,7 +758,7 @@ const AddData = () => {
 
                     {additionalRiceDetails.map((riceDetail, index) => (
                       <Row
-                        gutter={12}
+                        gutter={60}
                         key={index}
                         style={{ marginBottom: "10px" }}
                       >
@@ -793,7 +822,7 @@ const AddData = () => {
                         {/* Average Yield */}
                         <Col span={4}>
                           <Form.Item
-                            label="Average Yield (mt/ha)"
+                            label="Average Yield "
                             name={["additionalRice", index, "ave_yield"]}
                           >
                             <Input
@@ -824,6 +853,406 @@ const AddData = () => {
                   </>
                 )}
 
+                {selectedCrop === "Spices" && (
+            <>
+              <Col span={12}>
+                <Form.Item label="Name Of Buyer" name="Name of Buyer">
+                  <Input placeholder="Enter Name of Buyer" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Market Outlet Location" name="Market Outlet Location">
+                  <Input placeholder="Enter Market Outlet Location" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Association/Organization" name="Association/Organization">
+                  <Input placeholder="Enter Association/Organization" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12} key="cropping_intensity">
+                <Form.Item label="Cropping Intensity" name="cropping_intensity">
+                  <Select placeholder="Select Cropping Intensity">
+                    <Select.Option value="year_round">Year Round</Select.Option>
+                    <Select.Option value="quarterly">Quarterly</Select.Option>
+                    <Select.Option value="seasonal">Seasonal</Select.Option>
+                    <Select.Option value="annually">Annually</Select.Option>
+                    <Select.Option value="twice_a_month">Twice a Month</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Farm Address" name="farm_address">
+                  <Input placeholder="Enter Farm Address" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Area (hectare)" name="area_hectare">
+                  <Input type="number" placeholder="Enter Area (hectare)" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Farm Location Coordinates(longitude)" name="farm_location_longitude">
+                  <Input placeholder="Enter Longitude" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Farm Location Coordinates(latitude)" name="farm_location_laitude">
+                  <Input placeholder="Enter Latitude" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              
+                  <Col span={24}>
+              <Row gutter={[12, 12]}>
+                {additionalSpiceDetails.map((spiceDetail, index) => (
+                  <React.Fragment key={index}>
+                    <Col span={24} style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+                      <Row gutter={11} style={{ width: '200%', justifyContent: 'center', alignItems: 'center' }}>
+                        <Col span={10}>
+                          <Form.Item  rules={[{ required: true }]} label="Spice Type" name={["additionalSpice", index, "spices_type"]}>
+                            <Select placeholder="Select Spices Type" style={{ width: '100%' }}>
+                              <Option value="Ginger">Ginger</Option>
+                              <Option value="Onion">Onion</Option>
+                              <Option value="Hotpepper">Hotpepper</Option>
+                              <Option value="Sweet Pepper">Sweet Pepper</Option>
+                              <Option value="Turmeric">Turmeric</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                        <Col span={11}>
+                          <Form.Item rules={[{ required: true }]} label="Quantity" name={["additionalSpice", index, "quantity"]}>
+                            <Input type="number" placeholder="Enter Quantity" style={{ width: '100%' }} />
+                          </Form.Item>
+                        </Col>
+                        {additionalSpiceDetails.length > 1 && (
+                          <Col span={2} style={{ textAlign: "center"}}>
+                            <Button type="primary" danger onClick={() => handleRemoveAdditionalSpice(index)}>
+                              Remove
+                            </Button>
+                          </Col>
+                        )}
+                      </Row>
+                    </Col>
+                  </React.Fragment>
+                ))}
+                <Col span={24} style={{ display: "flex", justifyContent: "center" }}>
+                  <Button
+                    type="dashed"
+                    onClick={handleAddAdditionalSpice}
+                    style={{ width: "50%", marginBottom: "5px" }}
+                  >
+                    ADD ANOTHER SPICE ENTRY
+                  </Button>
+                </Col>
+              </Row>
+            </Col>
+            </>
+          )}
+
+            {selectedCrop === "Legumes" && (
+            <>
+              <Col span={12}>
+                <Form.Item label="Name Of Buyer" name="Name of Buyer">
+                  <Input placeholder="Enter Name of Buyer" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Market Outlet Location" name="Market Outlet Location">
+                  <Input placeholder="Enter Market Outlet Location" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Association/Organization" name="Association/Organization">
+                  <Input placeholder="Enter Association/Organization" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12} key="cropping_intensity">
+                <Form.Item label="Cropping Intensity" name="cropping_intensity">
+                  <Select placeholder="Select Cropping Intensity">
+                    <Select.Option value="year_round">Year Round</Select.Option>
+                    <Select.Option value="quarterly">Quarterly</Select.Option>
+                    <Select.Option value="seasonal">Seasonal</Select.Option>
+                    <Select.Option value="annually">Annually</Select.Option>
+                    <Select.Option value="twice_a_month">Twice a Month</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Farm Address" name="farm_address">
+                  <Input placeholder="Enter Farm Address" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Area (hectare)" name="area_hectare">
+                  <Input type="number" placeholder="Enter Area (hectare)" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Farm Location Coordinates(longitude)" name="farm_location_longitude">
+                  <Input placeholder="Enter Longitude" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Farm Location Coordinates(latitude)" name="farm_location_laitude">
+                  <Input placeholder="Enter Latitude" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              
+                  <Col span={24}>
+              <Row gutter={[12, 12]}>
+                {additionalLegumesDetails.map((legumesDetail, index) => (
+                  <React.Fragment key={index}>
+                    <Col span={24} style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+                      <Row gutter={11} style={{ width: '200%', justifyContent: 'center', alignItems: 'center' }}>
+                        <Col span={10}>
+                          <Form.Item  rules={[{ required: true }]} label="Legumes Type" name={["additionalLegumes", index, "legumes_type"]}>
+                            <Select placeholder="Select Legumes Type" style={{ width: '100%' }}>
+                              <Option value="Peanut">Peanut</Option>
+                              <Option value="Mungbean">Mungbean</Option>
+                              <Option value="Soybean">Soybean</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                        <Col span={11}>
+                          <Form.Item rules={[{ required: true }]} label="Quantity" name={["additionalLegumes", index, "quantity"]}>
+                            <Input type="number" placeholder="Enter Quantity" style={{ width: '100%' }} />
+                          </Form.Item>
+                        </Col>
+                        {additionalLegumesDetails.length > 1 && (
+                          <Col span={2} style={{ textAlign: "center"}}>
+                            <Button type="primary" danger onClick={() => handleRemoveAdditionalLegumes(index)}>
+                              Remove
+                            </Button>
+                          </Col>
+                        )}
+                      </Row>
+                    </Col>
+                  </React.Fragment>
+                ))}
+                <Col span={24} style={{ display: "flex", justifyContent: "center" }}>
+                  <Button
+                    type="dashed"
+                    onClick={handleAddAdditionalLegumes}
+                    style={{ width: "50%", marginBottom: "5px" }}
+                  >
+                    ADD ANOTHER LEGUMES ENTRY
+                  </Button>
+                </Col>
+              </Row>
+            </Col>
+            </>
+          )}
+
+            {selectedCrop === "Banana" && (
+            <>
+              <Col span={12}>
+                <Form.Item label="Name Of Buyer" name="Name of Buyer">
+                  <Input placeholder="Enter Name of Buyer" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Market Outlet Location" name="Market Outlet Location">
+                  <Input placeholder="Enter Market Outlet Location" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Association/Organization" name="Association/Organization">
+                  <Input placeholder="Enter Association/Organization" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12} key="cropping_intensity">
+                <Form.Item label="Cropping Intensity" name="cropping_intensity">
+                  <Select placeholder="Select Cropping Intensity">
+                    <Select.Option value="year_round">Year Round</Select.Option>
+                    <Select.Option value="quarterly">Quarterly</Select.Option>
+                    <Select.Option value="seasonal">Seasonal</Select.Option>
+                    <Select.Option value="annually">Annually</Select.Option>
+                    <Select.Option value="twice_a_month">Twice a Month</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Farm Address" name="farm_address">
+                  <Input placeholder="Enter Farm Address" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Area (hectare)" name="area_hectare">
+                  <Input type="number" placeholder="Enter Area (hectare)" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Farm Location Coordinates(longitude)" name="farm_location_longitude">
+                  <Input placeholder="Enter Longitude" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Farm Location Coordinates(latitude)" name="farm_location_laitude">
+                  <Input placeholder="Enter Latitude" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              
+                  <Col span={24}>
+              <Row gutter={[12, 12]}>
+                {additionalBananaDetails.map((bananaDetail, index) => (
+                  <React.Fragment key={index}>
+                    <Col span={24} style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+                      <Row gutter={11} style={{ width: '200%', justifyContent: 'center', alignItems: 'center' }}>
+                        <Col span={10}>
+                          <Form.Item  rules={[{ required: true }]} label="Banana Type" name={["additionalBanana", index, "banana_type"]}>
+                            <Select placeholder="Select Banana Type" style={{ width: '100%' }}>
+                              <Option value="Lakatan">Lakatan</Option>
+                              <Option value="Latundan">Latundan</Option>
+                              <Option value="Cardava">Cardava</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                        <Col span={11}>
+                          <Form.Item rules={[{ required: true }]} label="Quantity" name={["additionalBanana", index, "quantity"]}>
+                            <Input type="number" placeholder="Enter Quantity" style={{ width: '100%' }} />
+                          </Form.Item>
+                        </Col>
+                        {additionalBananaDetails.length > 1 && (
+                          <Col span={2} style={{ textAlign: "center"}}>
+                            <Button type="primary" danger onClick={() => handleRemoveAdditionalBanana(index)}>
+                              Remove
+                            </Button>
+                          </Col>
+                        )}
+                      </Row>
+                    </Col>
+                  </React.Fragment>
+                ))}
+                <Col span={24} style={{ display: "flex", justifyContent: "center" }}>
+                  <Button
+                    type="dashed"
+                    onClick={handleAddAdditionalBanana}
+                    style={{ width: "50%", marginBottom: "5px" }}
+                  >
+                    ADD ANOTHER BANANA ENTRY
+                  </Button>
+                </Col>
+              </Row>
+            </Col>
+            </>
+          )}
+
+      
+          {selectedCrop === "Vegetable" && (
+            <>
+              <Col span={12}>
+                <Form.Item label="Name Of Buyer" name="Name of Buyer">
+                  <Input placeholder="Enter Name of Buyer" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Market Outlet Location" name="Market Outlet Location">
+                  <Input placeholder="Enter Market Outlet Location" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Association/Organization" name="Association/Organization">
+                  <Input placeholder="Enter Association/Organization" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12} key="cropping_intensity">
+                <Form.Item label="Cropping Intensity" name="cropping_intensity">
+                  <Select placeholder="Select Cropping Intensity">
+                    <Select.Option value="year_round">Year Round</Select.Option>
+                    <Select.Option value="quarterly">Quarterly</Select.Option>
+                    <Select.Option value="seasonal">Seasonal</Select.Option>
+                    <Select.Option value="annually">Annually</Select.Option>
+                    <Select.Option value="twice_a_month">Twice a Month</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Farm Address" name="farm_address">
+                  <Input placeholder="Enter Farm Address" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Area (hectare)" name="area_hectare">
+                  <Input type="number" placeholder="Enter Area (hectare)" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Farm Location Coordinates(longitude)" name="farm_location_longitude">
+                  <Input placeholder="Enter Longitude" style={inputStyle} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Farm Location Coordinates(latitude)" name="farm_location_laitude">
+                  <Input placeholder="Enter Latitude" style={inputStyle} />
+                </Form.Item>
+              </Col>
+
+                    <Col span={24}>
+            <Row gutter={[12, 12]}>
+              {additionalVegetableDetails.map((vegetableDetail, index) => (
+                <React.Fragment key={index}>
+                  <Col span={24}>
+                    <Row gutter={11} style={{ justifyContent: 'center', alignItems: 'center' }}>
+                      <Col span={8}>
+                        <Form.Item rules={[{ required: true }]} label="Vegetable Type" name={["additionalVegetable", index, "vegetable_type"]}>
+                          <Select
+                            placeholder="Select Vegetable Type"
+                            style={{ width: '100%' }}
+                            onChange={(value) => {
+                              if (value === "Other Crop (specify)") {
+                                setSelectedVegetable(index);
+                              } else {
+                                setSelectedVegetable(null);
+                              }
+                            }}
+                          >
+                            <Option value="Eggplant">Eggplant</Option>
+                            <Option value="Ampalaya">Ampalaya</Option>
+                            <Option value="Okra">Okra</Option>
+                            <Option value="Pole Sitao">Pole Sitao</Option>
+                            <Option value="Squash">Squash</Option>
+                            <Option value="Tomato">Tomato</Option>
+                            <Option value="Other Crop (specify)">Other Crop (specify)</Option>
+                          </Select>
+                        </Form.Item>
+                      </Col>
+                      <Col span={7}>
+                        <Form.Item rules={[{ required: true }]} label="Quantity" name={["additionalVegetable", index, "quantity"]}>
+                          <Input type="number" placeholder="Enter Quantity" style={{ width: '100%' }} />
+                        </Form.Item>
+                      </Col>
+                      {selectedVegetable === index && (
+                        <Col span={7}>
+                          <Form.Item label="Other Crop (specify)" name={["additionalVegetable", index, "other_vegetable"]}>
+                            <Input placeholder="Specify Other Vegetable" style={{ width: '100%' }} />
+                          </Form.Item>
+                        </Col>
+                      )}
+                      {additionalVegetableDetails.length > 1 && (
+                        <Col span={2} style={{ textAlign: "center" }}>
+                          <Button type="primary" danger onClick={() => handleRemoveAdditionalVegetable(index)}>
+                            Remove
+                          </Button>
+                        </Col>
+                      )}
+                    </Row>
+                  </Col>
+                </React.Fragment>
+              ))}
+              <Col span={24} style={{ display: "flex", justifyContent: "center" }}>
+                <Button
+                  type="dashed"
+                  onClick={handleAddAdditionalVegetable}
+                  style={{ width: "50%", marginBottom: "5px" }}
+                >
+                  ADD ANOTHER VEGETABLE ENTRY
+                </Button>
+              </Col>
+            </Row>
+          </Col>
+            </>
+          )}
+                
                 {selectedCrop &&
                   cropConfigurations[selectedCrop] &&
                   cropConfigurations[selectedCrop].map((field) => {
@@ -840,25 +1269,6 @@ const AddData = () => {
                             </Form.Item>
                           </Col>
                         );
-                        break;
-                      case "Spice Type":
-                        if (selectedCrop === "Spices") {
-                          formItem = (
-                            <Col span={12} key={field}>
-                              <Form.Item label="Spice Type" name="spice_type">
-                                <Select placeholder="Select Spice Type">
-                                  <Option value="Ginger">Ginger</Option>
-                                  <Option value="Onion">Onion</Option>
-                                  <Option value="Hotpepper">Hotpepper</Option>
-                                  <Option value="Sweet Pepper">
-                                    Sweet Pepper
-                                  </Option>
-                                  <Option value="Turmeric">Turmeric</Option>
-                                </Select>
-                              </Form.Item>
-                            </Col>
-                          );
-                        }
                         break;
                       case "Legume Type":
                         if (selectedCrop === "Legumes") {
@@ -908,7 +1318,7 @@ const AddData = () => {
                         if (selectedCrop === "Cacao") {
                           formItem = (
                             <Col span={12} key={field}>
-                              <Form.Item label="Cacao" name="month">
+                              <Form.Item label="Month" name="month">
                                 <Select placeholder="Select Month" name="month">
                                   <Option value="January">January</Option>
                                   <Option value="February">February</Option>
@@ -949,6 +1359,7 @@ const AddData = () => {
                             <Form.Item label="Quantity" name="quantity">
                               <Input
                                 placeholder="Enter Quantity"
+                                type="number"
                                 style={inputStyle}
                               />
                             </Form.Item>
@@ -1005,6 +1416,7 @@ const AddData = () => {
                           <Col span={12} key={field}>
                             <Form.Item
                               label="Area (hectare)"
+                              type="number"
                               name="area_hectare"
                             >
                               <Input
