@@ -8,7 +8,7 @@ import {
 } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
 import DataEntry from "./components/DataEntry";
-import AddData from "./components/AddData"; 
+import AddData from "./components/AddData";
 import Inventory from "./components/Inventory";
 import Analytics from "./components/Analytics";
 import Settings from "./components/Settings";
@@ -25,7 +25,9 @@ function App() {
   return (
     <Router>
       {isAuthenticated ? (
-        <Layout style={{ height: "100vh", overflow: "hidden", display: "flex" }}>
+        <Layout
+          style={{ height: "100vh", overflow: "hidden", display: "flex" }}
+        >
           {/* Sidebar */}
           <Sidebar />
 

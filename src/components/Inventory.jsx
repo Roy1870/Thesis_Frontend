@@ -1,174 +1,316 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { farmerAPI } from "./services/api";
 import {
   Table,
-  Spin,
-  Alert,
+  Button,
   Input,
   Space,
-  Button,
-  Modal,
-  Dropdown,
-  Menu,
+  message,
+  Pagination,
+  Spin,
+  Alert,
+  Card,
   Typography,
   Badge,
-  Empty,
-  Card,
+  Tag,
   Tooltip,
-  Popconfirm,
 } from "antd";
 import {
   SearchOutlined,
-  PlusOutlined,
-  FilterOutlined,
-  DatabaseOutlined,
-  LoadingOutlined,
-  EyeOutlined,
-  EditOutlined,
   DeleteOutlined,
-  LeftOutlined,
-  RightOutlined,
+  EditOutlined,
+  EyeOutlined,
+  PlusOutlined,
+  UserOutlined,
+  HomeOutlined,
+  MailOutlined,
+  PhoneOutlined,
 } from "@ant-design/icons";
-import axios from "axios";
-import DataEntry from "./DataEntry";
+import Highlighter from "react-highlight-words";
+import EditFarmer from "./EditFarmer";
+import ViewFarmer from "./ViewFarmer";
 
 const { Title, Text } = Typography;
 
-const Inventory = ({ currentComponent, setCurrentComponent }) => {
-  const [farmerData, setFarmerData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [searchText, setSearchText] = useState("");
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isViewModalVisible, setIsViewModalVisible] = useState(false);
-  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-  const [currentFarmer, setCurrentFarmer] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const pageSize = 10;
+const Inventory = () => {
+  console.log("InventoryModern component rendering");
 
-  // Color theme
+  const [farmerData, setFarmerData] = useState([]);
+  const [allFarmerData, setAllFarmerData] = useState([]); // Store all data for client-side filtering
+  const [searchText, setSearchText] = useState("");
+  const [debouncedSearchText, setDebouncedSearchText] = useState(""); // For debounced search
+  const [searchedColumn, setSearchedColumn] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [isViewMode, setIsViewMode] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [currentFarmer, setCurrentFarmer] = useState(null);
+
+  // Theme colors
   const colors = {
     primary: "#6A9C89",
-    primaryLight: "#E9F2EF",
-    primaryDark: "#5A8C79",
-    background: "#FFFFFF",
-    backgroundAlt: "#F9FAFB",
-    border: "#EAECF0",
-    text: "#344054",
-    textLight: "#667085",
-    textDark: "#101828",
-    error: "#F04438",
-    warning: "#F79009",
-    success: "#12B76A",
-    info: "#3E7BFA",
+    secondary: "#E6F5E4",
+    accent: "#4F6F7D",
+    error: "#D32F2F",
+    warning: "#FFA000",
+    success: "#388E3C",
+    textDark: "#333333",
+    textLight: "#666666",
+    border: "#E0E0E0",
+    background: "#F5F7F9",
   };
 
-  // Function to fetch data with pagination
-  const fetchFarmerData = async (page = 1, search = "") => {
+  // Debounce search text to prevent too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchText(searchText);
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchText]);
+
+  // Fetch all data once on initial load
+  useEffect(() => {
+    fetchAllFarmerData();
+  }, []);
+
+  // Handle pagination and debounced search
+  useEffect(() => {
+    if (debouncedSearchText) {
+      // If search is active, do client-side filtering
+      filterFarmerData();
+    } else {
+      // Only fetch from API when not searching
+      fetchFarmerData(currentPage);
+    }
+  }, [currentPage, pageSize, debouncedSearchText]);
+
+  // Fetch all farmer data once for client-side filtering
+  const fetchAllFarmerData = async () => {
     try {
       setLoading(true);
-      const authToken = localStorage.getItem("authToken");
-
-      if (!authToken) {
-        setError("Authorization token not found.");
-        setLoading(false);
-        return;
-      }
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        page,
-        per_page: pageSize,
-      });
-
-      if (search) {
-        params.append("search", search);
-      }
-
-      const response = await axios.get(
-        `http://localhost:8000/api/farmers?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        }
-      );
-
-      // Laravel pagination returns data in a specific format
-      setFarmerData(response.data.data); // The actual items are in the data property
-      setTotalRecords(response.data.total); // Total number of records
+      const response = await farmerAPI.getAllFarmers(1, 1000); // Get a large batch
+      setAllFarmerData(response.data);
       setLoading(false);
     } catch (err) {
+      console.error("Error fetching all data:", err);
       setError("Failed to fetch data.");
       setLoading(false);
     }
   };
 
-  // Initial data fetch
-  useEffect(() => {
-    fetchFarmerData(currentPage, searchText);
-  }, [currentPage]); // Re-fetch when page changes
+  // Client-side filtering function
+  const filterFarmerData = useCallback(() => {
+    if (!debouncedSearchText.trim()) {
+      fetchFarmerData(currentPage);
+      return;
+    }
 
-  // Handle search with debounce
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setCurrentPage(1); // Reset to first page when searching
-      fetchFarmerData(1, searchText);
-    }, 500); // Wait 500ms after typing stops
+    setLoading(true);
+    const searchLower = debouncedSearchText.toLowerCase().trim();
 
-    return () => clearTimeout(timer);
-  }, [searchText]);
+    // Filter from all data to ensure we catch everything
+    const filtered = allFarmerData.filter(
+      (farmer) =>
+        (farmer.name && farmer.name.toLowerCase().includes(searchLower)) ||
+        (farmer.contact_number &&
+          farmer.contact_number.toLowerCase().includes(searchLower)) ||
+        (farmer.facebook_email &&
+          farmer.facebook_email.toLowerCase().includes(searchLower)) ||
+        (farmer.home_address &&
+          farmer.home_address.toLowerCase().includes(searchLower)) ||
+        (farmer.barangay && farmer.barangay.toLowerCase().includes(searchLower))
+    );
 
-  // Handler functions for row actions
-  const handleView = (farmer) => {
-    setCurrentFarmer(farmer);
-    setIsViewModalVisible(true);
+    // Paginate the filtered results
+    const startIndex = (currentPage - 1) * pageSize;
+    const paginatedResults = filtered.slice(startIndex, startIndex + pageSize);
+
+    setFarmerData(paginatedResults);
+    setTotalRecords(filtered.length);
+    setLoading(false);
+  }, [allFarmerData, debouncedSearchText, currentPage, pageSize]);
+
+  const fetchFarmerData = async (page = 1, search = "") => {
+    console.log("Fetching farmer data...");
+    try {
+      setLoading(true);
+
+      // Only use API for non-search or initial load
+      const response = await farmerAPI.getAllFarmers(page, pageSize, search);
+
+      // Laravel pagination returns data in a specific format
+      setFarmerData(response.data); // The actual items are in the data property
+      setTotalRecords(response.total); // Total number of records
+      setLoading(false);
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setError("Failed to fetch data.");
+      setLoading(false);
+    }
   };
 
-  const handleEdit = (farmer) => {
-    setCurrentFarmer(farmer);
-    setIsEditModalVisible(true);
+  const getColumnSearchProps = (dataIndex) => ({
+    filterDropdown: ({
+      setSelectedKeys,
+      selectedKeys,
+      confirm,
+      clearFilters,
+    }) => (
+      <div style={{ padding: 8 }}>
+        <Input
+          placeholder={`Search ${dataIndex}`}
+          value={selectedKeys[0]}
+          onChange={(e) =>
+            setSelectedKeys(e.target.value ? [e.target.value] : [])
+          }
+          onPressEnter={() => handleSearch(selectedKeys, confirm, dataIndex)}
+          style={{ width: 188, marginBottom: 8, display: "block" }}
+        />
+        <Space>
+          <Button
+            type="primary"
+            onClick={() => handleSearch(selectedKeys, confirm, dataIndex)}
+            icon={<SearchOutlined />}
+            size="small"
+            style={{ width: 90, backgroundColor: colors.primary }}
+          >
+            Search
+          </Button>
+          <Button
+            onClick={() => handleReset(clearFilters)}
+            size="small"
+            style={{ width: 90 }}
+          >
+            Reset
+          </Button>
+        </Space>
+      </div>
+    ),
+    filterIcon: (filtered) => (
+      <SearchOutlined
+        style={{ color: filtered ? colors.primary : undefined }}
+      />
+    ),
+    onFilter: (value, record) =>
+      record[dataIndex]
+        ? record[dataIndex]
+            .toString()
+            .toLowerCase()
+            .includes(value.toLowerCase())
+        : "",
+    render: (text) =>
+      searchedColumn === dataIndex ? (
+        <Highlighter
+          highlightStyle={{ backgroundColor: "#ffc069", padding: 0 }}
+          searchWords={[searchText]}
+          autoEscape
+          textToHighlight={text ? text.toString() : ""}
+        />
+      ) : (
+        text
+      ),
+  });
+
+  const handleSearch = (selectedKeys, confirm, dataIndex) => {
+    confirm();
+    setSearchText(selectedKeys[0]);
+    setSearchedColumn(dataIndex);
+    setCurrentPage(1);
+  };
+
+  const handleReset = (clearFilters) => {
+    clearFilters();
+    setSearchText("");
   };
 
   const handleDelete = async (farmerId) => {
     try {
-      const authToken = localStorage.getItem("authToken");
-
-      await axios.delete(`http://localhost:8000/api/farmers/${farmerId}`, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
-      });
+      await farmerAPI.deleteFarmer(farmerId);
 
       // Refresh data after deletion
-      fetchFarmerData(currentPage, searchText);
+      fetchAllFarmerData(); // Refresh all data
+      if (searchText) {
+        filterFarmerData();
+      } else {
+        fetchFarmerData(currentPage);
+      }
+      message.success("Farmer deleted successfully");
     } catch (err) {
-      setError("Failed to delete farmer.");
+      message.error("Failed to delete farmer.");
     }
   };
 
-  // Table columns including action buttons
+  const handleView = (record) => {
+    setCurrentFarmer(record);
+    setIsViewMode(true);
+  };
+
+  const handleEdit = (record) => {
+    setCurrentFarmer(record);
+    setIsEditMode(true);
+
+    // Listen for the editFarmer event from ViewFarmer component
+    window.addEventListener(
+      "editFarmer",
+      (event) => {
+        setCurrentFarmer(event.detail);
+        setIsEditMode(true);
+      },
+      { once: true }
+    );
+  };
+
+  const handleCloseView = () => {
+    setIsViewMode(false);
+    setCurrentFarmer(null);
+  };
+
+  const handleCloseEdit = () => {
+    setIsEditMode(false);
+    setCurrentFarmer(null);
+    // Refresh data after editing
+    fetchAllFarmerData(); // Refresh all data
+    if (searchText) {
+      filterFarmerData();
+    } else {
+      fetchFarmerData(currentPage);
+    }
+  };
+
+  const handleSearchInputChange = (e) => {
+    const value = e.target.value;
+    setSearchText(value);
+    setCurrentPage(1); // Reset to first page when searching
+  };
+
   const columns = [
     {
       title: "Name",
       dataIndex: "name",
       key: "name",
+      ...getColumnSearchProps("name"),
       render: (text) => (
-        <span
-          style={{ fontWeight: 500, color: colors.textDark, fontSize: "14px" }}
-        >
-          {text}
-        </span>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <UserOutlined style={{ marginRight: 8, color: colors.primary }} />
+          <span>{text}</span>
+        </div>
       ),
     },
     {
-      title: "Contact Number",
+      title: "Contact",
       dataIndex: "contact_number",
       key: "contact_number",
       render: (text) => (
-        <span style={{ fontSize: "14px", color: colors.text }}>{text}</span>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <PhoneOutlined style={{ marginRight: 8, color: colors.accent }} />
+          <span>{text || "N/A"}</span>
+        </div>
       ),
     },
     {
@@ -177,33 +319,47 @@ const Inventory = ({ currentComponent, setCurrentComponent }) => {
       key: "facebook_email",
       responsive: ["md"],
       render: (text) => (
-        <span style={{ fontSize: "14px", color: colors.text }}>{text}</span>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <MailOutlined style={{ marginRight: 8, color: colors.accent }} />
+          <span>{text || "N/A"}</span>
+        </div>
       ),
     },
     {
-      title: "Home Address",
+      title: "Address",
       dataIndex: "home_address",
       key: "home_address",
       responsive: ["lg"],
       render: (text) => (
-        <span style={{ fontSize: "14px", color: colors.text }}>
-          {text || "-"}
-        </span>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <HomeOutlined style={{ marginRight: 8, color: colors.accent }} />
+          <span>{text || "N/A"}</span>
+        </div>
+      ),
+    },
+    {
+      title: "Barangay",
+      dataIndex: "barangay",
+      key: "barangay",
+      responsive: ["md"],
+      render: (text) => (
+        <Tag color={colors.primary} style={{ borderRadius: "4px" }}>
+          {text || "N/A"}
+        </Tag>
       ),
     },
     {
       title: "Actions",
       key: "actions",
-      width: 120,
+      width: 180,
       render: (_, record) => (
         <Space size="small">
-          <Tooltip title="View">
+          <Tooltip title="View Details">
             <Button
               type="text"
               icon={<EyeOutlined />}
               onClick={() => handleView(record)}
-              style={{ color: colors.info }}
-              className="action-button"
+              style={{ color: colors.primary }}
             />
           </Tooltip>
           <Tooltip title="Edit">
@@ -212,704 +368,137 @@ const Inventory = ({ currentComponent, setCurrentComponent }) => {
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
               style={{ color: colors.warning }}
-              className="action-button"
             />
           </Tooltip>
           <Tooltip title="Delete">
-            <Popconfirm
-              title="Delete this farmer?"
-              description="This action cannot be undone."
-              onConfirm={() => handleDelete(record.farmer_id)}
-              okText="Yes"
-              cancelText="No"
-              okButtonProps={{
-                style: {
-                  backgroundColor: colors.error,
-                  borderColor: colors.error,
-                },
+            <Button
+              type="text"
+              icon={<DeleteOutlined />}
+              onClick={() => {
+                if (
+                  window.confirm("Are you sure you want to delete this farmer?")
+                ) {
+                  handleDelete(record.farmer_id);
+                }
               }}
-            >
-              <Button
-                type="text"
-                icon={<DeleteOutlined />}
-                style={{ color: colors.error }}
-                className="action-button"
-              />
-            </Popconfirm>
+              danger
+            />
           </Tooltip>
         </Space>
       ),
     },
   ];
 
-  const handleSearchChange = (e) => {
-    setSearchText(e.target.value);
-    // The useEffect with debounce will handle the actual search
-  };
-
-  const showModal = () => {
-    setIsModalVisible(true);
-  };
-
-  const handleModalClose = () => {
-    setIsModalVisible(false);
-    // Refresh data after adding a new entry
-    fetchFarmerData(currentPage, searchText);
-  };
-
-  const handleViewModalClose = () => {
-    setIsViewModalVisible(false);
-    setCurrentFarmer(null);
-  };
-
-  const handleEditModalClose = () => {
-    setIsEditModalVisible(false);
-    setCurrentFarmer(null);
-    // Refresh data after editing
-    fetchFarmerData(currentPage, searchText);
-  };
-
-  const menu = (
-    <Menu>
-      <Menu.Item key="all">All Types</Menu.Item>
-      <Menu.Divider />
-      <Menu.Item key="grower">Grower</Menu.Item>
-      <Menu.Item key="operator">Operator</Menu.Item>
-      <Menu.Item key="raiser">Raiser</Menu.Item>
-    </Menu>
-  );
-
-  // Function to render farmer details in view modal
-  const renderFarmerDetails = () => {
-    if (!currentFarmer) return null;
-
+  // If in edit mode, show the edit page instead of the inventory list
+  if (isEditMode && currentFarmer) {
     return (
-      <div style={{ fontSize: "14px" }}>
-        <div style={{ marginBottom: "24px" }}>
-          <Title
-            level={5}
-            style={{ marginBottom: "16px", color: colors.textDark }}
-          >
-            Personal Information
-          </Title>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 2fr",
-              gap: "12px",
-            }}
-          >
-            <Text strong style={{ color: colors.textLight }}>
-              Name:
-            </Text>
-            <Text>{currentFarmer.name || "-"}</Text>
-
-            <Text strong style={{ color: colors.textLight }}>
-              Contact Number:
-            </Text>
-            <Text>{currentFarmer.contact_number || "-"}</Text>
-
-            <Text strong style={{ color: colors.textLight }}>
-              Email:
-            </Text>
-            <Text>{currentFarmer.facebook_email || "-"}</Text>
-
-            <Text strong style={{ color: colors.textLight }}>
-              Home Address:
-            </Text>
-            <Text>{currentFarmer.home_address || "-"}</Text>
-          </div>
-        </div>
-
-        {currentFarmer.crops && currentFarmer.crops.length > 0 && (
-          <div style={{ marginBottom: "24px" }}>
-            <Title
-              level={5}
-              style={{ marginBottom: "16px", color: colors.textDark }}
-            >
-              Crop Information
-            </Title>
-            {currentFarmer.crops.map((crop, index) => (
-              <div
-                key={index}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 2fr",
-                  gap: "12px",
-                  marginBottom: "16px",
-                }}
-              >
-                <Text strong style={{ color: colors.textLight }}>
-                  Crop Type:
-                </Text>
-                <Text>{crop.crop_type || "-"}</Text>
-
-                <Text strong style={{ color: colors.textLight }}>
-                  Area:
-                </Text>
-                <Text>{crop.area || "-"}</Text>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {currentFarmer.rice && currentFarmer.rice.length > 0 && (
-          <div>
-            <Title
-              level={5}
-              style={{ marginBottom: "16px", color: colors.textDark }}
-            >
-              Rice Information
-            </Title>
-            {currentFarmer.rice.map((rice, index) => (
-              <div
-                key={index}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 2fr",
-                  gap: "12px",
-                }}
-              >
-                <Text strong style={{ color: colors.textLight }}>
-                  Area Type:
-                </Text>
-                <Text>{rice.area_type || "-"}</Text>
-
-                <Text strong style={{ color: colors.textLight }}>
-                  Size:
-                </Text>
-                <Text>{rice.size || "-"}</Text>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <EditFarmer
+        farmer={currentFarmer}
+        onClose={handleCloseEdit}
+        colors={colors}
+      />
     );
-  };
+  }
 
-  // Custom pagination renderer
-  const itemRender = (_, type, originalElement) => {
-    if (type === "prev") {
-      return (
-        <Button
-          type="text"
-          size="small"
-          icon={<LeftOutlined />}
-          disabled={currentPage === 1}
-          style={{
-            color: currentPage === 1 ? colors.textLight : colors.primary,
-            borderRadius: "4px",
-            padding: "0 8px",
-            height: "24px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        />
-      );
-    }
-    if (type === "next") {
-      return (
-        <Button
-          type="text"
-          size="small"
-          icon={<RightOutlined />}
-          disabled={currentPage === Math.ceil(totalRecords / pageSize)}
-          style={{
-            color:
-              currentPage === Math.ceil(totalRecords / pageSize)
-                ? colors.textLight
-                : colors.primary,
-            borderRadius: "4px",
-            padding: "0 8px",
-            height: "24px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        />
-      );
-    }
-    return originalElement;
-  };
+  // If in view mode, show a detailed view of the farmer
+  if (isViewMode && currentFarmer) {
+    return (
+      <ViewFarmer
+        farmer={currentFarmer}
+        onClose={handleCloseView}
+        colors={colors}
+      />
+    );
+  }
 
   return (
     <div
       style={{
-        padding: "12px", // Reduced from 16px
-        backgroundColor: colors.backgroundAlt,
-        minHeight: "90vh", // Reduced from 100vh
-        width: "100%", // Changed from max-width to width
-        margin: "0 auto",
+        padding: "12px",
+        backgroundColor: colors.background,
+        minHeight: "100vh",
+        maxWidth: "100%",
+        overflow: "hidden",
       }}
     >
       <Card
-        bordered={false}
-        style={{
-          borderRadius: "8px",
-          boxShadow: "0px 1px 2px rgba(16, 24, 40, 0.05)",
-          marginBottom: "12px", // Reduced from 16px
-        }}
-        bodyStyle={{ padding: "12px" }} // Added to make card content more compact
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "12px",
-          }}
-        >
-          <div>
-            <Title
-              level={4}
-              style={{
-                margin: 0,
-                color: colors.textDark,
-                fontWeight: 600,
-                fontSize: "18px",
-              }}
-            >
-              <DatabaseOutlined
-                style={{ marginRight: "8px", color: colors.primary }}
-              />
-              Inventory Records
-            </Title>
-            <Text
-              style={{
-                color: colors.textLight,
-                display: "block",
-                marginTop: "4px",
-                fontSize: "13px",
-              }}
-            >
-              Manage and track your farmer inventory data
-            </Text>
-          </div>
-
-          <Space wrap>
-            <Input
-              placeholder="Search by name or contact..."
-              value={searchText}
-              onChange={handleSearchChange}
-              style={{
-                width: 240,
-                borderRadius: "6px",
-                boxShadow: "0px 1px 2px rgba(16, 24, 40, 0.05)",
-              }}
-              prefix={<SearchOutlined style={{ color: colors.textLight }} />}
-            />
-            <Dropdown overlay={menu} trigger={["click"]}>
-              <Button
-                icon={<FilterOutlined />}
-                style={{
-                  borderRadius: "6px",
-                  display: "flex",
-                  alignItems: "center",
-                  boxShadow: "0px 1px 2px rgba(16, 24, 40, 0.05)",
-                }}
-              >
-                Filter
-              </Button>
-            </Dropdown>
-          </Space>
-        </div>
-      </Card>
-
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "12px",
-        }}
-      >
-        <Button
-          type="primary"
-          onClick={showModal}
-          icon={<PlusOutlined />}
-          style={{
-            backgroundColor: colors.primary,
-            borderColor: colors.primary,
-            borderRadius: "6px",
-            height: "36px",
-            boxShadow: "0px 1px 2px rgba(16, 24, 40, 0.05)",
-            display: "flex",
-            alignItems: "center",
-          }}
-        >
-          Add New Entry
-        </Button>
-
-        <Badge
-          count={totalRecords}
-          style={{
-            backgroundColor: colors.primary,
-            boxShadow: "0px 1px 2px rgba(16, 24, 40, 0.05)",
-          }}
-          overflowCount={999}
-        >
-          <div
-            style={{
-              padding: "0 8px",
-              fontSize: "13px",
-              color: colors.textLight,
-            }}
-          >
-            Total Records
-          </div>
-        </Badge>
-      </div>
-
-      <Card
-        bordered={false}
-        bodyStyle={{ padding: 0 }}
-        style={{
-          borderRadius: "8px",
-          overflow: "hidden",
-          boxShadow: "0px 1px 2px rgba(16, 24, 40, 0.05)",
-        }}
-      >
-        <div
-          style={{
-            padding: "12px 16px",
-            borderBottom: `1px solid ${colors.border}`,
-            backgroundColor: colors.background,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <Title
-            level={5}
-            style={{
-              margin: 0,
-              fontSize: "15px",
-              fontWeight: 600,
-              color: colors.textDark,
-            }}
-          >
-            Farmer Records
+        title={
+          <Title level={4} style={{ margin: 0, fontSize: "18px" }}>
+            Farmer Inventory
           </Title>
-
-          <Text style={{ color: colors.textLight, fontSize: "13px" }}>
-            Showing {farmerData.length} of {totalRecords} records
-          </Text>
-        </div>
-
-        {loading ? (
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              padding: "60px 0",
-              backgroundColor: colors.background,
-            }}
+        }
+        extra={
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => (window.location.href = "/add-data")}
+            style={{ backgroundColor: colors.primary }}
+            size="middle"
           >
-            <Spin
-              indicator={
-                <LoadingOutlined
-                  style={{ fontSize: 32, color: colors.primary }}
-                  spin
-                />
-              }
-              tip={
-                <span
-                  style={{
-                    marginTop: "12px",
-                    color: colors.textLight,
-                    fontSize: "13px",
-                  }}
-                >
-                  Loading data...
-                </span>
-              }
+            Add New Farmer
+          </Button>
+        }
+        style={{
+          borderRadius: 8,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+          marginBottom: 16,
+        }}
+        bodyStyle={{ padding: "16px" }}
+      >
+        <Space
+          style={{
+            marginBottom: 16,
+            width: "100%",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <Input
+              placeholder="Search farmers"
+              value={searchText}
+              onChange={handleSearchInputChange}
+              prefix={<SearchOutlined style={{ color: colors.primary }} />}
+              style={{ width: 250 }}
+              allowClear
             />
           </div>
-        ) : (
+          <Badge
+            count={totalRecords}
+            style={{ backgroundColor: colors.primary }}
+          >
+            <span style={{ padding: "0 8px" }}>Total Records</span>
+          </Badge>
+        </Space>
+
+        {error && (
+          <Alert message={error} type="error" style={{ marginBottom: 16 }} />
+        )}
+
+        <Spin spinning={loading}>
           <Table
             columns={columns}
             dataSource={farmerData}
             rowKey="farmer_id"
-            pagination={{
-              current: currentPage,
-              pageSize: pageSize,
-              total: totalRecords,
-              onChange: (page) => setCurrentPage(page),
-              showSizeChanger: false,
-              style: { padding: "8px 16px" }, // Reduced vertical padding
-              position: ["bottomCenter"],
-              itemRender: itemRender,
-              size: "small",
-              simple: true,
-            }}
-            locale={{
-              emptyText: (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description={
-                    <span style={{ color: colors.textLight }}>
-                      No records found
-                    </span>
-                  }
-                  style={{ margin: "20px 0" }} // Reduced from 40px
-                />
-              ),
-            }}
-            rowClassName={(record, index) =>
-              index % 2 === 0 ? "" : "ant-table-row-light"
-            }
+            pagination={false}
+            style={{ marginBottom: 16 }}
+            bordered
+            scroll={{ x: farmerData.length > 0 ? "max-content" : undefined }}
             size="small"
           />
-        )}
-      </Card>
+        </Spin>
 
-      {error && (
-        <Alert
-          message="Error"
-          description={error}
-          type="error"
-          showIcon
-          style={{
-            marginTop: "12px",
-            borderRadius: "6px",
-            boxShadow: "0px 1px 2px rgba(16, 24, 40, 0.05)",
+        <Pagination
+          current={currentPage}
+          pageSize={pageSize}
+          total={totalRecords}
+          onChange={(page) => {
+            console.log("Changing to page:", page);
+            setCurrentPage(page);
           }}
+          style={{ marginTop: 16, textAlign: "center" }}
+          showSizeChanger={false}
         />
-      )}
-
-      {/* Add New Farmer Modal */}
-      <Modal
-        title={
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              color: colors.textDark,
-              borderBottom: `1px solid ${colors.border}`,
-              padding: "12px 16px",
-              margin: "-20px -24px 16px",
-            }}
-          >
-            <PlusOutlined
-              style={{ marginRight: "8px", color: colors.primary }}
-            />
-            <span style={{ fontWeight: 600, fontSize: "16px" }}>
-              Add New Farmer Entry
-            </span>
-          </div>
-        }
-        open={isModalVisible}
-        onCancel={handleModalClose}
-        footer={null}
-        width={700}
-        style={{ top: 20 }}
-        bodyStyle={{
-          padding: "12px 16px", // Reduced from 16px 20px
-          maxHeight: "70vh", // Reduced from 80vh
-          overflow: "auto",
-        }}
-        maskStyle={{ backgroundColor: "rgba(16, 24, 40, 0.6)" }}
-      >
-        <DataEntry handleCancel={handleModalClose} />
-      </Modal>
-
-      {/* View Farmer Details Modal */}
-      <Modal
-        title={
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              color: colors.textDark,
-              borderBottom: `1px solid ${colors.border}`,
-              padding: "12px 16px",
-              margin: "-20px -24px 16px",
-            }}
-          >
-            <EyeOutlined style={{ marginRight: "8px", color: colors.info }} />
-            <span style={{ fontWeight: 600, fontSize: "16px" }}>
-              Farmer Details
-            </span>
-          </div>
-        }
-        open={isViewModalVisible}
-        onCancel={handleViewModalClose}
-        footer={[
-          <Button
-            key="close"
-            onClick={handleViewModalClose}
-            style={{ borderRadius: "6px" }}
-          >
-            Close
-          </Button>,
-        ]}
-        width={600}
-        style={{ top: 20 }}
-        bodyStyle={{
-          padding: "12px 16px", // Reduced from 16px 20px
-          maxHeight: "70vh", // Reduced from 80vh
-          overflow: "auto",
-        }}
-        maskStyle={{ backgroundColor: "rgba(16, 24, 40, 0.6)" }}
-      >
-        {renderFarmerDetails()}
-      </Modal>
-
-      {/* Edit Farmer Modal */}
-      <Modal
-        title={
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              color: colors.textDark,
-              borderBottom: `1px solid ${colors.border}`,
-              padding: "12px 16px",
-              margin: "-20px -24px 16px",
-            }}
-          >
-            <EditOutlined
-              style={{ marginRight: "8px", color: colors.warning }}
-            />
-            <span style={{ fontWeight: 600, fontSize: "16px" }}>
-              Edit Farmer
-            </span>
-          </div>
-        }
-        open={isEditModalVisible}
-        onCancel={handleEditModalClose}
-        footer={null}
-        width={700}
-        style={{ top: 20 }}
-        bodyStyle={{
-          padding: "12px 16px", // Reduced from 16px 20px
-          maxHeight: "70vh", // Reduced from 80vh
-          overflow: "auto",
-        }}
-        maskStyle={{ backgroundColor: "rgba(16, 24, 40, 0.6)" }}
-      >
-        {currentFarmer && (
-          <DataEntry
-            handleCancel={handleEditModalClose}
-            editMode={true}
-            farmerData={currentFarmer}
-          />
-        )}
-      </Modal>
-
-      {/* Add custom styles for more refined table and action buttons */}
-      <style jsx global>{`
-        .ant-table {
-          background: ${colors.background};
-        }
-        .ant-table-thead > tr > th {
-          background-color: ${colors.backgroundAlt} !important;
-          color: ${colors.textDark};
-          font-weight: 600;
-          font-size: 13px;
-          padding: 10px 12px;
-          border-bottom: 1px solid ${colors.border};
-        }
-        .ant-table-tbody > tr > td {
-          padding: 10px 12px;
-          border-bottom: 1px solid ${colors.border};
-          font-size: 13px;
-        }
-        .ant-table-tbody > tr:hover > td {
-          background-color: ${colors.primaryLight} !important;
-        }
-        .ant-table-row-light {
-          background-color: ${colors.backgroundAlt};
-        }
-        .ant-pagination {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .ant-pagination-item {
-          border-radius: 4px;
-          font-size: 12px;
-          min-width: 24px;
-          height: 24px;
-          line-height: 22px;
-          margin: 0 4px;
-        }
-        .ant-pagination-item a {
-          padding: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .ant-pagination-item-active {
-          border-color: ${colors.primary};
-          background-color: ${colors.primaryLight};
-        }
-        .ant-pagination-item-active a {
-          color: ${colors.primary};
-          font-weight: 500;
-        }
-        .ant-pagination-prev,
-        .ant-pagination-next {
-          min-width: 24px;
-          height: 24px;
-          line-height: 22px;
-          margin: 0 4px;
-        }
-        .ant-pagination-prev .ant-pagination-item-link,
-        .ant-pagination-next .ant-pagination-item-link {
-          border-radius: 4px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .ant-btn-primary {
-          background-color: ${colors.primary};
-          border-color: ${colors.primary};
-        }
-        .ant-btn-primary:hover {
-          background-color: ${colors.primaryDark};
-          border-color: ${colors.primaryDark};
-        }
-        .ant-input-affix-wrapper:focus,
-        .ant-input-affix-wrapper-focused {
-          border-color: ${colors.primary};
-          box-shadow: 0 0 0 2px rgba(106, 156, 137, 0.2);
-        }
-        .ant-btn:focus,
-        .ant-btn-primary:focus {
-          border-color: ${colors.primary};
-          box-shadow: 0 0 0 2px rgba(106, 156, 137, 0.2);
-        }
-        .action-button {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 28px;
-          height: 28px;
-          border-radius: 4px;
-          padding: 0;
-          margin: 0 2px;
-        }
-        .action-button:hover {
-          background-color: ${colors.backgroundAlt};
-        }
-        .ant-table-small .ant-table-thead > tr > th {
-          background-color: ${colors.backgroundAlt} !important;
-        }
-        .ant-pagination-simple .ant-pagination-simple-pager {
-          margin-right: 0;
-        }
-        .ant-pagination-simple .ant-pagination-simple-pager input {
-          border-radius: 4px;
-          margin: 0 4px;
-          padding: 0 4px;
-          height: 24px;
-          width: 40px;
-        }
-      `}</style>
+      </Card>
     </div>
   );
 };
