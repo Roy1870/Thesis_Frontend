@@ -16,6 +16,7 @@ import {
   Badge,
   Tag,
   Tooltip,
+  Popconfirm,
 } from "antd";
 import {
   SearchOutlined,
@@ -234,15 +235,11 @@ const Inventory = () => {
       await farmerAPI.deleteFarmer(farmerId);
 
       // Refresh data after deletion
-      fetchAllFarmerData(); // Refresh all data
-      if (searchText) {
-        filterFarmerData();
-      } else {
-        fetchFarmerData(currentPage);
-      }
+      fetchFarmerData(currentPage, searchText);
       message.success("Farmer deleted successfully");
     } catch (err) {
-      message.error("Failed to delete farmer.");
+      console.error("Error deleting farmer:", err);
+      message.error(`Failed to delete farmer: ${err.message}`);
     }
   };
 
@@ -370,20 +367,27 @@ const Inventory = () => {
               style={{ color: colors.warning }}
             />
           </Tooltip>
-          <Tooltip title="Delete">
+          <Popconfirm
+            title="Delete this farmer?"
+            description="This action cannot be undone."
+            onConfirm={() => handleDelete(record.farmer_id)}
+            okText="Yes"
+            cancelText="No"
+            okButtonProps={{
+              style: {
+                backgroundColor: colors.error,
+                borderColor: colors.error,
+              },
+            }}
+            placement="bottomRight"
+          >
             <Button
               type="text"
               icon={<DeleteOutlined />}
-              onClick={() => {
-                if (
-                  window.confirm("Are you sure you want to delete this farmer?")
-                ) {
-                  handleDelete(record.farmer_id);
-                }
-              }}
               danger
+              className="action-button"
             />
-          </Tooltip>
+          </Popconfirm>
         </Space>
       ),
     },

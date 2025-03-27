@@ -25,6 +25,7 @@ import {
   DeleteOutlined,
 } from "@ant-design/icons";
 import { farmerAPI } from "./services/api";
+import EditFarmer from "./EditFarmer";
 
 const { Title, Text } = Typography;
 
@@ -34,66 +35,68 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("info");
   const [cropDataType, setCropDataType] = useState("Crop"); // Default column title
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // Function to fetch farmer details (declared here to be accessible in handleCloseEdit)
+  const fetchFarmerDetails = async () => {
+    try {
+      setFetchLoading(true);
+
+      const response = await farmerAPI.getFarmerById(farmer.farmer_id);
+
+      // Determine the crop data type from the first crop item
+      if (response.crops && response.crops.length > 0) {
+        try {
+          const firstCrop = response.crops[0];
+          if (firstCrop.production_data) {
+            const data = JSON.parse(firstCrop.production_data);
+            if (data.month) {
+              setCropDataType("Month");
+            } else if (data.crop) {
+              setCropDataType("Crop");
+            }
+          }
+        } catch (e) {
+          console.error("Error parsing crop data:", e);
+        }
+      }
+
+      // Process the crops data to extract JSON values
+      if (response.crops && response.crops.length > 0) {
+        response.crops = response.crops.map((crop) => {
+          if (crop.production_data) {
+            try {
+              const data = JSON.parse(crop.production_data);
+              return {
+                ...crop,
+                crop_value: data.crop || null,
+                month_value: data.month || null,
+                quantity_value: data.quantity || null,
+              };
+            } catch (e) {
+              return {
+                ...crop,
+                crop_value: null,
+                month_value: null,
+                quantity_value: null,
+              };
+            }
+          }
+          return crop;
+        });
+      }
+
+      setFarmerData(response);
+      setFetchLoading(false);
+    } catch (err) {
+      console.error("Error fetching farmer details:", err);
+      setError(`Failed to fetch farmer details: ${err.message}`);
+      setFetchLoading(false);
+    }
+  };
 
   // Fetch the farmer data
   useEffect(() => {
-    const fetchFarmerDetails = async () => {
-      try {
-        setFetchLoading(true);
-
-        const response = await farmerAPI.getFarmerById(farmer.farmer_id);
-
-        // Determine the crop data type from the first crop item
-        if (response.crops && response.crops.length > 0) {
-          try {
-            const firstCrop = response.crops[0];
-            if (firstCrop.production_data) {
-              const data = JSON.parse(firstCrop.production_data);
-              if (data.month) {
-                setCropDataType("Month");
-              } else if (data.crop) {
-                setCropDataType("Crop");
-              }
-            }
-          } catch (e) {
-            console.error("Error parsing crop data:", e);
-          }
-        }
-
-        // Process the crops data to extract JSON values
-        if (response.crops && response.crops.length > 0) {
-          response.crops = response.crops.map((crop) => {
-            if (crop.production_data) {
-              try {
-                const data = JSON.parse(crop.production_data);
-                return {
-                  ...crop,
-                  crop_value: data.crop || null,
-                  month_value: data.month || null,
-                  quantity_value: data.quantity || null,
-                };
-              } catch (e) {
-                return {
-                  ...crop,
-                  crop_value: null,
-                  month_value: null,
-                  quantity_value: null,
-                };
-              }
-            }
-            return crop;
-          });
-        }
-
-        setFarmerData(response);
-        setFetchLoading(false);
-      } catch (err) {
-        console.error("Error fetching farmer details:", err);
-        setError(`Failed to fetch farmer details: ${err.message}`);
-        setFetchLoading(false);
-      }
-    };
-
     fetchFarmerDetails();
   }, [farmer.farmer_id]);
 
@@ -161,16 +164,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
   ];
 
   const handleEdit = (farmer) => {
-    // This will be handled by the parent component
-    onClose();
-    // We need to pass the farmer data back to the Inventory component
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent("editFarmer", { detail: farmer }));
-      // Directly trigger edit mode in the parent component
-      if (typeof window !== "undefined") {
-        window.location.href = `/edit-farmer/${farmer.farmer_id}`;
-      }
-    }, 100);
+    setIsEditMode(true);
   };
 
   const handleDelete = async (farmerId) => {
@@ -182,6 +176,23 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
       message.error(`Failed to delete farmer: ${error.message}`);
     }
   };
+
+  const handleCloseEdit = () => {
+    setIsEditMode(false);
+    // Refresh farmer data after editing
+    fetchFarmerDetails();
+  };
+
+  // If in edit mode, show the edit page instead of the view
+  if (isEditMode && farmerData) {
+    return (
+      <EditFarmer
+        farmer={farmerData}
+        onClose={handleCloseEdit}
+        colors={colors}
+      />
+    );
+  }
 
   if (fetchLoading) {
     return (
@@ -215,74 +226,71 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
 
   return (
     <div className="min-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden">
-      {/* Header with back button and farmer name */}
+      {/* Header with back button and action buttons */}
       <Card
         bordered={false}
         className="rounded-lg shadow-sm mb-3"
-        bodyStyle={{ padding: "10px" }}
+        bodyStyle={{ padding: "16px" }}
       >
-        <div className="flex items-center mb-2">
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={onClose}
-            className="mr-2"
-          >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            width: "100%",
+            marginBottom: "16px",
+          }}
+        >
+          <Button icon={<ArrowLeftOutlined />} onClick={onClose}>
             Back
           </Button>
-          <span className="text-lg font-medium">
-            {farmerData?.name || "Loading..."}
-          </span>
-        </div>
-
-        {/* Action buttons below header */}
-        <div className="flex mb-3 gap-2">
-          <Button
-            type="primary"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(farmerData)}
-            className="inline-flex items-center rounded-md h-[34px] shadow-sm"
-            style={{
-              backgroundColor: colors.warning,
-              borderColor: colors.warning,
-            }}
-          >
-            <span className="ml-1">Edit</span>
-          </Button>
-          <Popconfirm
-            title="Delete this farmer?"
-            description="This action cannot be undone."
-            onConfirm={() => {
-              handleDelete(farmerData.farmer_id);
-              onClose();
-            }}
-            okText="Yes"
-            cancelText="No"
-            okButtonProps={{
-              style: {
-                backgroundColor: colors.error,
-                borderColor: colors.error,
-              },
-            }}
-            placement="bottomRight"
-          >
+          <div style={{ display: "flex", gap: "8px" }}>
             <Button
               type="primary"
-              danger
-              icon={<DeleteOutlined />}
+              icon={<EditOutlined />}
+              onClick={() => handleEdit(farmerData)}
               className="inline-flex items-center rounded-md h-[34px] shadow-sm"
+              style={{
+                backgroundColor: colors.warning,
+                borderColor: colors.warning,
+              }}
             >
-              <span className="ml-1">Delete</span>
+              <span className="ml-1">Edit</span>
             </Button>
-          </Popconfirm>
+            <Popconfirm
+              title="Delete this farmer?"
+              description="This action cannot be undone."
+              onConfirm={() => {
+                handleDelete(farmerData.farmer_id);
+              }}
+              okText="Yes"
+              cancelText="No"
+              okButtonProps={{
+                style: {
+                  backgroundColor: colors.error,
+                  borderColor: colors.error,
+                },
+              }}
+              placement="bottomRight"
+            >
+              <Button
+                type="primary"
+                danger
+                icon={<DeleteOutlined />}
+                className="inline-flex items-center rounded-md h-[34px] shadow-sm"
+              >
+                <span className="ml-1">Delete</span>
+              </Button>
+            </Popconfirm>
+          </div>
         </div>
 
         {/* Navigation buttons */}
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap gap-4 mb-2">
           <Button
             type={activeTab === "info" ? "primary" : "default"}
             icon={<UserOutlined />}
             onClick={() => setActiveTab("info")}
-            className="mr-2"
             style={{
               backgroundColor: activeTab === "info" ? colors.primary : "",
               borderColor: activeTab === "info" ? colors.primary : "",
@@ -296,7 +304,6 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
               type={activeTab === "crops" ? "primary" : "default"}
               icon={<InfoCircleOutlined />}
               onClick={() => setActiveTab("crops")}
-              className="mr-2"
               style={{
                 backgroundColor: activeTab === "crops" ? colors.primary : "",
                 borderColor: activeTab === "crops" ? colors.primary : "",
@@ -320,7 +327,6 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
               type={activeTab === "rice" ? "primary" : "default"}
               icon={<InfoCircleOutlined />}
               onClick={() => setActiveTab("rice")}
-              className="mr-2"
               style={{
                 backgroundColor: activeTab === "rice" ? colors.primary : "",
                 borderColor: activeTab === "rice" ? colors.primary : "",

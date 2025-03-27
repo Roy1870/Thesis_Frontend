@@ -794,21 +794,21 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
         className="rounded-lg shadow-sm mb-3"
         bodyStyle={{ padding: "10px" }}
       >
-        <div className="flex items-center mb-2">
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={onClose}
-            className="mr-2"
-          >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            width: "100%",
+          }}
+        >
+          <Button icon={<ArrowLeftOutlined />} onClick={onClose}>
             Back
           </Button>
-          <span className="text-lg font-medium">
-            {farmerData?.name || "Loading..."}
-          </span>
         </div>
 
         {/* Navigation buttons */}
-        <div className="flex flex-wrap gap-5 mb-2">
+        <div className="flex flex-wrap gap-5 mb-2 mt-3">
           <Button
             type={activeTab === "info" ? "primary" : "default"}
             icon={<UserOutlined />}
@@ -821,40 +821,40 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
             Farmer Information
           </Button>
 
-          {hasCrops && (
-            <Button
-              type={activeTab === "crops" ? "primary" : "default"}
-              icon={<InfoCircleOutlined />}
-              onClick={() => setActiveTab("crops")}
-              style={{
-                backgroundColor: activeTab === "crops" ? colors.primary : "",
-                borderColor: activeTab === "crops" ? colors.primary : "",
-              }}
-            >
-              Crop Information
+          <Button
+            type={activeTab === "crops" ? "primary" : "default"}
+            icon={<InfoCircleOutlined />}
+            onClick={() => setActiveTab("crops")}
+            style={{
+              backgroundColor: activeTab === "crops" ? colors.primary : "",
+              borderColor: activeTab === "crops" ? colors.primary : "",
+            }}
+          >
+            Crop Information
+            {hasCrops && (
               <Badge
                 count={farmerData.crops.length}
-                className="ml-1 "
+                className="ml-1"
                 style={{
                   backgroundColor:
                     activeTab === "crops" ? "#fff" : colors.primary,
                   color: activeTab === "crops" ? colors.primary : "#fff",
                 }}
               />
-            </Button>
-          )}
+            )}
+          </Button>
 
-          {hasRice && (
-            <Button
-              type={activeTab === "rice" ? "primary" : "default"}
-              icon={<InfoCircleOutlined />}
-              onClick={() => setActiveTab("rice")}
-              style={{
-                backgroundColor: activeTab === "rice" ? colors.primary : "",
-                borderColor: activeTab === "rice" ? colors.primary : "",
-              }}
-            >
-              Rice Information
+          <Button
+            type={activeTab === "rice" ? "primary" : "default"}
+            icon={<InfoCircleOutlined />}
+            onClick={() => setActiveTab("rice")}
+            style={{
+              backgroundColor: activeTab === "rice" ? colors.primary : "",
+              borderColor: activeTab === "rice" ? colors.primary : "",
+            }}
+          >
+            Rice Information
+            {hasRice && (
               <Badge
                 count={farmerData.rice.length}
                 className="ml-1"
@@ -864,8 +864,8 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
                   color: activeTab === "rice" ? colors.primary : "#fff",
                 }}
               />
-            </Button>
-          )}
+            )}
+          </Button>
 
           {hasLivestock && (
             <Button
@@ -1081,7 +1081,8 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
               image={Empty.PRESENTED_IMAGE_SIMPLE}
               description="No crop information available"
               className="py-10"
-            />
+              style={{ marginBottom: "20px" }}
+            ></Empty>
           )}
         </Card>
       )}
@@ -1129,7 +1130,8 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
               image={Empty.PRESENTED_IMAGE_SIMPLE}
               description="No rice information available"
               className="py-10"
-            />
+              style={{ marginBottom: "20px" }}
+            ></Empty>
           )}
         </Card>
       )}
@@ -1184,7 +1186,21 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
               image={Empty.PRESENTED_IMAGE_SIMPLE}
               description="No livestock records available"
               className="py-10"
-            />
+              style={{ marginBottom: "20px" }}
+            >
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={showAddLivestockModal}
+                style={{
+                  backgroundColor: colors.primary,
+                  borderColor: colors.primary,
+                  marginTop: "16px",
+                }}
+              >
+                Add Livestock
+              </Button>
+            </Empty>
           )}
         </Card>
       )}
