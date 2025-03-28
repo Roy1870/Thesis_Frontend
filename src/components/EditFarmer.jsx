@@ -67,6 +67,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
   const [currentLivestock, setCurrentLivestock] = useState(null);
   const [livestockModalLoading, setLivestockModalLoading] = useState(false);
   const [livestockForm] = Form.useForm();
+  const [livestockLoading, setLivestockLoading] = useState(true);
 
   // Fetch the farmer data
   useEffect(() => {
@@ -143,7 +144,28 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
       }
     };
 
+    const fetchLivestockRecords = async () => {
+      try {
+        setLivestockLoading(true);
+
+        // Get all livestock records
+        const response = await livestockAPI.getAllLivestockRecords();
+
+        // Filter records for this farmer
+        const farmerLivestockRecords = response.filter(
+          (record) => record.farmer_id === farmer.farmer_id
+        );
+
+        setLivestockRecords(farmerLivestockRecords);
+        setLivestockLoading(false);
+      } catch (err) {
+        console.error("Error fetching livestock records:", err);
+        setLivestockLoading(false);
+      }
+    };
+
     fetchFarmerDetails();
+    fetchLivestockRecords();
   }, [farmer.farmer_id, form]);
 
   const onFinish = async (values) => {
@@ -417,40 +439,67 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
     try {
       const values = await livestockForm.validateFields();
       setLivestockModalLoading(true);
-
-      // Create the livestock object
-      const livestockObject = {
-        animal_type: values.animal_type,
-        subcategory: values.subcategory,
-        quantity: Number.parseInt(values.quantity, 10),
-        updated_by: "User", // You can replace this with the actual user name or ID
-      };
-
-      console.log("Submitting livestock data:", livestockObject);
+      const currentUser = localStorage.getItem("userName") || "System";
 
       if (isEditingLivestock && currentLivestock) {
-        // Update existing livestock record
-        await livestockAPI.updateLivestockRecord(
-          currentLivestock.id,
-          livestockObject
-        );
-        message.success("Livestock record updated successfully.");
-      } else {
-        // Add new livestock record
-        await livestockAPI.createLivestockRecords({
+        // Format the update data according to the required structure
+        const updateData = {
+          farmer_id: farmer.farmer_id,
           name: farmerData.name,
           contact_number: farmerData.contact_number || "",
           facebook_email: farmerData.facebook_email || "",
           home_address: farmerData.home_address || "",
           barangay: farmerData.barangay || "",
-          livestock_records: [livestockObject],
-        });
+          livestock_records: [
+            {
+              animal_type: values.animal_type,
+              subcategory: values.subcategory,
+              quantity: Number.parseInt(values.quantity, 10),
+              updated_by: currentUser,
+            },
+          ],
+        };
+
+        console.log("Updating livestock record with data:", updateData);
+        await livestockAPI.updateLivestockRecord(
+          currentLivestock.record_id,
+          updateData
+        );
+        message.success("Livestock record updated successfully.");
+      } else {
+        // Add new livestock record
+        const newLivestockData = {
+          farmer_id: farmer.farmer_id,
+          name: farmerData.name,
+          contact_number: farmerData.contact_number || "",
+          facebook_email: farmerData.facebook_email || "",
+          home_address: farmerData.home_address || "",
+          barangay: farmerData.barangay || "",
+          livestock_records: [
+            {
+              animal_type: values.animal_type,
+              subcategory: values.subcategory,
+              quantity: Number.parseInt(values.quantity, 10),
+              updated_by: currentUser,
+            },
+          ],
+        };
+
+        await livestockAPI.createLivestockRecords(newLivestockData);
         message.success("Livestock record added successfully.");
       }
+
+      // Refresh livestock records
+      const allLivestockRecords = await livestockAPI.getAllLivestockRecords();
+      const farmerLivestockRecords = allLivestockRecords.filter(
+        (record) => record.farmer_id === farmer.farmer_id
+      );
+      setLivestockRecords(farmerLivestockRecords);
 
       // Refresh farmer data
       const response = await farmerAPI.getFarmerById(farmer.farmer_id);
       setFarmerData(response);
+
       setLivestockModalLoading(false);
       setIsLivestockModalVisible(false);
       livestockForm.resetFields();
@@ -467,13 +516,59 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
 
   const handleDeleteLivestock = async (recordId) => {
     try {
+      if (!recordId) {
+        console.error("Error: Record ID is undefined");
+        message.error(
+          "Failed to delete livestock record: Record ID is missing"
+        );
+        return;
+      }
+
+      console.log(`Deleting livestock record with ID: ${recordId}`);
+
+      // Use the API function from the provided API service
       await livestockAPI.deleteLivestockRecord(recordId);
       message.success("Livestock record deleted successfully.");
 
-      // Refresh farmer data
+      // Refresh livestock records
+      const allLivestockRecords = await livestockAPI.getAllLivestockRecords();
+      const farmerLivestockRecords = allLivestockRecords.filter(
+        (record) => record.farmer_id === farmer.farmer_id
+      );
+      setLivestockRecords(farmerLivestockRecords);
+
+      // Refresh farmer data to ensure consistency with other data
       const response = await farmerAPI.getFarmerById(farmer.farmer_id);
+
+      // Process the crops data to extract JSON values (keeping this consistent with crop/rice pattern)
+      if (response.crops && response.crops.length > 0) {
+        response.crops = response.crops.map((crop) => {
+          if (crop.production_data) {
+            try {
+              const data = JSON.parse(crop.production_data);
+              return {
+                ...crop,
+                crop_value: data.crop || null,
+                month_value: data.month || null,
+                quantity_value: data.quantity || null,
+              };
+            } catch (e) {
+              console.error("Error parsing production data:", e);
+              return {
+                ...crop,
+                crop_value: null,
+                month_value: null,
+                quantity_value: null,
+              };
+            }
+          }
+          return crop;
+        });
+      }
+
       setFarmerData(response);
     } catch (error) {
+      console.error("Error deleting livestock record:", error);
       message.error(`Failed to delete livestock record. ${error.message}`);
     }
   };
@@ -597,7 +692,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
           <Popconfirm
             title="Delete this livestock record?"
             description="This action cannot be undone."
-            onConfirm={() => handleDeleteLivestock(record.id)}
+            onConfirm={() => handleDeleteLivestock(record.record_id)}
             okText="Yes"
             cancelText="No"
             okButtonProps={{
@@ -783,8 +878,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
   // Check if rice and crop data exists
   const hasRice = farmerData?.rice && farmerData.rice.length > 0;
   const hasCrops = farmerData?.crops && farmerData.crops.length > 0;
-  const hasLivestock =
-    farmerData?.livestock_records && farmerData.livestock_records.length > 0;
+  const hasLivestock = livestockRecords.length > 0;
 
   return (
     <div className="min-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden">
@@ -867,20 +961,19 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
             )}
           </Button>
 
-          {hasLivestock && (
-            <Button
-              type={activeTab === "livestock" ? "primary" : "default"}
-              icon={<InfoCircleOutlined />}
-              onClick={() => setActiveTab("livestock")}
-              style={{
-                backgroundColor:
-                  activeTab === "livestock" ? colors.primary : "",
-                borderColor: activeTab === "livestock" ? colors.primary : "",
-              }}
-            >
-              Livestock Records
+          <Button
+            type={activeTab === "livestock" ? "primary" : "default"}
+            icon={<InfoCircleOutlined />}
+            onClick={() => setActiveTab("livestock")}
+            style={{
+              backgroundColor: activeTab === "livestock" ? colors.primary : "",
+              borderColor: activeTab === "livestock" ? colors.primary : "",
+            }}
+          >
+            Livestock Records
+            {hasLivestock && (
               <Badge
-                count={farmerData.livestock_records.length}
+                count={livestockRecords.length}
                 className="ml-1"
                 style={{
                   backgroundColor:
@@ -888,8 +981,8 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
                   color: activeTab === "livestock" ? colors.primary : "#fff",
                 }}
               />
-            </Button>
-          )}
+            )}
+          </Button>
         </div>
       </Card>
 
@@ -1162,10 +1255,14 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
           className="rounded-lg shadow-sm mt-4"
           bodyStyle={{ padding: "0" }}
         >
-          {hasLivestock ? (
+          {livestockLoading ? (
+            <div className="py-10 flex justify-center">
+              <Spin tip="Loading livestock records..." />
+            </div>
+          ) : hasLivestock ? (
             <Table
               columns={livestockColumns}
-              dataSource={farmerData.livestock_records}
+              dataSource={livestockRecords}
               rowKey={(record) =>
                 `${record.animal_type}-${record.subcategory}-${
                   record.id || Math.random()
@@ -1175,10 +1272,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
               size="small"
               scroll={{
                 y: "calc(100vh - 300px)",
-                x:
-                  farmerData.livestock_records.length > 0
-                    ? "max-content"
-                    : undefined,
+                x: livestockRecords.length > 0 ? "max-content" : undefined,
               }}
             />
           ) : (
@@ -1187,20 +1281,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
               description="No livestock records available"
               className="py-10"
               style={{ marginBottom: "20px" }}
-            >
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={showAddLivestockModal}
-                style={{
-                  backgroundColor: colors.primary,
-                  borderColor: colors.primary,
-                  marginTop: "16px",
-                }}
-              >
-                Add Livestock
-              </Button>
-            </Empty>
+            ></Empty>
           )}
         </Card>
       )}

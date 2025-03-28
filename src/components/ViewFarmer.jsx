@@ -24,14 +24,16 @@ import {
   EditOutlined,
   DeleteOutlined,
 } from "@ant-design/icons";
-import { farmerAPI } from "./services/api";
+import { farmerAPI, livestockAPI } from "./services/api";
 import EditFarmer from "./EditFarmer";
 
 const { Title, Text } = Typography;
 
 const ViewFarmer = ({ farmer, onClose, colors }) => {
   const [farmerData, setFarmerData] = useState(null);
+  const [livestockRecords, setLivestockRecords] = useState([]);
   const [fetchLoading, setFetchLoading] = useState(true);
+  const [livestockLoading, setLivestockLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("info");
   const [cropDataType, setCropDataType] = useState("Crop"); // Default column title
@@ -95,9 +97,31 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
     }
   };
 
-  // Fetch the farmer data
+  // Fetch livestock records separately
+  const fetchLivestockRecords = async () => {
+    try {
+      setLivestockLoading(true);
+
+      // Get all livestock records
+      const response = await livestockAPI.getAllLivestockRecords();
+
+      // Filter records for this farmer
+      const farmerLivestockRecords = response.filter(
+        (record) => record.farmer_id === farmer.farmer_id
+      );
+
+      setLivestockRecords(farmerLivestockRecords);
+      setLivestockLoading(false);
+    } catch (err) {
+      console.error("Error fetching livestock records:", err);
+      setLivestockLoading(false);
+    }
+  };
+
+  // Fetch the farmer data and livestock records
   useEffect(() => {
     fetchFarmerDetails();
+    fetchLivestockRecords();
   }, [farmer.farmer_id]);
 
   const riceColumns = [
@@ -163,6 +187,29 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
     },
   ];
 
+  const livestockColumns = [
+    {
+      title: "Animal Type",
+      dataIndex: "animal_type",
+      key: "animal_type",
+    },
+    {
+      title: "Subcategory",
+      dataIndex: "subcategory",
+      key: "subcategory",
+    },
+    {
+      title: "Quantity",
+      dataIndex: "quantity",
+      key: "quantity",
+    },
+    {
+      title: "Updated By",
+      dataIndex: "updated_by",
+      key: "updated_by",
+    },
+  ];
+
   const handleEdit = (farmer) => {
     setIsEditMode(true);
   };
@@ -181,6 +228,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
     setIsEditMode(false);
     // Refresh farmer data after editing
     fetchFarmerDetails();
+    fetchLivestockRecords();
   };
 
   // If in edit mode, show the edit page instead of the view
@@ -223,6 +271,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
   // Check if rice and crop data exists
   const hasRice = farmerData?.rice && farmerData.rice.length > 0;
   const hasCrops = farmerData?.crops && farmerData.crops.length > 0;
+  const hasLivestock = livestockRecords.length > 0;
 
   return (
     <div className="min-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden">
@@ -340,6 +389,31 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                   backgroundColor:
                     activeTab === "rice" ? "#fff" : colors.primary,
                   color: activeTab === "rice" ? colors.primary : "#fff",
+                }}
+              />
+            </Button>
+          )}
+
+          {/* Only show livestock button if records exist */}
+          {hasLivestock && (
+            <Button
+              type={activeTab === "livestock" ? "primary" : "default"}
+              icon={<InfoCircleOutlined />}
+              onClick={() => setActiveTab("livestock")}
+              style={{
+                backgroundColor:
+                  activeTab === "livestock" ? colors.primary : "",
+                borderColor: activeTab === "livestock" ? colors.primary : "",
+              }}
+            >
+              Livestock Records
+              <Badge
+                count={livestockRecords.length}
+                className="ml-1.5"
+                style={{
+                  backgroundColor:
+                    activeTab === "livestock" ? "#fff" : colors.primary,
+                  color: activeTab === "livestock" ? colors.primary : "#fff",
                 }}
               />
             </Button>
@@ -499,6 +573,48 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
               description="No crop information available"
+              className="py-10"
+            />
+          )}
+        </Card>
+      )}
+
+      {activeTab === "livestock" && (
+        <Card
+          title={
+            <div className="flex items-center">
+              <InfoCircleOutlined className="mr-2" />
+              <span>Livestock Records</span>
+            </div>
+          }
+          bordered={false}
+          className="rounded-lg shadow-sm mt-4"
+          bodyStyle={{ padding: "0" }}
+        >
+          {livestockLoading ? (
+            <div className="py-10 flex justify-center">
+              <Spin tip="Loading livestock records..." />
+            </div>
+          ) : hasLivestock ? (
+            <Table
+              columns={livestockColumns}
+              dataSource={livestockRecords}
+              rowKey={(record) =>
+                `${record.animal_type}-${record.subcategory}-${
+                  record.id || Math.random()
+                }`
+              }
+              pagination={false}
+              size="small"
+              scroll={{
+                y: "calc(100vh - 300px)",
+                x: livestockRecords.length > 0 ? "max-content" : undefined,
+              }}
+            />
+          ) : (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="No livestock records available"
               className="py-10"
             />
           )}
