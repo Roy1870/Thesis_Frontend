@@ -231,8 +231,78 @@ export const livestockAPI = {
   },
 };
 
+// Operator API endpoints
+export const operatorAPI = {
+  // Get all operators with pagination and search
+  getAllOperators: async (page = 1, perPage = 10, search = "") => {
+    const params = new URLSearchParams({
+      page,
+      per_page: perPage,
+    });
+
+    if (search) {
+      params.append("search", search);
+    }
+
+    try {
+      const response = await apiClient.get(`/operators?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to fetch operators: ${error.message}`);
+    }
+  },
+
+  // Get a single operator by ID
+  getOperatorById: async (operatorId) => {
+    try {
+      const response = await apiClient.get(`/operators/${operatorId}`);
+      console.log("API Response for operator by ID:", response.data);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to fetch operator details: ${error.message}`);
+    }
+  },
+
+  // Add operator to a farmer
+  addOperator: async (data) => {
+    try {
+      const response = await apiClient.post(`/operators`, data);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to add operator: ${error.message}`);
+    }
+  },
+
+  // Update an operator
+  updateOperator: async (operatorId, operatorData) => {
+    try {
+      const response = await apiClient.put(
+        `/operators/${operatorId}`,
+        operatorData
+      );
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to update operator: ${error.message}`);
+    }
+  },
+
+  // Delete an operator
+  deleteOperator: async (operatorId) => {
+    try {
+      if (!operatorId) {
+        throw new Error("Operator ID is required for deletion");
+      }
+      const response = await apiClient.delete(`/operators/${operatorId}`);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to delete operator: ${error.message}`);
+    }
+  },
+};
+
 // Export a default object with all APIs
 export default {
   farmer: farmerAPI,
   livestock: livestockAPI,
+  operator: operatorAPI,
 };

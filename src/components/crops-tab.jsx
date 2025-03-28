@@ -114,7 +114,11 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
 
   const fetchLivestockRecords = useCallback(async () => {
     try {
-      setLivestockLoading(true);
+      // Only show loading on initial fetch, not on refreshes
+      if (livestockRecords.length === 0) {
+        setLivestockLoading(true);
+      }
+
       // Get all livestock records
       const response = await livestockAPI.getAllLivestockRecords();
       // Filter records for this farmer
@@ -127,24 +131,28 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
       console.error("Error fetching livestock records:", err);
       setLivestockLoading(false);
     }
-  }, [farmer.farmer_id]);
+  }, [farmer.farmer_id, livestockRecords.length]);
 
   const fetchOperatorData = useCallback(async () => {
     try {
-      setOperatorLoading(true);
-      // Get all operators
-      const response = await operatorAPI.getAllOperators();
-      // Filter records for this farmer
-      const farmerOperators = response.filter(
-        (operator) => operator.farmer_id === farmer.farmer_id
+      // Only show loading on initial fetch, not on refreshes
+      if (operatorData.length === 0) {
+        setOperatorLoading(true);
+      }
+
+      // Use the getOperatorsByFarmerId method instead of getAllOperators to reduce API calls
+      const response = await operatorAPI.getOperatorsByFarmerId(
+        farmer.farmer_id
       );
-      setOperatorData(farmerOperators);
+
+      // No need to filter as the API already returns filtered data
+      setOperatorData(response);
       setOperatorLoading(false);
     } catch (err) {
       console.error("Error fetching operator data:", err);
       setOperatorLoading(false);
     }
-  }, [farmer.farmer_id]);
+  }, [farmer.farmer_id, operatorData.length]);
 
   useEffect(() => {
     fetchFarmerDetails();
