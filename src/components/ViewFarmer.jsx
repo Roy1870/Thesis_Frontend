@@ -23,8 +23,9 @@ import {
   InfoCircleOutlined,
   EditOutlined,
   DeleteOutlined,
+  EnvironmentOutlined,
 } from "@ant-design/icons";
-import { farmerAPI, livestockAPI } from "./services/api";
+import { farmerAPI, livestockAPI, operatorAPI } from "./services/api";
 import EditFarmer from "./EditFarmer";
 
 const { Title, Text } = Typography;
@@ -32,8 +33,10 @@ const { Title, Text } = Typography;
 const ViewFarmer = ({ farmer, onClose, colors }) => {
   const [farmerData, setFarmerData] = useState(null);
   const [livestockRecords, setLivestockRecords] = useState([]);
+  const [operatorData, setOperatorData] = useState([]);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [livestockLoading, setLivestockLoading] = useState(true);
+  const [operatorLoading, setOperatorLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("info");
   const [cropDataType, setCropDataType] = useState("Crop"); // Default column title
@@ -118,10 +121,32 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
     }
   };
 
-  // Fetch the farmer data and livestock records
+  // Fetch operator data separately
+  const fetchOperatorData = async () => {
+    try {
+      setOperatorLoading(true);
+
+      // Get operators for this farmer using getOperatorById
+      const response = await operatorAPI.getAllOperators();
+
+      // Filter records for this farmer
+      const Operator = response.filter(
+        (Operator) => Operator.farmer_id === farmer.farmer_id
+      );
+
+      setOperatorData(Operator);
+      setOperatorLoading(false);
+    } catch (err) {
+      console.error("Error fetching operator data:", err);
+      setOperatorLoading(false);
+    }
+  };
+
+  // Fetch the farmer data, livestock records, and operator data
   useEffect(() => {
     fetchFarmerDetails();
     fetchLivestockRecords();
+    fetchOperatorData();
   }, [farmer.farmer_id]);
 
   const riceColumns = [
@@ -210,6 +235,50 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
     },
   ];
 
+  const operatorColumns = [
+    {
+      title: "Fishpond Location",
+      dataIndex: "fishpond_location",
+      key: "fishpond_location",
+    },
+    {
+      title: "Cultured Species",
+      dataIndex: "cultured_species",
+      key: "cultured_species",
+    },
+    {
+      title: "Area (sqm)",
+      dataIndex: "productive_area_sqm",
+      key: "productive_area_sqm",
+    },
+    {
+      title: "Stocking Density",
+      dataIndex: "stocking_density",
+      key: "stocking_density",
+    },
+    {
+      title: "Production (kg)",
+      dataIndex: "production_kg",
+      key: "production_kg",
+    },
+    {
+      title: "Status",
+      dataIndex: "operational_status",
+      key: "operational_status",
+      render: (status) => (
+        <Badge
+          status={status === "Active" ? "success" : "default"}
+          text={status}
+        />
+      ),
+    },
+    {
+      title: "Remarks",
+      dataIndex: "remarks",
+      key: "remarks",
+    },
+  ];
+
   const handleEdit = (farmer) => {
     setIsEditMode(true);
   };
@@ -229,6 +298,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
     // Refresh farmer data after editing
     fetchFarmerDetails();
     fetchLivestockRecords();
+    fetchOperatorData();
   };
 
   // If in edit mode, show the edit page instead of the view
@@ -268,10 +338,11 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
     );
   }
 
-  // Check if rice and crop data exists
+  // Check if rice, crop, livestock, and operator data exists
   const hasRice = farmerData?.rice && farmerData.rice.length > 0;
   const hasCrops = farmerData?.crops && farmerData.crops.length > 0;
   const hasLivestock = livestockRecords.length > 0;
+  const hasOperators = operatorData.length > 0;
 
   return (
     <div className="min-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden">
@@ -414,6 +485,30 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                   backgroundColor:
                     activeTab === "livestock" ? "#fff" : colors.primary,
                   color: activeTab === "livestock" ? colors.primary : "#fff",
+                }}
+              />
+            </Button>
+          )}
+
+          {/* Only show operator button if records exist */}
+          {hasOperators && (
+            <Button
+              type={activeTab === "operator" ? "primary" : "default"}
+              icon={<EnvironmentOutlined />}
+              onClick={() => setActiveTab("operator")}
+              style={{
+                backgroundColor: activeTab === "operator" ? colors.primary : "",
+                borderColor: activeTab === "operator" ? colors.primary : "",
+              }}
+            >
+              Operator Information
+              <Badge
+                count={operatorData.length}
+                className="ml-1.5"
+                style={{
+                  backgroundColor:
+                    activeTab === "operator" ? "#fff" : colors.primary,
+                  color: activeTab === "operator" ? colors.primary : "#fff",
                 }}
               />
             </Button>
@@ -615,6 +710,46 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
               description="No livestock records available"
+              className="py-10"
+            />
+          )}
+        </Card>
+      )}
+
+      {activeTab === "operator" && (
+        <Card
+          title={
+            <div className="flex items-center">
+              <EnvironmentOutlined className="mr-2 text-green-600" />
+              <span>Operator Information</span>
+            </div>
+          }
+          bordered={false}
+          className="rounded-lg shadow-sm mt-4"
+          bodyStyle={{ padding: "0" }}
+        >
+          {operatorLoading ? (
+            <div className="py-10 flex justify-center">
+              <Spin tip="Loading operator records..." />
+            </div>
+          ) : hasOperators ? (
+            <Table
+              columns={operatorColumns}
+              dataSource={operatorData}
+              rowKey={(record) =>
+                record.operator_id || record.id || Math.random().toString()
+              }
+              pagination={false}
+              size="small"
+              scroll={{
+                y: "calc(100vh - 300px)",
+                x: operatorData.length > 0 ? "max-content" : undefined,
+              }}
+            />
+          ) : (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="No operator information available"
               className="py-10"
             />
           )}

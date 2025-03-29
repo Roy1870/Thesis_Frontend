@@ -59,8 +59,38 @@ export const farmerAPI = {
   // Get a single farmer by ID
   getFarmerById: async (farmerId) => {
     try {
-      const response = await apiClient.get(`/farmers/${farmerId}`);
-      return response.data;
+      // Try to directly get the farmer by ID first
+      try {
+        // This might not work if the endpoint doesn't exist
+        const response = await apiClient.get(`/farmers/${farmerId}`);
+        return response.data;
+      } catch (directError) {
+        // If direct access fails, try to get all farmers and filter
+        console.log("Direct farmer fetch failed, trying alternative method");
+
+        // Get all farmers without pagination
+        const response = await apiClient.get(`/farmers`);
+
+        // Check if response.data is an array
+        let farmers = response.data;
+        if (!Array.isArray(farmers)) {
+          // If it's not an array, it might be paginated data
+          if (response.data.data && Array.isArray(response.data.data)) {
+            farmers = response.data.data;
+          } else {
+            throw new Error("Unexpected API response format");
+          }
+        }
+
+        // Find the specific farmer by ID
+        const farmer = farmers.find((f) => f.farmer_id === farmerId);
+
+        if (!farmer) {
+          throw new Error(`Farmer with ID ${farmerId} not found`);
+        }
+
+        return farmer;
+      }
     } catch (error) {
       throw new Error(`Failed to fetch farmer details: ${error.message}`);
     }
@@ -123,9 +153,11 @@ export const farmerAPI = {
   },
 
   // Delete a crop
-  deleteCrop: async (cropId) => {
+  deleteCrop: async (farmerId, cropId) => {
     try {
-      const response = await apiClient.delete(`/crops/${cropId}`);
+      const response = await apiClient.delete(
+        `/farmers/${farmerId}/crops/${cropId}`
+      );
       return response.data;
     } catch (error) {
       throw new Error(`Failed to delete crop: ${error.message}`);
@@ -133,12 +165,40 @@ export const farmerAPI = {
   },
 
   // Delete rice data
-  deleteRice: async (riceId) => {
+  deleteRice: async (farmerId, riceId) => {
     try {
-      const response = await apiClient.delete(`/rice/${riceId}`);
+      const response = await apiClient.delete(
+        `/farmers/${farmerId}/rice/${riceId}`
+      );
       return response.data;
     } catch (error) {
       throw new Error(`Failed to delete rice data: ${error.message}`);
+    }
+  },
+
+  updateCrop: async (farmerId, cropId, cropData) => {
+    try {
+      // cropData should already be in the correct format
+      const response = await apiClient.put(
+        `/farmers/${farmerId}/crops/${cropId}`,
+        cropData
+      );
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to update crop: ${error.message}`);
+    }
+  },
+
+  updateRice: async (farmerId, riceId, riceData) => {
+    try {
+      // riceData should already be in the correct format
+      const response = await apiClient.put(
+        `/farmers/${farmerId}/rice/${riceId}`,
+        riceData
+      );
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to update rice data: ${error.message}`);
     }
   },
 };
@@ -202,11 +262,11 @@ export const livestockAPI = {
   },
 
   // Update a livestock record
-  updateLivestockRecord: async (recordId, data) => {
+  updateLivestockRecord: async (recordId, livestockData) => {
     try {
       const response = await apiClient.put(
         `/livestock-records/${recordId}`,
-        data
+        livestockData
       );
       return response.data;
     } catch (error) {
@@ -274,10 +334,10 @@ export const operatorAPI = {
   },
 
   // Update an operator
-  updateOperator: async (operatorId, operatorData) => {
+  updateOperator: async (farmerId, operatorData) => {
     try {
       const response = await apiClient.put(
-        `/operators/${operatorId}`,
+        `/operators/${farmerId}`,
         operatorData
       );
       return response.data;

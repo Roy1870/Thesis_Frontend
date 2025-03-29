@@ -35,7 +35,9 @@ const LivestockTab = ({ farmerId, farmerData, colors, onDataChange }) => {
   const [livestockLoading, setLivestockLoading] = useState(true);
 
   useEffect(() => {
-    fetchLivestockRecords();
+    if (farmerId) {
+      fetchLivestockRecords();
+    }
   }, [farmerId]);
 
   const fetchLivestockRecords = async () => {
@@ -93,60 +95,55 @@ const LivestockTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       setLivestockModalLoading(true);
       const currentUser = localStorage.getItem("userName") || "System";
 
-      if (isEditingLivestock && currentLivestock) {
-        // Format the update data according to the required structure
-        const updateData = {
-          farmer_id: farmerId,
-          name: farmerData.name,
-          contact_number: farmerData.contact_number || "",
-          facebook_email: farmerData.facebook_email || "",
-          home_address: farmerData.home_address || "",
-          barangay: farmerData.barangay || "",
-          livestock_records: [
-            {
-              animal_type: values.animal_type,
-              subcategory: values.subcategory,
-              quantity: Number.parseInt(values.quantity, 10),
-              updated_by: currentUser,
-            },
-          ],
-        };
+      // Structure the data with livestock records only
+      const livestockData = {
+        name: farmerData.name,
+        contact_number: farmerData.contact_number || "",
+        facebook_email: farmerData.facebook_email || "",
+        home_address: farmerData.home_address || "",
+        barangay: farmerData.barangay || "",
+        livestock_records: [
+          {
+            animal_type: values.animal_type,
+            subcategory: values.subcategory,
+            quantity: Number.parseInt(values.quantity, 10),
+            updated_by: currentUser,
+          },
+        ],
+      };
 
-        console.log("Updating livestock record with data:", updateData);
+      if (isEditingLivestock && currentLivestock) {
+        // Update existing livestock record
+        console.log(
+          "Updating livestock record with data:",
+          JSON.stringify(livestockData, null, 2)
+        );
         await livestockAPI.updateLivestockRecord(
           currentLivestock.record_id,
-          updateData
+          livestockData
         );
         message.success("Livestock record updated successfully.");
       } else {
-        // Add new livestock record
-        const newLivestockData = {
+        // Add new livestock record with farmer details
+        const dataWithFarmerId = {
           farmer_id: farmerId,
           name: farmerData.name,
           contact_number: farmerData.contact_number || "",
           facebook_email: farmerData.facebook_email || "",
           home_address: farmerData.home_address || "",
           barangay: farmerData.barangay || "",
-          livestock_records: [
-            {
-              animal_type: values.animal_type,
-              subcategory: values.subcategory,
-              quantity: Number.parseInt(values.quantity, 10),
-              updated_by: currentUser,
-            },
-          ],
+          ...livestockData,
         };
-
-        await livestockAPI.createLivestockRecords(newLivestockData);
+        console.log(
+          "Creating livestock record with data:",
+          JSON.stringify(dataWithFarmerId, null, 2)
+        );
+        await livestockAPI.createLivestockRecords(dataWithFarmerId);
         message.success("Livestock record added successfully.");
       }
 
-      // Refresh livestock records without showing loading
-      const response = await livestockAPI.getAllLivestockRecords();
-      const farmerLivestockRecords = response.filter(
-        (record) => record.farmer_id === farmerId
-      );
-      setLivestockRecords(farmerLivestockRecords);
+      // Refresh livestock records
+      await fetchLivestockRecords();
 
       // Notify parent component to refresh data
       if (onDataChange) {
@@ -183,12 +180,8 @@ const LivestockTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       await livestockAPI.deleteLivestockRecord(recordId);
       message.success("Livestock record deleted successfully.");
 
-      // Refresh livestock records without showing loading
-      const response = await livestockAPI.getAllLivestockRecords();
-      const farmerLivestockRecords = response.filter(
-        (record) => record.farmer_id === farmerId
-      );
-      setLivestockRecords(farmerLivestockRecords);
+      // Refresh livestock records
+      await fetchLivestockRecords();
 
       // Notify parent component to refresh data
       if (onDataChange) {
@@ -297,9 +290,8 @@ const LivestockTab = ({ farmerId, farmerData, colors, onDataChange }) => {
             columns={livestockColumns}
             dataSource={livestockRecords}
             rowKey={(record) =>
-              `${record.animal_type}-${record.subcategory}-${
-                record.id || Math.random()
-              }`
+              record.record_id ||
+              `${record.animal_type}-${record.subcategory}-${Math.random()}`
             }
             pagination={false}
             size="small"
@@ -434,9 +426,6 @@ const LivestockTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                     {getFieldValue("animal_type") === "Turkey" && (
                       <>
                         <Option value="Gobbler">Gobbler</Option>
-
-                        <Option value="Hen">Hen</Option>
-
                         <Option value="Hen">Hen</Option>
                       </>
                     )}

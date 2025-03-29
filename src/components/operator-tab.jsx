@@ -46,20 +46,23 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
   const fetchOperatorData = async () => {
     try {
-      setOperatorLoading(true);
+      // Only show loading on initial fetch, not on refreshes
+      if (operatorData.length === 0) {
+        setOperatorLoading(true);
+      }
 
-      // Get all operators
+      // Get all livestock records
       const response = await operatorAPI.getAllOperators();
 
       // Filter records for this farmer
-      const farmerOperators = response.filter(
+      const operator = response.filter(
         (operator) => operator.farmer_id === farmerId
       );
 
-      setOperatorData(farmerOperators);
+      setOperatorData(operator);
       setOperatorLoading(false);
     } catch (err) {
-      console.error("Error fetching operator data:", err);
+      console.error("Error fetching operator records:", err);
       setOperatorLoading(false);
     }
   };
@@ -118,7 +121,6 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       };
 
       // Structure the data with farmer and operator objects
-
       const FarmersData = {
         farmer_id: farmerData.farmer_id,
         name: farmerData.name,
@@ -146,11 +148,6 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
         ],
       };
 
-      const requestData = {
-        farmer: FarmersData,
-        operator: formattedValues,
-      };
-
       if (isEditingOperator && currentOperator) {
         // Update existing operator
         console.log(
@@ -158,7 +155,7 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
           JSON.stringify(FarmersData, null, 2)
         );
         await operatorAPI.updateOperator(
-          currentOperator.operator_id || currentOperator.id,
+          currentOperator.farmer_id || currentOperator.id,
           FarmersData
         );
         message.success("Operator data updated successfully.");

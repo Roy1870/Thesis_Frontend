@@ -3,37 +3,21 @@
 import { useState, useEffect, useCallback } from "react";
 import { farmerAPI } from "./services/api";
 import {
-  Table,
-  Button,
-  Input,
-  Space,
-  message,
-  Pagination,
-  Spin,
-  Alert,
-  Card,
-  Typography,
-  Badge,
-  Tag,
-  Tooltip,
-  Popconfirm,
-} from "antd";
-import {
-  SearchOutlined,
-  DeleteOutlined,
-  EditOutlined,
-  EyeOutlined,
-  PlusOutlined,
-  UserOutlined,
-  HomeOutlined,
-  MailOutlined,
-  PhoneOutlined,
-} from "@ant-design/icons";
+  UserIcon,
+  PhoneIcon,
+  MailIcon,
+  HomeIcon,
+  PlusIcon,
+  SearchIcon,
+  TrashIcon,
+  PencilIcon,
+  EyeIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+} from "lucide-react";
 import Highlighter from "react-highlight-words";
 import EditFarmer from "./EditFarmer";
 import ViewFarmer from "./ViewFarmer";
-
-const { Title, Text } = Typography;
 
 const Inventory = () => {
   console.log("InventoryModern component rendering");
@@ -51,8 +35,9 @@ const Inventory = () => {
   const [isViewMode, setIsViewMode] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [currentFarmer, setCurrentFarmer] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
 
-  // Theme colors
+  // Theme colors - we'll use Tailwind classes instead of these directly
   const colors = {
     primary: "#6A9C89",
     secondary: "#E6F5E4",
@@ -156,68 +141,6 @@ const Inventory = () => {
     }
   };
 
-  const getColumnSearchProps = (dataIndex) => ({
-    filterDropdown: ({
-      setSelectedKeys,
-      selectedKeys,
-      confirm,
-      clearFilters,
-    }) => (
-      <div style={{ padding: 8 }}>
-        <Input
-          placeholder={`Search ${dataIndex}`}
-          value={selectedKeys[0]}
-          onChange={(e) =>
-            setSelectedKeys(e.target.value ? [e.target.value] : [])
-          }
-          onPressEnter={() => handleSearch(selectedKeys, confirm, dataIndex)}
-          style={{ width: 188, marginBottom: 8, display: "block" }}
-        />
-        <Space>
-          <Button
-            type="primary"
-            onClick={() => handleSearch(selectedKeys, confirm, dataIndex)}
-            icon={<SearchOutlined />}
-            size="small"
-            style={{ width: 90, backgroundColor: colors.primary }}
-          >
-            Search
-          </Button>
-          <Button
-            onClick={() => handleReset(clearFilters)}
-            size="small"
-            style={{ width: 90 }}
-          >
-            Reset
-          </Button>
-        </Space>
-      </div>
-    ),
-    filterIcon: (filtered) => (
-      <SearchOutlined
-        style={{ color: filtered ? colors.primary : undefined }}
-      />
-    ),
-    onFilter: (value, record) =>
-      record[dataIndex]
-        ? record[dataIndex]
-            .toString()
-            .toLowerCase()
-            .includes(value.toLowerCase())
-        : "",
-    render: (text) =>
-      searchedColumn === dataIndex ? (
-        <Highlighter
-          highlightStyle={{ backgroundColor: "#ffc069", padding: 0 }}
-          searchWords={[searchText]}
-          autoEscape
-          textToHighlight={text ? text.toString() : ""}
-        />
-      ) : (
-        text
-      ),
-  });
-
   const handleSearch = (selectedKeys, confirm, dataIndex) => {
     confirm();
     setSearchText(selectedKeys[0]);
@@ -236,10 +159,11 @@ const Inventory = () => {
 
       // Refresh data after deletion
       fetchFarmerData(currentPage, searchText);
-      message.success("Farmer deleted successfully");
+      showToast("Farmer deleted successfully", "success");
+      setShowDeleteConfirm(null);
     } catch (err) {
       console.error("Error deleting farmer:", err);
-      message.error(`Failed to delete farmer: ${err.message}`);
+      showToast(`Failed to delete farmer: ${err.message}`, "error");
     }
   };
 
@@ -286,112 +210,11 @@ const Inventory = () => {
     setCurrentPage(1); // Reset to first page when searching
   };
 
-  const columns = [
-    {
-      title: "Name",
-      dataIndex: "name",
-      key: "name",
-      ...getColumnSearchProps("name"),
-      render: (text) => (
-        <div style={{ display: "flex", alignItems: "center" }}>
-          <UserOutlined style={{ marginRight: 8, color: colors.primary }} />
-          <span>{text}</span>
-        </div>
-      ),
-    },
-    {
-      title: "Contact",
-      dataIndex: "contact_number",
-      key: "contact_number",
-      render: (text) => (
-        <div style={{ display: "flex", alignItems: "center" }}>
-          <PhoneOutlined style={{ marginRight: 8, color: colors.accent }} />
-          <span>{text || "N/A"}</span>
-        </div>
-      ),
-    },
-    {
-      title: "Email",
-      dataIndex: "facebook_email",
-      key: "facebook_email",
-      responsive: ["md"],
-      render: (text) => (
-        <div style={{ display: "flex", alignItems: "center" }}>
-          <MailOutlined style={{ marginRight: 8, color: colors.accent }} />
-          <span>{text || "N/A"}</span>
-        </div>
-      ),
-    },
-    {
-      title: "Address",
-      dataIndex: "home_address",
-      key: "home_address",
-      responsive: ["lg"],
-      render: (text) => (
-        <div style={{ display: "flex", alignItems: "center" }}>
-          <HomeOutlined style={{ marginRight: 8, color: colors.accent }} />
-          <span>{text || "N/A"}</span>
-        </div>
-      ),
-    },
-    {
-      title: "Barangay",
-      dataIndex: "barangay",
-      key: "barangay",
-      responsive: ["md"],
-      render: (text) => (
-        <Tag color={colors.primary} style={{ borderRadius: "4px" }}>
-          {text || "N/A"}
-        </Tag>
-      ),
-    },
-    {
-      title: "Actions",
-      key: "actions",
-      width: 180,
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="View Details">
-            <Button
-              type="text"
-              icon={<EyeOutlined />}
-              onClick={() => handleView(record)}
-              style={{ color: colors.primary }}
-            />
-          </Tooltip>
-          <Tooltip title="Edit">
-            <Button
-              type="text"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-              style={{ color: colors.warning }}
-            />
-          </Tooltip>
-          <Popconfirm
-            title="Delete this farmer?"
-            description="This action cannot be undone."
-            onConfirm={() => handleDelete(record.farmer_id)}
-            okText="Yes"
-            cancelText="No"
-            okButtonProps={{
-              style: {
-                backgroundColor: colors.error,
-                borderColor: colors.error,
-              },
-            }}
-            placement="bottomRight"
-          >
-            <Button
-              type="text"
-              icon={<DeleteOutlined />}
-              danger
-              className="action-button"
-            />
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
+  // Simple toast notification function
+  const showToast = (message, type = "info") => {
+    // In a real app, you'd use a toast library or custom component
+    alert(message);
+  };
 
   // If in edit mode, show the edit page instead of the inventory list
   if (isEditMode && currentFarmer) {
@@ -416,93 +239,267 @@ const Inventory = () => {
   }
 
   return (
-    <div
-      style={{
-        padding: "12px",
-        backgroundColor: colors.background,
-        minHeight: "100vh",
-        maxWidth: "100%",
-        overflow: "hidden",
-      }}
-    >
-      <Card
-        title={
-          <Title level={4} style={{ margin: 0, fontSize: "18px" }}>
-            Farmer Inventory
-          </Title>
-        }
-        extra={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
+    <div className="p-3 bg-[#F5F7F9] min-h-screen max-w-full overflow-hidden">
+      <div className="bg-white rounded-lg shadow-md mb-4">
+        <div className="flex justify-between items-center p-4 border-b">
+          <h4 className="text-lg font-semibold m-0">Farmer Inventory</h4>
+          <button
             onClick={() => (window.location.href = "/add-data")}
-            style={{ backgroundColor: colors.primary }}
-            size="middle"
+            className="flex items-center gap-1 bg-[#6A9C89] text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-opacity-90 transition-colors"
           >
+            <PlusIcon className="w-4 h-4" />
             Add New Farmer
-          </Button>
-        }
-        style={{
-          borderRadius: 8,
-          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-          marginBottom: 16,
-        }}
-        bodyStyle={{ padding: "16px" }}
-      >
-        <Space
-          style={{
-            marginBottom: 16,
-            width: "100%",
-            justifyContent: "space-between",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <Input
-              placeholder="Search farmers"
-              value={searchText}
-              onChange={handleSearchInputChange}
-              prefix={<SearchOutlined style={{ color: colors.primary }} />}
-              style={{ width: 250 }}
-              allowClear
-            />
+          </button>
+        </div>
+
+        <div className="p-4">
+          <div className="flex justify-between items-center mb-4 w-full">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <SearchIcon className="w-4 h-4 text-[#6A9C89]" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search farmers"
+                value={searchText}
+                onChange={handleSearchInputChange}
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-md w-[250px] focus:outline-none focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent"
+              />
+              {searchText && (
+                <button
+                  onClick={() => setSearchText("")}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3"
+                >
+                  <span className="text-gray-400 hover:text-gray-600">×</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center">
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-sm font-medium bg-[#6A9C89] text-white">
+                <span className="px-2">Total Records: {totalRecords}</span>
+              </span>
+            </div>
           </div>
-          <Badge
-            count={totalRecords}
-            style={{ backgroundColor: colors.primary }}
-          >
-            <span style={{ padding: "0 8px" }}>Total Records</span>
-          </Badge>
-        </Space>
 
-        {error && (
-          <Alert message={error} type="error" style={{ marginBottom: 16 }} />
-        )}
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+              {error}
+            </div>
+          )}
 
-        <Spin spinning={loading}>
-          <Table
-            columns={columns}
-            dataSource={farmerData}
-            rowKey="farmer_id"
-            pagination={false}
-            style={{ marginBottom: 16 }}
-            bordered
-            scroll={{ x: farmerData.length > 0 ? "max-content" : undefined }}
-            size="small"
-          />
-        </Spin>
+          <div className="relative">
+            {loading && (
+              <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center z-10">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#6A9C89]"></div>
+              </div>
+            )}
 
-        <Pagination
-          current={currentPage}
-          pageSize={pageSize}
-          total={totalRecords}
-          onChange={(page) => {
-            console.log("Changing to page:", page);
-            setCurrentPage(page);
-          }}
-          style={{ marginTop: 16, textAlign: "center" }}
-          showSizeChanger={false}
-        />
-      </Card>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 border">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Contact
+                    </th>
+                    <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Email
+                    </th>
+                    <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Address
+                    </th>
+                    <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Barangay
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[180px]">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {farmerData.map((farmer) => (
+                    <tr key={farmer.farmer_id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <UserIcon className="w-4 h-4 mr-2 text-[#6A9C89]" />
+                          <span className="text-sm text-gray-900">
+                            {searchedColumn === "name" ? (
+                              <Highlighter
+                                highlightStyle={{
+                                  backgroundColor: "#ffc069",
+                                  padding: 0,
+                                }}
+                                searchWords={[searchText]}
+                                autoEscape
+                                textToHighlight={
+                                  farmer.name ? farmer.name.toString() : ""
+                                }
+                              />
+                            ) : (
+                              farmer.name
+                            )}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <PhoneIcon className="w-4 h-4 mr-2 text-[#4F6F7D]" />
+                          <span className="text-sm text-gray-900">
+                            {farmer.contact_number || "N/A"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <MailIcon className="w-4 h-4 mr-2 text-[#4F6F7D]" />
+                          <span className="text-sm text-gray-900">
+                            {farmer.facebook_email || "N/A"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <HomeIcon className="w-4 h-4 mr-2 text-[#4F6F7D]" />
+                          <span className="text-sm text-gray-900">
+                            {farmer.home_address || "N/A"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap">
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-md bg-[#E6F5E4] text-[#6A9C89]">
+                          {farmer.barangay || "N/A"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleView(farmer)}
+                            className="text-[#6A9C89] hover:text-opacity-70"
+                            title="View Details"
+                          >
+                            <EyeIcon className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => handleEdit(farmer)}
+                            className="text-[#FFA000] hover:text-opacity-70"
+                            title="Edit"
+                          >
+                            <PencilIcon className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() =>
+                              setShowDeleteConfirm(farmer.farmer_id)
+                            }
+                            className="text-[#D32F2F] hover:text-opacity-70"
+                            title="Delete"
+                          >
+                            <TrashIcon className="w-5 h-5" />
+                          </button>
+
+                          {showDeleteConfirm === farmer.farmer_id && (
+                            <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                              <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
+                                <h3 className="text-lg font-medium mb-2">
+                                  Delete this farmer?
+                                </h3>
+                                <p className="text-gray-500 mb-4">
+                                  This action cannot be undone.
+                                </p>
+                                <div className="flex justify-end space-x-2">
+                                  <button
+                                    onClick={() => setShowDeleteConfirm(null)}
+                                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                  >
+                                    No
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      handleDelete(farmer.farmer_id)
+                                    }
+                                    className="px-4 py-2 bg-[#D32F2F] text-white rounded-md text-sm font-medium hover:bg-opacity-90"
+                                  >
+                                    Yes
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {farmerData.length === 0 && !loading && (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="px-6 py-4 text-center text-gray-500"
+                      >
+                        No data found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-center mt-4">
+              <nav className="flex items-center">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="px-2 py-1 rounded-md mr-2 border border-gray-300 disabled:opacity-50"
+                >
+                  <ChevronLeftIcon className="w-5 h-5" />
+                </button>
+
+                <div className="flex space-x-1">
+                  {[
+                    ...Array(Math.min(5, Math.ceil(totalRecords / pageSize))),
+                  ].map((_, i) => {
+                    const pageNum = i + 1;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-8 h-8 flex items-center justify-center rounded-md ${
+                          currentPage === pageNum
+                            ? "bg-[#6A9C89] text-white"
+                            : "border border-gray-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+
+                  {Math.ceil(totalRecords / pageSize) > 5 && (
+                    <span className="flex items-center px-2">...</span>
+                  )}
+                </div>
+
+                <button
+                  onClick={() =>
+                    setCurrentPage(
+                      Math.min(
+                        Math.ceil(totalRecords / pageSize),
+                        currentPage + 1
+                      )
+                    )
+                  }
+                  disabled={currentPage >= Math.ceil(totalRecords / pageSize)}
+                  className="px-2 py-1 rounded-md ml-2 border border-gray-300 disabled:opacity-50"
+                >
+                  <ChevronRightIcon className="w-5 h-5" />
+                </button>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

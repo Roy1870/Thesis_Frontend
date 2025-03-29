@@ -1,51 +1,27 @@
 "use client";
 
-import React, { useState } from "react";
-import { DownOutlined, UpOutlined } from "@ant-design/icons";
-import { Button } from "antd";
+import { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
-const AccordionSection = ({ title, children, defaultOpen = true }) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+function AccordionSection({ title, children }) {
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div
-      style={{
-        marginBottom: "16px",
-        border: "1px solid #e8e8e8",
-        borderRadius: "8px",
-      }}
-    >
+    <div className="border rounded-md mb-4 overflow-hidden">
       <div
-        style={{
-          padding: "12px 16px",
-          backgroundColor: "#f5f5f5",
-          borderRadius: "8px 8px 0 0",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          cursor: "pointer",
-          borderBottom: isOpen ? "1px solid #e8e8e8" : "none",
-        }}
+        className="flex justify-between items-center p-3 bg-gray-50 cursor-pointer"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <span style={{ fontWeight: 500 }}>{title}</span>
-        <Button
-          type="text"
-          icon={isOpen ? <UpOutlined /> : <DownOutlined />}
-          size="small"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsOpen(!isOpen);
-          }}
-        />
+        <h3 className="text-sm font-medium">{title}</h3>
+        {isOpen ? (
+          <ChevronUp className="h-4 w-4 text-gray-500" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-gray-500" />
+        )}
       </div>
-      {isOpen && (
-        <div style={{ padding: "16px", maxHeight: "400px", overflowY: "auto" }}>
-          {children}
-        </div>
-      )}
+      {isOpen && <div className="p-3 border-t">{children}</div>}
     </div>
   );
-};
+}
 
 export default AccordionSection;

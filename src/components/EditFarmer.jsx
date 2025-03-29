@@ -2,26 +2,14 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  Form,
-  Input,
-  Button,
-  Card,
-  Typography,
-  message,
-  Spin,
-  Alert,
-  Badge,
-  Row,
-  Col,
-} from "antd";
-import {
-  ArrowLeftOutlined,
-  SaveOutlined,
-  UserOutlined,
-  HomeOutlined,
-  InfoCircleOutlined,
-  EnvironmentOutlined,
-} from "@ant-design/icons";
+  ArrowLeft,
+  Save,
+  User,
+  Home,
+  Info,
+  MapPin,
+  Loader,
+} from "lucide-react";
 import { farmerAPI } from "./services/api";
 import { livestockAPI } from "./services/api";
 import { operatorAPI } from "./services/api";
@@ -30,15 +18,20 @@ import LivestockTab from "./livestock-tab";
 import RiceTab from "./rice-tab";
 import CropsTab from "./crops-tab";
 
-// Add compact form styles
-const compactFormItemStyle = {
-  marginBottom: "8px",
-};
-
-const { Text } = Typography;
-
 const EditFarmer = ({ farmer, onClose, colors }) => {
-  const [form] = Form.useForm();
+  const [formData, setFormData] = useState({
+    name: "",
+    contact_number: "",
+    facebook_email: "",
+    home_address: "",
+    farm_address: "",
+    farm_location_longitude: "",
+    farm_location_latitude: "",
+    market_outlet_location: "",
+    buyer_name: "",
+    association_organization: "",
+    barangay: "",
+  });
   const [loading, setLoading] = useState(false);
   const [farmerData, setFarmerData] = useState(null);
   const [fetchLoading, setFetchLoading] = useState(true);
@@ -90,18 +83,18 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
       setFarmerData(response);
 
       // Set form values
-      form.setFieldsValue({
-        name: response.name,
-        contact_number: response.contact_number,
-        facebook_email: response.facebook_email,
-        home_address: response.home_address,
-        farm_address: response.farm_address,
-        farm_location_longitude: response.farm_location_longitude,
-        farm_location_latitude: response.farm_location_latitude,
-        market_outlet_location: response.market_outlet_location,
-        buyer_name: response.buyer_name,
-        association_organization: response.association_organization,
-        barangay: response.barangay,
+      setFormData({
+        name: response.name || "",
+        contact_number: response.contact_number || "",
+        facebook_email: response.facebook_email || "",
+        home_address: response.home_address || "",
+        farm_address: response.farm_address || "",
+        farm_location_longitude: response.farm_location_longitude || "",
+        farm_location_latitude: response.farm_location_latitude || "",
+        market_outlet_location: response.market_outlet_location || "",
+        buyer_name: response.buyer_name || "",
+        association_organization: response.association_organization || "",
+        barangay: response.barangay || "",
       });
 
       setFetchLoading(false);
@@ -110,11 +103,15 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
       setError(`Failed to fetch farmer details: ${err.message}`);
       setFetchLoading(false);
     }
-  }, [farmer.farmer_id, form]);
+  }, [farmer.farmer_id]);
 
   const fetchLivestockRecords = useCallback(async () => {
     try {
-      setLivestockLoading(true);
+      // Only show loading on initial fetch, not on refreshes
+      if (livestockRecords.length === 0) {
+        setLivestockLoading(true);
+      }
+
       // Get all livestock records
       const response = await livestockAPI.getAllLivestockRecords();
       // Filter records for this farmer
@@ -127,24 +124,30 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
       console.error("Error fetching livestock records:", err);
       setLivestockLoading(false);
     }
-  }, [farmer.farmer_id]);
+  }, [farmer.farmer_id, livestockRecords.length]);
 
   const fetchOperatorData = useCallback(async () => {
     try {
-      setOperatorLoading(true);
+      // Only show loading on initial fetch, not on refreshes
+      if (operatorData.length === 0) {
+        setOperatorLoading(true);
+      }
+
       // Get all operators
       const response = await operatorAPI.getAllOperators();
+
       // Filter records for this farmer
       const farmerOperators = response.filter(
         (operator) => operator.farmer_id === farmer.farmer_id
       );
+
       setOperatorData(farmerOperators);
       setOperatorLoading(false);
     } catch (err) {
       console.error("Error fetching operator data:", err);
       setOperatorLoading(false);
     }
-  }, [farmer.farmer_id]);
+  }, [farmer.farmer_id, operatorData.length]);
 
   useEffect(() => {
     fetchFarmerDetails();
@@ -157,16 +160,25 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
     refreshTrigger,
   ]);
 
-  const onFinish = async (values) => {
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setLoading(true);
     try {
-      console.log("Updating farmer with data:", values);
-      await farmerAPI.updateFarmer(farmer.farmer_id, values);
-      message.success("Farmer updated successfully.");
+      console.log("Updating farmer with data:", formData);
+      await farmerAPI.updateFarmer(farmer.farmer_id, formData);
+      alert("Farmer updated successfully.");
       refreshAllData(); // Refresh data after update
       setLoading(false);
     } catch (error) {
-      message.error(`Failed to update farmer. ${error.message}`);
+      alert(`Failed to update farmer. ${error.message}`);
       setLoading(false);
     }
   };
@@ -174,7 +186,10 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
   if (fetchLoading || livestockLoading || operatorLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <Spin size="large" tip="Loading farmer details..." />
+        <div className="flex flex-col items-center">
+          <Loader className="w-10 h-10 animate-spin text-[#6A9C89] mb-2" />
+          <p className="text-gray-600">Loading farmer details...</p>
+        </div>
       </div>
     );
   }
@@ -182,17 +197,19 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
   if (error) {
     return (
       <div className="p-5">
-        <Alert
-          message="Error"
-          description={error}
-          type="error"
-          showIcon
-          action={
-            <Button onClick={onClose} type="primary">
-              Go Back
-            </Button>
-          }
-        />
+        <div
+          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4"
+          role="alert"
+        >
+          <strong className="font-bold">Error!</strong>
+          <span className="block sm:inline"> {error}</span>
+          <button
+            onClick={onClose}
+            className="mt-3 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+          >
+            Go Back
+          </button>
+        </div>
       </div>
     );
   }
@@ -206,276 +223,302 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
   return (
     <div className="min-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden">
       {/* Header with back button and farmer name */}
-      <Card
-        bordered={false}
-        className="rounded-lg shadow-sm mb-3"
-        bodyStyle={{ padding: "10px" }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            width: "100%",
-          }}
-        >
-          <Button icon={<ArrowLeftOutlined />} onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-sm mb-3 p-3">
+        <div className="flex justify-between items-center w-full">
+          <button
+            className="flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            onClick={onClose}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
             Back
-          </Button>
+          </button>
         </div>
 
         {/* Navigation buttons */}
         <div className="flex flex-wrap gap-5 mb-2 mt-3">
-          <Button
-            type={activeTab === "info" ? "primary" : "default"}
-            icon={<UserOutlined />}
+          <button
+            className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+              activeTab === "info"
+                ? `bg-[${colors.primary}] text-white`
+                : "bg-white text-gray-700 border border-gray-300"
+            }`}
             onClick={() => setActiveTab("info")}
             style={{
               backgroundColor: activeTab === "info" ? colors.primary : "",
               borderColor: activeTab === "info" ? colors.primary : "",
             }}
           >
+            <User className="w-4 h-4 mr-2" />
             Farmer Information
-          </Button>
+          </button>
 
-          <Button
-            type={activeTab === "crops" ? "primary" : "default"}
-            icon={<InfoCircleOutlined />}
+          <button
+            className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+              activeTab === "crops"
+                ? `bg-[${colors.primary}] text-white`
+                : "bg-white text-gray-700 border border-gray-300"
+            }`}
             onClick={() => setActiveTab("crops")}
             style={{
               backgroundColor: activeTab === "crops" ? colors.primary : "",
               borderColor: activeTab === "crops" ? colors.primary : "",
             }}
           >
+            <Info className="w-4 h-4 mr-2" />
             Crop Information
             {hasCrops && (
-              <Badge
-                count={farmerData.crops.length}
-                className="ml-1"
+              <span
+                className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
+                  activeTab === "crops"
+                    ? "bg-white text-[#6A9C89]"
+                    : `bg-[${colors.primary}] text-white`
+                }`}
                 style={{
                   backgroundColor:
                     activeTab === "crops" ? "#fff" : colors.primary,
                   color: activeTab === "crops" ? colors.primary : "#fff",
                 }}
-              />
+              >
+                {farmerData.crops.length}
+              </span>
             )}
-          </Button>
+          </button>
 
-          <Button
-            type={activeTab === "rice" ? "primary" : "default"}
-            icon={<InfoCircleOutlined />}
+          <button
+            className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+              activeTab === "rice"
+                ? `bg-[${colors.primary}] text-white`
+                : "bg-white text-gray-700 border border-gray-300"
+            }`}
             onClick={() => setActiveTab("rice")}
             style={{
               backgroundColor: activeTab === "rice" ? colors.primary : "",
               borderColor: activeTab === "rice" ? colors.primary : "",
             }}
           >
+            <Info className="w-4 h-4 mr-2" />
             Rice Information
             {hasRice && (
-              <Badge
-                count={farmerData.rice.length}
-                className="ml-1"
+              <span
+                className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
+                  activeTab === "rice"
+                    ? "bg-white text-[#6A9C89]"
+                    : `bg-[${colors.primary}] text-white`
+                }`}
                 style={{
                   backgroundColor:
                     activeTab === "rice" ? "#fff" : colors.primary,
                   color: activeTab === "rice" ? colors.primary : "#fff",
                 }}
-              />
+              >
+                {farmerData.rice.length}
+              </span>
             )}
-          </Button>
+          </button>
 
-          <Button
-            type={activeTab === "livestock" ? "primary" : "default"}
-            icon={<InfoCircleOutlined />}
+          <button
+            className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+              activeTab === "livestock"
+                ? `bg-[${colors.primary}] text-white`
+                : "bg-white text-gray-700 border border-gray-300"
+            }`}
             onClick={() => setActiveTab("livestock")}
             style={{
               backgroundColor: activeTab === "livestock" ? colors.primary : "",
               borderColor: activeTab === "livestock" ? colors.primary : "",
             }}
           >
+            <Info className="w-4 h-4 mr-2" />
             Livestock Records
             {hasLivestock && (
-              <Badge
-                count={livestockRecords.length}
-                className="ml-1"
+              <span
+                className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
+                  activeTab === "livestock"
+                    ? "bg-white text-[#6A9C89]"
+                    : `bg-[${colors.primary}] text-white`
+                }`}
                 style={{
                   backgroundColor:
                     activeTab === "livestock" ? "#fff" : colors.primary,
                   color: activeTab === "livestock" ? colors.primary : "#fff",
                 }}
-              />
+              >
+                {livestockRecords.length}
+              </span>
             )}
-          </Button>
+          </button>
 
-          <Button
-            type={activeTab === "operator" ? "primary" : "default"}
-            icon={<EnvironmentOutlined />}
+          <button
+            className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+              activeTab === "operator"
+                ? `bg-[${colors.primary}] text-white`
+                : "bg-white text-gray-700 border border-gray-300"
+            }`}
             onClick={() => setActiveTab("operator")}
             style={{
               backgroundColor: activeTab === "operator" ? colors.primary : "",
               borderColor: activeTab === "operator" ? colors.primary : "",
             }}
           >
+            <MapPin className="w-4 h-4 mr-2" />
             Operator Information
             {hasOperators && (
-              <Badge
-                count={operatorData.length}
-                className="ml-1"
+              <span
+                className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
+                  activeTab === "operator"
+                    ? "bg-white text-[#6A9C89]"
+                    : `bg-[${colors.primary}] text-white`
+                }`}
                 style={{
                   backgroundColor:
                     activeTab === "operator" ? "#fff" : colors.primary,
                   color: activeTab === "operator" ? colors.primary : "#fff",
                 }}
-              />
+              >
+                {operatorData.length}
+              </span>
             )}
-          </Button>
+          </button>
         </div>
-      </Card>
+      </div>
 
       {/* Content based on active tab */}
       {activeTab === "info" && (
-        <Card
-          bordered={false}
-          className="rounded-lg shadow-sm mb-4"
-          bodyStyle={{ padding: "16px" }}
-        >
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={onFinish}
-            initialValues={{
-              name: farmerData?.name || "",
-              contact_number: farmerData?.contact_number || "",
-              facebook_email: farmerData?.facebook_email || "",
-              home_address: farmerData?.home_address || "",
-              farm_address: farmerData?.farm_address || "",
-              farm_location_longitude:
-                farmerData?.farm_location_longitude || "",
-              farm_location_latitude: farmerData?.farm_location_latitude || "",
-              market_outlet_location: farmerData?.market_outlet_location || "",
-              buyer_name: farmerData?.buyer_name || "",
-              association_organization:
-                farmerData?.association_organization || "",
-              barangay: farmerData?.barangay || "",
-            }}
-          >
-            <Row gutter={[24, 24]}>
-              <Col span={24} md={12}>
-                <Card
-                  title={
-                    <div style={{ display: "flex", alignItems: "center" }}>
-                      <UserOutlined
-                        style={{ marginRight: 8, color: colors.primary }}
-                      />
-                      <span>Personal Information</span>
-                    </div>
-                  }
-                  style={{ borderRadius: 8, height: "100%" }}
-                >
-                  <div style={{ marginBottom: 16 }}>
-                    <Text type="secondary">Name</Text>
-                    <Form.Item
-                      name="name"
-                      rules={[{ required: true }]}
-                      style={{ marginBottom: 0 }}
-                    >
-                      <Input style={{ fontSize: 16 }} />
-                    </Form.Item>
-                  </div>
-                  <div style={{ marginBottom: 16 }}>
-                    <Text type="secondary">Contact Number</Text>
-                    <Form.Item
-                      name="contact_number"
-                      style={{ marginBottom: 0 }}
-                    >
-                      <Input style={{ fontSize: 16 }} />
-                    </Form.Item>
-                  </div>
-                  <div style={{ marginBottom: 16 }}>
-                    <Text type="secondary">Email</Text>
-                    <Form.Item
-                      name="facebook_email"
-                      style={{ marginBottom: 0 }}
-                    >
-                      <Input style={{ fontSize: 16 }} />
-                    </Form.Item>
-                  </div>
-                  <div>
-                    <Text type="secondary">Barangay</Text>
-                    <Form.Item name="barangay" style={{ marginBottom: 0 }}>
-                      <Input style={{ fontSize: 16 }} />
-                    </Form.Item>
-                  </div>
-                </Card>
-              </Col>
-              <Col span={24} md={12}>
-                <Card
-                  title={
-                    <div style={{ display: "flex", alignItems: "center" }}>
-                      <HomeOutlined
-                        style={{ marginRight: 8, color: colors.primary }}
-                      />
-                      <span>Address Information</span>
-                    </div>
-                  }
-                  style={{ borderRadius: 8, height: "100%" }}
-                >
-                  <div style={{ marginBottom: 16 }}>
-                    <Text type="secondary">Home Address</Text>
-                    <Form.Item name="home_address" style={{ marginBottom: 0 }}>
-                      <Input style={{ fontSize: 16 }} />
-                    </Form.Item>
-                  </div>
-                  <div style={{ marginBottom: 16 }}>
-                    <Text type="secondary">Farm Address</Text>
-                    <Form.Item name="farm_address" style={{ marginBottom: 0 }}>
-                      <Input style={{ fontSize: 16 }} />
-                    </Form.Item>
-                  </div>
-                  <div>
-                    <Text type="secondary">Farm Location</Text>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <Form.Item
-                        name="farm_location_longitude"
-                        style={{ marginBottom: 0, width: "50%" }}
-                      >
-                        <Input
-                          style={{ fontSize: 16 }}
-                          placeholder="Longitude"
-                        />
-                      </Form.Item>
-                      <Form.Item
-                        name="farm_location_latitude"
-                        style={{ marginBottom: 0, width: "50%" }}
-                      >
-                        <Input
-                          style={{ fontSize: 16 }}
-                          placeholder="Latitude"
-                        />
-                      </Form.Item>
-                    </div>
-                  </div>
-                </Card>
-              </Col>
-            </Row>
+        <div className="bg-white rounded-lg shadow-sm mb-4 p-4">
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white rounded-lg shadow p-4">
+                <div className="flex items-center mb-3">
+                  <User className="w-5 h-5 mr-2 text-[#6A9C89]" />
+                  <h3 className="text-lg font-medium">Personal Information</h3>
+                </div>
 
-            <Form.Item className="mt-6">
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={loading}
-                icon={<SaveOutlined />}
-                style={{
-                  backgroundColor: colors.primary,
-                  borderColor: colors.primary,
-                  marginTop: "24px",
-                }}
-              >
-                Save Changes
-              </Button>
-            </Form.Item>
-          </Form>
-        </Card>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-base"
+                    required
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Contact Number
+                  </label>
+                  <input
+                    type="text"
+                    name="contact_number"
+                    value={formData.contact_number}
+                    onChange={handleInputChange}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-base"
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    name="facebook_email"
+                    value={formData.facebook_email}
+                    onChange={handleInputChange}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-base"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Barangay
+                  </label>
+                  <input
+                    type="text"
+                    name="barangay"
+                    value={formData.barangay}
+                    onChange={handleInputChange}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-base"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-4">
+                <div className="flex items-center mb-3">
+                  <Home className="w-5 h-5 mr-2 text-[#6A9C89]" />
+                  <h3 className="text-lg font-medium">Address Information</h3>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Home Address
+                  </label>
+                  <input
+                    type="text"
+                    name="home_address"
+                    value={formData.home_address}
+                    onChange={handleInputChange}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-base"
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Farm Address
+                  </label>
+                  <input
+                    type="text"
+                    name="farm_address"
+                    value={formData.farm_address}
+                    onChange={handleInputChange}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-base"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Farm Location
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      name="farm_location_longitude"
+                      value={formData.farm_location_longitude}
+                      onChange={handleInputChange}
+                      placeholder="Longitude"
+                      className="w-1/2 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-base"
+                    />
+                    <input
+                      type="text"
+                      name="farm_location_latitude"
+                      value={formData.farm_location_latitude}
+                      onChange={handleInputChange}
+                      placeholder="Latitude"
+                      className="w-1/2 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-base"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="mt-6 flex items-center px-4 py-2 bg-[#6A9C89] text-white rounded-md hover:bg-opacity-90 transition-colors"
+              disabled={loading}
+            >
+              {loading ? (
+                <Loader className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
+              Save Changes
+            </button>
+          </form>
+        </div>
       )}
 
       {activeTab === "crops" && (

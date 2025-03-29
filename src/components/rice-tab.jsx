@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Button,
   Card,
@@ -13,6 +13,7 @@ import {
   Select,
   InputNumber,
   message,
+  Spin,
 } from "antd";
 import {
   PlusOutlined,
@@ -26,22 +27,43 @@ const { Option } = Select;
 
 const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
   const [riceForm] = Form.useForm();
+  const [rice, setRice] = useState([]);
   const [isRiceModalVisible, setIsRiceModalVisible] = useState(false);
   const [isEditingRice, setIsEditingRice] = useState(false);
   const [currentRice, setCurrentRice] = useState(null);
   const [riceModalLoading, setRiceModalLoading] = useState(false);
-  const [rice, setRice] = useState([]);
+  const [riceLoading, setRiceLoading] = useState(true);
+  const [modalTitle, setModalTitle] = useState("Add New Rice");
+
+  const fetchRiceData = useCallback(async () => {
+    try {
+      // Only show loading on initial fetch, not on refreshes
+      if (rice.length === 0) {
+        setRiceLoading(true);
+      }
+
+      // Get farmer data which includes rice
+      const response = await farmerAPI.getFarmerById(farmerId);
+
+      setRice(response.rice || []);
+      setRiceLoading(false);
+    } catch (err) {
+      console.error("Error fetching rice data:", err);
+      setRiceLoading(false);
+    }
+  }, [farmerId, rice.length]);
 
   useEffect(() => {
-    if (farmerData?.rice) {
-      setRice(farmerData.rice);
+    if (farmerId) {
+      fetchRiceData();
     }
-  }, [farmerData]);
+  }, [farmerId, fetchRiceData]);
 
   // Rice Modal Functions
   const showAddRiceModal = () => {
     setIsEditingRice(false);
     setCurrentRice(null);
+    setModalTitle("Add New Rice");
     riceForm.resetFields();
     setIsRiceModalVisible(true);
   };
@@ -49,6 +71,7 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
   const showEditRiceModal = (rice) => {
     setIsEditingRice(true);
     setCurrentRice(rice);
+    setModalTitle(`Edit Rice (${rice.area_type} - ${rice.seed_type})`);
 
     riceForm.setFieldsValue({
       area_type: rice.area_type,
@@ -71,45 +94,44 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       const values = await riceForm.validateFields();
       setRiceModalLoading(true);
 
-      // Create the rice object
-      const riceObject = {
-        area_type: values.area_type,
-        seed_type: values.seed_type,
-        area_harvested: values.area_harvested,
-        production: values.production,
-        ave_yield: values.ave_yield,
-      };
-
-      console.log("Submitting rice data:", riceObject);
-
       if (isEditingRice && currentRice) {
-        // Update existing rice
-        await farmerAPI.updateFarmer(farmerId, {
-          name: farmerData.name,
-          home_address: farmerData.home_address || "",
-          contact_number: farmerData.contact_number || "",
-          facebook_email: farmerData.facebook_email || "",
-          barangay: farmerData.barangay || "",
-          farm_address: farmerData.farm_address || "",
-          farm_location_longitude: farmerData.farm_location_longitude || "",
-          farm_location_latitude: farmerData.farm_location_latitude || "",
-          market_outlet_location: farmerData.market_outlet_location || "",
-          buyer_name: farmerData.buyer_name || "",
-          association_organization: farmerData.association_organization || "",
-          rice: [riceObject],
-        });
+        // For updates, use the updateRice endpoint with the exact format required
+        const riceData = {
+          rice: [
+            {
+              area_type: values.area_type,
+              seed_type: values.seed_type,
+              area_harvested: values.area_harvested,
+              production: values.production,
+              ave_yield: values.ave_yield,
+            },
+          ],
+        };
+
+        console.log("Updating rice data:", JSON.stringify(riceData, null, 2));
+        await farmerAPI.updateRice(farmerId, currentRice.rice_id, riceData);
         message.success("Rice data updated successfully.");
       } else {
-        // Add new rice
-        await farmerAPI.addRice(farmerId, {
-          rice: [riceObject],
-        });
+        // For new entries, use the same format
+        const riceData = {
+          rice: [
+            {
+              area_type: values.area_type,
+              seed_type: values.seed_type,
+              area_harvested: values.area_harvested,
+              production: values.production,
+              ave_yield: values.ave_yield,
+            },
+          ],
+        };
+
+        console.log("Creating rice data:", JSON.stringify(riceData, null, 2));
+        await farmerAPI.addRice(farmerId, riceData);
         message.success("Rice data added successfully.");
       }
 
-      // Refresh farmer data without showing loading
-      const response = await farmerAPI.getFarmerById(farmerId);
-      setRice(response.rice || []);
+      // Refresh rice data
+      await fetchRiceData();
 
       // Notify parent component to refresh data
       if (onDataChange) {
@@ -132,12 +154,11 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
   const handleDeleteRice = async (riceId) => {
     try {
-      await farmerAPI.deleteRice(riceId);
+      await farmerAPI.deleteRice(farmerId, riceId);
       message.success("Rice entry deleted successfully.");
 
-      // Refresh farmer data without showing loading
-      const response = await farmerAPI.getFarmerById(farmerId);
-      setRice(response.rice || []);
+      // Refresh rice data
+      await fetchRiceData();
 
       // Notify parent component to refresh data
       if (onDataChange) {
@@ -241,7 +262,11 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
         className="rounded-lg shadow-sm mt-4"
         bodyStyle={{ padding: "0" }}
       >
-        {hasRice ? (
+        {riceLoading ? (
+          <div className="py-10 flex justify-center">
+            <Spin tip="Loading rice records..." />
+          </div>
+        ) : hasRice ? (
           <Table
             columns={riceColumns}
             dataSource={rice}
@@ -265,7 +290,7 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
       {/* Add Rice Modal */}
       <Modal
-        title={isEditingRice ? "Edit Rice" : "Add New Rice"}
+        title={modalTitle}
         open={isRiceModalVisible}
         onCancel={handleRiceModalCancel}
         width={700}

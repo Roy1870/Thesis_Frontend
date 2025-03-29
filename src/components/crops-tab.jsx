@@ -2,65 +2,71 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  Form,
-  Input,
   Button,
   Card,
-  Typography,
+  Table,
+  Popconfirm,
+  Empty,
+  Space,
+  Modal,
+  Form,
+  Input,
+  Select,
+  InputNumber,
   message,
   Spin,
-  Alert,
-  Badge,
   Row,
   Col,
 } from "antd";
 import {
-  ArrowLeftOutlined,
-  SaveOutlined,
-  UserOutlined,
-  HomeOutlined,
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
   InfoCircleOutlined,
-  EnvironmentOutlined,
 } from "@ant-design/icons";
 import { farmerAPI } from "./services/api";
-import { livestockAPI } from "./services/api";
-import { operatorAPI } from "./services/api";
-import OperatorTab from "./operator-tab";
-import LivestockTab from "./livestock-tab";
-import RiceTab from "./rice-tab";
-import CropsTab from "./crops-tab";
 
-// Add compact form styles
-const compactFormItemStyle = {
-  marginBottom: "8px",
-};
+const { Option } = Select;
 
-const { Text } = Typography;
+const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
+  const [cropForm] = Form.useForm();
+  const [cropDataType, setCropDataType] = useState("Crop");
+  const [isCropModalVisible, setIsCropModalVisible] = useState(false);
+  const [isEditingCrop, setIsEditingCrop] = useState(false);
+  const [currentCrop, setCurrentCrop] = useState(null);
+  const [cropModalLoading, setCropModalLoading] = useState(false);
+  const [crops, setCrops] = useState([]);
+  const [cropLoading, setCropLoading] = useState(true);
+  const [selectedCropType, setSelectedCropType] = useState(null);
+  const [modalTitle, setModalTitle] = useState("Add New Crop");
+  const [isEditingRice, setIsEditingRice] = useState(false); // Declare isEditingRice
 
-const EditFarmer = ({ farmer, onClose, colors }) => {
-  const [form] = Form.useForm();
-  const [loading, setLoading] = useState(false);
-  const [farmerData, setFarmerData] = useState(null);
-  const [fetchLoading, setFetchLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState("info");
-  const [livestockRecords, setLivestockRecords] = useState([]);
-  const [operatorData, setOperatorData] = useState([]);
-  const [livestockLoading, setLivestockLoading] = useState(true);
-  const [operatorLoading, setOperatorLoading] = useState(true);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-  // Function to trigger a refresh of all data
-  const refreshAllData = useCallback(() => {
-    setRefreshTrigger((prev) => prev + 1);
-  }, []);
-
-  // Fetch the farmer data
-  const fetchFarmerDetails = useCallback(async () => {
+  const fetchCropData = useCallback(async () => {
     try {
-      setFetchLoading(true);
+      // Only show loading on initial fetch, not on refreshes
+      if (crops.length === 0) {
+        setCropLoading(true);
+      }
 
-      const response = await farmerAPI.getFarmerById(farmer.farmer_id);
+      // Get farmer data which includes crops
+      const response = await farmerAPI.getFarmerById(farmerId);
+
+      // Determine the crop data type from the first crop item
+      if (response.crops && response.crops.length > 0) {
+        try {
+          const firstCrop = response.crops[0];
+          if (firstCrop.production_data) {
+            const data = JSON.parse(firstCrop.production_data);
+            if (data.month) {
+              setCropDataType("Month");
+            } else if (data.crop) {
+              setCropDataType("Crop");
+            }
+          }
+        } catch (e) {
+          console.error("Error parsing crop data:", e);
+        }
+      }
 
       // Process the crops data to extract JSON values
       if (response.crops && response.crops.length > 0) {
@@ -75,6 +81,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
                 quantity_value: data.quantity || null,
               };
             } catch (e) {
+              console.error("Error parsing production data:", e);
               return {
                 ...crop,
                 crop_value: null,
@@ -87,442 +94,489 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
         });
       }
 
-      setFarmerData(response);
-
-      // Set form values
-      form.setFieldsValue({
-        name: response.name,
-        contact_number: response.contact_number,
-        facebook_email: response.facebook_email,
-        home_address: response.home_address,
-        farm_address: response.farm_address,
-        farm_location_longitude: response.farm_location_longitude,
-        farm_location_latitude: response.farm_location_latitude,
-        market_outlet_location: response.market_outlet_location,
-        buyer_name: response.buyer_name,
-        association_organization: response.association_organization,
-        barangay: response.barangay,
-      });
-
-      setFetchLoading(false);
+      setCrops(response.crops || []);
+      setCropLoading(false);
     } catch (err) {
-      console.error("Error fetching farmer details:", err);
-      setError(`Failed to fetch farmer details: ${err.message}`);
-      setFetchLoading(false);
+      console.error("Error fetching crop data:", err);
+      setCropLoading(false);
     }
-  }, [farmer.farmer_id, form]);
-
-  const fetchLivestockRecords = useCallback(async () => {
-    try {
-      // Only show loading on initial fetch, not on refreshes
-      if (livestockRecords.length === 0) {
-        setLivestockLoading(true);
-      }
-
-      // Get all livestock records
-      const response = await livestockAPI.getAllLivestockRecords();
-      // Filter records for this farmer
-      const farmerLivestockRecords = response.filter(
-        (record) => record.farmer_id === farmer.farmer_id
-      );
-      setLivestockRecords(farmerLivestockRecords);
-      setLivestockLoading(false);
-    } catch (err) {
-      console.error("Error fetching livestock records:", err);
-      setLivestockLoading(false);
-    }
-  }, [farmer.farmer_id, livestockRecords.length]);
-
-  const fetchOperatorData = useCallback(async () => {
-    try {
-      // Only show loading on initial fetch, not on refreshes
-      if (operatorData.length === 0) {
-        setOperatorLoading(true);
-      }
-
-      // Use the getOperatorsByFarmerId method instead of getAllOperators to reduce API calls
-      const response = await operatorAPI.getOperatorsByFarmerId(
-        farmer.farmer_id
-      );
-
-      // No need to filter as the API already returns filtered data
-      setOperatorData(response);
-      setOperatorLoading(false);
-    } catch (err) {
-      console.error("Error fetching operator data:", err);
-      setOperatorLoading(false);
-    }
-  }, [farmer.farmer_id, operatorData.length]);
+  }, [farmerId, crops.length]);
 
   useEffect(() => {
-    fetchFarmerDetails();
-    fetchLivestockRecords();
-    fetchOperatorData();
-  }, [
-    fetchFarmerDetails,
-    fetchLivestockRecords,
-    fetchOperatorData,
-    refreshTrigger,
-  ]);
+    if (farmerId) {
+      fetchCropData();
+    }
+  }, [farmerId, fetchCropData]);
 
-  const onFinish = async (values) => {
-    setLoading(true);
+  // Crop Modal Functions
+  const showAddCropModal = () => {
+    setIsEditingCrop(false);
+    setCurrentCrop(null);
+    setSelectedCropType(null);
+    setModalTitle("Add New Crop");
+    cropForm.resetFields();
+    setIsCropModalVisible(true);
+  };
+
+  const showEditCropModal = (crop) => {
+    setIsEditingCrop(true);
+    setCurrentCrop(crop);
+    setSelectedCropType(crop.crop_type);
+
+    // Set a more descriptive title
+    let cropName = "";
     try {
-      console.log("Updating farmer with data:", values);
-      await farmerAPI.updateFarmer(farmer.farmer_id, values);
-      message.success("Farmer updated successfully.");
-      refreshAllData(); // Refresh data after update
-      setLoading(false);
+      if (crop.production_data) {
+        const productionData = JSON.parse(crop.production_data);
+        if (crop.crop_type === "Cacao") {
+          cropName = `${crop.variety_clone || "Cacao"} (${
+            productionData.month || "Unknown month"
+          })`;
+        } else {
+          cropName = productionData.crop || crop.crop_type;
+        }
+      } else {
+        cropName = crop.crop_type;
+      }
+    } catch (e) {
+      cropName = crop.crop_type;
+    }
+
+    setModalTitle(`Edit ${cropName}`);
+
+    // Parse production data to set form values
+    let productionData = {};
+    try {
+      if (crop.production_data) {
+        productionData = JSON.parse(crop.production_data);
+      }
+    } catch (e) {
+      console.error("Error parsing production data:", e);
+    }
+
+    // Set form values based on crop type
+    cropForm.setFieldsValue({
+      crop_type: crop.crop_type,
+      variety_clone: crop.variety_clone || "",
+      area_hectare: crop.area_hectare,
+      production_type: crop.production_type || "seasonal",
+      crop_value: productionData.crop || "",
+      month_value: productionData.month || "",
+      quantity: productionData.quantity || "",
+    });
+
+    setIsCropModalVisible(true);
+  };
+
+  const handleCropModalCancel = () => {
+    setIsCropModalVisible(false);
+    cropForm.resetFields();
+    setSelectedCropType(null);
+  };
+
+  const handleCropModalSubmit = async () => {
+    try {
+      const values = await cropForm.validateFields();
+      setCropModalLoading(true);
+
+      if (isEditingCrop && currentCrop) {
+        // Update existing crop
+        let productionData = {};
+
+        if (values.crop_type === "Cacao") {
+          productionData = {
+            month: values.month_value,
+            quantity: values.quantity,
+          };
+        } else {
+          productionData = {
+            crop: values.crop_value,
+            quantity: values.quantity,
+          };
+        }
+
+        const cropEntry = {
+          crop_type: values.crop_type,
+          variety_clone: values.variety_clone || "",
+          area_hectare: values.area_hectare
+            ? Number.parseFloat(values.area_hectare)
+            : 0,
+          production_type: values.production_type || "seasonal",
+          production_data: JSON.stringify(productionData),
+        };
+
+        const cropData = {
+          crops: [cropEntry],
+        };
+
+        console.log("Updating crop data:", JSON.stringify(cropData, null, 2));
+        await farmerAPI.updateCrop(farmerId, currentCrop.crop_id, cropData);
+        message.success("Crop updated successfully.");
+      } else {
+        // Add new crop
+        let productionData = {};
+
+        if (values.crop_type === "Cacao") {
+          productionData = {
+            month: values.month_value,
+            quantity: values.quantity,
+          };
+        } else {
+          productionData = {
+            crop: values.crop_value,
+            quantity: values.quantity,
+          };
+        }
+
+        const cropEntry = {
+          crop_type: values.crop_type,
+          variety_clone: values.variety_clone || "",
+          area_hectare: values.area_hectare
+            ? Number.parseFloat(values.area_hectare)
+            : 0,
+          production_type: values.production_type || "seasonal",
+          production_data: JSON.stringify(productionData),
+        };
+
+        const cropsData = {
+          crops: [cropEntry],
+        };
+
+        console.log("Creating crop data:", JSON.stringify(cropsData, null, 2));
+        await farmerAPI.addCrops(farmerId, cropsData);
+        message.success("Crop added successfully.");
+      }
+
+      // Refresh crop data
+      await fetchCropData();
+
+      // Notify parent component to refresh data
+      if (onDataChange) {
+        onDataChange();
+      }
+
+      setCropModalLoading(false);
+      setIsCropModalVisible(false);
+      cropForm.resetFields();
+      setSelectedCropType(null);
     } catch (error) {
-      message.error(`Failed to update farmer. ${error.message}`);
-      setLoading(false);
+      console.error("Error submitting crop form:", error);
+      message.error(
+        `Failed to ${isEditingCrop ? "update" : "add"} crop. ${error.message}`
+      );
+      setCropModalLoading(false);
     }
   };
 
-  if (fetchLoading || livestockLoading || operatorLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Spin size="large" tip="Loading farmer details..." />
-      </div>
-    );
-  }
+  const handleDeleteCrop = async (cropId) => {
+    try {
+      await farmerAPI.deleteCrop(farmerId, cropId);
+      message.success("Crop entry deleted successfully.");
 
-  if (error) {
-    return (
-      <div className="p-5">
-        <Alert
-          message="Error"
-          description={error}
-          type="error"
-          showIcon
-          action={
-            <Button onClick={onClose} type="primary">
-              Go Back
-            </Button>
-          }
-        />
-      </div>
-    );
-  }
+      // Refresh crop data
+      await fetchCropData();
 
-  // Check if rice, crop, livestock data exists
-  const hasRice = farmerData?.rice && farmerData.rice.length > 0;
-  const hasCrops = farmerData?.crops && farmerData.crops.length > 0;
-  const hasLivestock = livestockRecords && livestockRecords.length > 0;
-  const hasOperators = operatorData && operatorData.length > 0;
+      // Notify parent component to refresh data
+      if (onDataChange) {
+        onDataChange();
+      }
+    } catch (error) {
+      message.error(`Failed to delete crop entry. ${error.message}`);
+    }
+  };
+
+  const cropColumns = [
+    {
+      title: "Crop Type",
+      dataIndex: "crop_type",
+      key: "crop_type",
+    },
+    {
+      title: "Variety/Clone",
+      dataIndex: "variety_clone",
+      key: "variety_clone",
+    },
+    {
+      title: "Area (Hectare)",
+      dataIndex: "area_hectare",
+      key: "area_hectare",
+    },
+    {
+      title: "Cropping Intensity",
+      dataIndex: "production_type",
+      key: "production_type",
+    },
+    {
+      title: cropDataType,
+      key: "crop_or_month",
+      render: (_, record) => {
+        return cropDataType === "Crop" ? record.crop_value : record.month_value;
+      },
+    },
+    {
+      title: "Quantity",
+      key: "quantity",
+      dataIndex: "quantity_value",
+    },
+    {
+      title: "Actions",
+      key: "actions",
+      width: 120,
+      render: (_, record) => (
+        <Space size="small">
+          <Button
+            type="text"
+            icon={<EditOutlined />}
+            onClick={() => showEditCropModal(record)}
+            className="action-button"
+            style={{ color: colors.warning }}
+          />
+          <Popconfirm
+            title="Delete this crop entry?"
+            description="This action cannot be undone."
+            onConfirm={() => handleDeleteCrop(record.crop_id)}
+            okText="Yes"
+            cancelText="No"
+            okButtonProps={{
+              style: {
+                backgroundColor: colors.error,
+                borderColor: colors.error,
+              },
+            }}
+          >
+            <Button
+              type="text"
+              icon={<DeleteOutlined />}
+              danger
+              className="action-button"
+            />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  const hasCrops = crops && crops.length > 0;
 
   return (
-    <div className="min-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden">
-      {/* Header with back button and farmer name */}
+    <>
       <Card
+        title={
+          <div className="flex items-center">
+            <InfoCircleOutlined className="mr-2 text-green-600" />
+            <span className="text-base font-medium">Crop Information</span>
+          </div>
+        }
+        extra={
+          <Button
+            type="primary"
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={showAddCropModal}
+            style={{
+              backgroundColor: colors.primary,
+              borderColor: colors.primary,
+            }}
+          >
+            Add Crop
+          </Button>
+        }
         bordered={false}
-        className="rounded-lg shadow-sm mb-3"
-        bodyStyle={{ padding: "10px" }}
+        className="rounded-lg shadow-sm mt-4"
+        bodyStyle={{ padding: "0" }}
       >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            width: "100%",
-          }}
-        >
-          <Button icon={<ArrowLeftOutlined />} onClick={onClose}>
-            Back
-          </Button>
-        </div>
-
-        {/* Navigation buttons */}
-        <div className="flex flex-wrap gap-5 mb-2 mt-3">
-          <Button
-            type={activeTab === "info" ? "primary" : "default"}
-            icon={<UserOutlined />}
-            onClick={() => setActiveTab("info")}
-            style={{
-              backgroundColor: activeTab === "info" ? colors.primary : "",
-              borderColor: activeTab === "info" ? colors.primary : "",
+        {cropLoading ? (
+          <div className="py-10 flex justify-center">
+            <Spin tip="Loading crop records..." />
+          </div>
+        ) : hasCrops ? (
+          <Table
+            columns={cropColumns}
+            dataSource={crops}
+            rowKey="crop_id"
+            pagination={false}
+            size="small"
+            scroll={{
+              x: crops.length > 0 ? "max-content" : undefined,
             }}
-          >
-            Farmer Information
-          </Button>
-
-          <Button
-            type={activeTab === "crops" ? "primary" : "default"}
-            icon={<InfoCircleOutlined />}
-            onClick={() => setActiveTab("crops")}
-            style={{
-              backgroundColor: activeTab === "crops" ? colors.primary : "",
-              borderColor: activeTab === "crops" ? colors.primary : "",
-            }}
-          >
-            Crop Information
-            {hasCrops && (
-              <Badge
-                count={farmerData.crops.length}
-                className="ml-1"
-                style={{
-                  backgroundColor:
-                    activeTab === "crops" ? "#fff" : colors.primary,
-                  color: activeTab === "crops" ? colors.primary : "#fff",
-                }}
-              />
-            )}
-          </Button>
-
-          <Button
-            type={activeTab === "rice" ? "primary" : "default"}
-            icon={<InfoCircleOutlined />}
-            onClick={() => setActiveTab("rice")}
-            style={{
-              backgroundColor: activeTab === "rice" ? colors.primary : "",
-              borderColor: activeTab === "rice" ? colors.primary : "",
-            }}
-          >
-            Rice Information
-            {hasRice && (
-              <Badge
-                count={farmerData.rice.length}
-                className="ml-1"
-                style={{
-                  backgroundColor:
-                    activeTab === "rice" ? "#fff" : colors.primary,
-                  color: activeTab === "rice" ? colors.primary : "#fff",
-                }}
-              />
-            )}
-          </Button>
-
-          <Button
-            type={activeTab === "livestock" ? "primary" : "default"}
-            icon={<InfoCircleOutlined />}
-            onClick={() => setActiveTab("livestock")}
-            style={{
-              backgroundColor: activeTab === "livestock" ? colors.primary : "",
-              borderColor: activeTab === "livestock" ? colors.primary : "",
-            }}
-          >
-            Livestock Records
-            {hasLivestock && (
-              <Badge
-                count={livestockRecords.length}
-                className="ml-1"
-                style={{
-                  backgroundColor:
-                    activeTab === "livestock" ? "#fff" : colors.primary,
-                  color: activeTab === "livestock" ? colors.primary : "#fff",
-                }}
-              />
-            )}
-          </Button>
-
-          <Button
-            type={activeTab === "operator" ? "primary" : "default"}
-            icon={<EnvironmentOutlined />}
-            onClick={() => setActiveTab("operator")}
-            style={{
-              backgroundColor: activeTab === "operator" ? colors.primary : "",
-              borderColor: activeTab === "operator" ? colors.primary : "",
-            }}
-          >
-            Operator Information
-            {hasOperators && (
-              <Badge
-                count={operatorData.length}
-                className="ml-1"
-                style={{
-                  backgroundColor:
-                    activeTab === "operator" ? "#fff" : colors.primary,
-                  color: activeTab === "operator" ? colors.primary : "#fff",
-                }}
-              />
-            )}
-          </Button>
-        </div>
+          />
+        ) : (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="No crop information available"
+            className="py-10"
+            style={{ marginBottom: "20px" }}
+          ></Empty>
+        )}
       </Card>
 
-      {/* Content based on active tab */}
-      {activeTab === "info" && (
-        <Card
-          bordered={false}
-          className="rounded-lg shadow-sm mb-4"
-          bodyStyle={{ padding: "16px" }}
-        >
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={onFinish}
-            initialValues={{
-              name: farmerData?.name || "",
-              contact_number: farmerData?.contact_number || "",
-              facebook_email: farmerData?.facebook_email || "",
-              home_address: farmerData?.home_address || "",
-              farm_address: farmerData?.farm_address || "",
-              farm_location_longitude:
-                farmerData?.farm_location_longitude || "",
-              farm_location_latitude: farmerData?.farm_location_latitude || "",
-              market_outlet_location: farmerData?.market_outlet_location || "",
-              buyer_name: farmerData?.buyer_name || "",
-              association_organization:
-                farmerData?.association_organization || "",
-              barangay: farmerData?.barangay || "",
+      {/* Add Crop Modal */}
+      <Modal
+        title={modalTitle}
+        open={isCropModalVisible}
+        onCancel={handleCropModalCancel}
+        width={700}
+        footer={[
+          <Button key="cancel" onClick={handleCropModalCancel}>
+            Cancel
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            loading={cropModalLoading}
+            onClick={handleCropModalSubmit}
+            style={{
+              backgroundColor: colors.primary,
+              borderColor: colors.primary,
             }}
           >
-            <Row gutter={[24, 24]}>
-              <Col span={24} md={12}>
-                <Card
-                  title={
-                    <div style={{ display: "flex", alignItems: "center" }}>
-                      <UserOutlined
-                        style={{ marginRight: 8, color: colors.primary }}
-                      />
-                      <span>Personal Information</span>
-                    </div>
-                  }
-                  style={{ borderRadius: 8, height: "100%" }}
-                >
-                  <div style={{ marginBottom: 16 }}>
-                    <Text type="secondary">Name</Text>
-                    <Form.Item
-                      name="name"
-                      rules={[{ required: true }]}
-                      style={{ marginBottom: 0 }}
-                    >
-                      <Input style={{ fontSize: 16 }} />
-                    </Form.Item>
-                  </div>
-                  <div style={{ marginBottom: 16 }}>
-                    <Text type="secondary">Contact Number</Text>
-                    <Form.Item
-                      name="contact_number"
-                      style={{ marginBottom: 0 }}
-                    >
-                      <Input style={{ fontSize: 16 }} />
-                    </Form.Item>
-                  </div>
-                  <div style={{ marginBottom: 16 }}>
-                    <Text type="secondary">Email</Text>
-                    <Form.Item
-                      name="facebook_email"
-                      style={{ marginBottom: 0 }}
-                    >
-                      <Input style={{ fontSize: 16 }} />
-                    </Form.Item>
-                  </div>
-                  <div>
-                    <Text type="secondary">Barangay</Text>
-                    <Form.Item name="barangay" style={{ marginBottom: 0 }}>
-                      <Input style={{ fontSize: 16 }} />
-                    </Form.Item>
-                  </div>
-                </Card>
-              </Col>
-              <Col span={24} md={12}>
-                <Card
-                  title={
-                    <div style={{ display: "flex", alignItems: "center" }}>
-                      <HomeOutlined
-                        style={{ marginRight: 8, color: colors.primary }}
-                      />
-                      <span>Address Information</span>
-                    </div>
-                  }
-                  style={{ borderRadius: 8, height: "100%" }}
-                >
-                  <div style={{ marginBottom: 16 }}>
-                    <Text type="secondary">Home Address</Text>
-                    <Form.Item name="home_address" style={{ marginBottom: 0 }}>
-                      <Input style={{ fontSize: 16 }} />
-                    </Form.Item>
-                  </div>
-                  <div style={{ marginBottom: 16 }}>
-                    <Text type="secondary">Farm Address</Text>
-                    <Form.Item name="farm_address" style={{ marginBottom: 0 }}>
-                      <Input style={{ fontSize: 16 }} />
-                    </Form.Item>
-                  </div>
-                  <div>
-                    <Text type="secondary">Farm Location</Text>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <Form.Item
-                        name="farm_location_longitude"
-                        style={{ marginBottom: 0, width: "50%" }}
-                      >
-                        <Input
-                          style={{ fontSize: 16 }}
-                          placeholder="Longitude"
-                        />
-                      </Form.Item>
-                      <Form.Item
-                        name="farm_location_latitude"
-                        style={{ marginBottom: 0, width: "50%" }}
-                      >
-                        <Input
-                          style={{ fontSize: 16 }}
-                          placeholder="Latitude"
-                        />
-                      </Form.Item>
-                    </div>
-                  </div>
-                </Card>
-              </Col>
-            </Row>
-
-            <Form.Item className="mt-6">
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={loading}
-                icon={<SaveOutlined />}
-                style={{
-                  backgroundColor: colors.primary,
-                  borderColor: colors.primary,
-                  marginTop: "24px",
-                }}
+            {isEditingCrop ? "Update" : "Add"}
+          </Button>,
+        ]}
+      >
+        <Form
+          form={cropForm}
+          layout="vertical"
+          initialValues={{
+            production_type: "seasonal",
+          }}
+        >
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="crop_type"
+                label="Crop Type"
+                rules={[{ required: true, message: "Please select crop type" }]}
               >
-                Save Changes
-              </Button>
-            </Form.Item>
-          </Form>
-        </Card>
-      )}
+                <Select
+                  placeholder="Select Crop Type"
+                  onChange={(value) => setSelectedCropType(value)}
+                >
+                  <Option value="Spices">Spices</Option>
+                  <Option value="Legumes">Legumes</Option>
+                  <Option value="Vegetable">Vegetable</Option>
+                  <Option value="Cacao">Cacao</Option>
+                  <Option value="Banana">Banana</Option>
+                </Select>
+              </Form.Item>
+            </Col>
 
-      {activeTab === "crops" && (
-        <CropsTab
-          farmerId={farmer.farmer_id}
-          farmerData={farmerData}
-          colors={colors}
-          onDataChange={refreshAllData}
-        />
-      )}
+            {/* Common fields for all crop types */}
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label="Area (Hectare)"
+                name="area_hectare"
+                rules={[
+                  { required: true, message: "Please enter area in hectares" },
+                ]}
+              >
+                <InputNumber
+                  className="w-full"
+                  min={0}
+                  step={0.01}
+                  placeholder="Enter area in hectares"
+                />
+              </Form.Item>
+            </Col>
 
-      {activeTab === "rice" && (
-        <RiceTab
-          farmerId={farmer.farmer_id}
-          farmerData={farmerData}
-          colors={colors}
-          onDataChange={refreshAllData}
-        />
-      )}
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="production_type"
+                label="Cropping Intensity"
+                rules={[
+                  {
+                    required: true,
+                    message: "Please select cropping intensity",
+                  },
+                ]}
+              >
+                <Select placeholder="Select Cropping Intensity">
+                  <Option value="year_round">Year Round</Option>
+                  <Option value="quarterly">Quarterly</Option>
+                  <Option value="seasonal">Seasonal</Option>
+                  <Option value="annually">Annually</Option>
+                  <Option value="twice_a_month">Twice a Month</Option>
+                </Select>
+              </Form.Item>
+            </Col>
 
-      {activeTab === "livestock" && (
-        <LivestockTab
-          farmerId={farmer.farmer_id}
-          farmerData={farmerData}
-          colors={colors}
-          onDataChange={refreshAllData}
-        />
-      )}
+            {/* Variety/Clone field only for Cacao */}
+            {selectedCropType === "Cacao" && (
+              <Col xs={24} sm={12}>
+                <Form.Item
+                  name="variety_clone"
+                  label="Variety/Clone"
+                  rules={[
+                    { required: true, message: "Please enter variety/clone" },
+                  ]}
+                >
+                  <Input placeholder="Enter variety or clone" />
+                </Form.Item>
+              </Col>
+            )}
 
-      {activeTab === "operator" && (
-        <OperatorTab
-          farmerId={farmer.farmer_id}
-          farmerData={farmerData}
-          colors={colors}
-          onDataChange={refreshAllData}
-        />
-      )}
-    </div>
+            {/* Cacao specific fields */}
+            {selectedCropType === "Cacao" && (
+              <>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    name="month_value"
+                    label="Month"
+                    rules={[{ required: true, message: "Please select month" }]}
+                  >
+                    <Select placeholder="Select month">
+                      <Option value="January">January</Option>
+                      <Option value="February">February</Option>
+                      <Option value="March">March</Option>
+                      <Option value="April">April</Option>
+                      <Option value="May">May</Option>
+                      <Option value="June">June</Option>
+                      <Option value="July">July</Option>
+                      <Option value="August">August</Option>
+                      <Option value="September">September</Option>
+                      <Option value="October">October</Option>
+                      <Option value="November">November</Option>
+                      <Option value="December">December</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </>
+            )}
+
+            {/* Fields for other crop types */}
+            {selectedCropType !== "Cacao" && (
+              <>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    name="crop_value"
+                    label="Crop"
+                    rules={[{ required: true, message: "Please enter crop" }]}
+                  >
+                    <Input placeholder="Enter crop" />
+                  </Form.Item>
+                </Col>
+              </>
+            )}
+
+            {/* Quantity field for all crop types */}
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="quantity"
+                label="Quantity"
+                rules={[{ required: true, message: "Please enter quantity" }]}
+              >
+                <InputNumber
+                  className="w-full"
+                  min={0}
+                  placeholder="Enter quantity"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
+    </>
   );
 };
 
-export default EditFarmer;
+export default CropsTab;
