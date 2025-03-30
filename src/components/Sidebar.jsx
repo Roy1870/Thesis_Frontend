@@ -175,7 +175,7 @@ const Sidebar = () => {
               }`}
             >
               <FormOutlined className="mr-3" />
-              {(!collapsed || mobile) && <span>Add Data</span>}
+              {(!collapsed || mobile) && <span>Data Entry</span>}
             </button>
           </li>
           <li>

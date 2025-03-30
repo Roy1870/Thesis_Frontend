@@ -223,7 +223,22 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
   const hasOperators = operatorData && operatorData.length > 0;
 
   return (
-    <div className="min-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden">
+    <div className="min-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden pb-safe">
+      <style jsx>{`
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+
+        @media (max-width: 640px) {
+          .pb-safe {
+            padding-bottom: 80px;
+          }
+        }
+      `}</style>
       {/* Header with back button and farmer name */}
       <div className="p-2 mb-3 bg-white rounded-lg shadow-sm sm:p-3">
         <div className="flex items-center justify-between w-full">
@@ -237,7 +252,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
         </div>
 
         {/* Navigation buttons - scrollable on mobile */}
-        <div className="flex gap-2 px-2 pb-2 mt-3 mb-2 -mx-2 overflow-x-auto flex-nowrap sm:gap-5 sm:mx-0 sm:px-0 sm:flex-wrap">
+        <div className="flex gap-2 px-2 pb-2 mt-3 mb-2 -mx-2 overflow-x-auto flex-nowrap sm:gap-5 sm:mx-0 sm:px-0 sm:flex-wrap hide-scrollbar">
           <button
             className={`flex items-center px-2 py-1 sm:px-3 sm:py-2 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap ${
               activeTab === "info"
@@ -513,13 +528,13 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
 
             <button
               type="submit"
-              className="mt-4 sm:mt-6 flex items-center px-3 py-2 sm:px-4 sm:py-2 bg-[#6A9C89] text-white rounded-md hover:bg-opacity-90 transition-colors text-sm sm:text-base"
+              className="mt-6 sm:mt-8 flex items-center justify-center px-6 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-md transition-colors text-sm sm:text-base shadow-md fixed bottom-4 left-0 right-0 mx-auto w-[calc(100%-2rem)] sm:w-auto sm:static"
               disabled={loading}
             >
               {loading ? (
-                <Loader className="w-3 h-3 mr-1 sm:w-4 sm:h-4 sm:mr-2 animate-spin" />
+                <Loader className="w-4 h-4 mr-2 animate-spin" />
               ) : (
-                <Save className="w-3 h-3 mr-1 sm:w-4 sm:h-4 sm:mr-2" />
+                <Save className="w-4 h-4 mr-2" />
               )}
               Save Changes
             </button>

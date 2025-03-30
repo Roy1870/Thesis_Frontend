@@ -16,6 +16,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
   const [cropDataType, setCropDataType] = useState("Crop"); // Default column title
   const [isEditMode, setIsEditMode] = useState(false);
   const [viewingRemarks, setViewingRemarks] = useState(null);
+  const [cropSubTab, setCropSubTab] = useState("regular"); // "regular" or "highValue"
 
   // Function to fetch farmer details (declared here to be accessible in handleCloseEdit)
   const fetchFarmerDetails = async () => {
@@ -174,13 +175,6 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
       key: "production_type",
     },
     {
-      title: cropDataType,
-      key: "crop_or_month",
-      render: (_, record) => {
-        return cropDataType === "Crop" ? record.crop_value : record.month_value;
-      },
-    },
-    {
       title: "Quantity",
       key: "quantity",
       dataIndex: "quantity_value",
@@ -256,6 +250,21 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
       title: "Remarks",
       dataIndex: "remarks",
       key: "remarks",
+      render: (remarks) => (
+        <div className="max-w-xs">
+          {remarks ? (
+            <div
+              className="text-blue-600 truncate cursor-pointer hover:text-blue-800 hover:underline"
+              title="Click to view full remarks"
+              onClick={() => setViewingRemarks(remarks)}
+            >
+              {remarks}
+            </div>
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -303,8 +312,8 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
 
   if (error) {
     return (
-      <div className="p-5">
-        <div className="p-4 text-red-800 border border-red-200 rounded-lg bg-red-50">
+      <div className="p-3 sm:p-4">
+        <div className="p-3 text-red-800 border border-red-200 rounded-lg sm:p-4 bg-red-50">
           <div className="font-bold">Error</div>
           <div>{error}</div>
           <button
@@ -325,7 +334,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
   const hasOperators = operatorData.length > 0;
 
   return (
-    <div className="min-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden">
+    <div className="min-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden pb-20">
       {/* Header with back button and action buttons */}
       <div className="p-3 mb-3 bg-white rounded-lg shadow-sm sm:p-4">
         <div className="flex flex-col justify-between w-full gap-2 mb-4 sm:flex-row sm:items-center">
@@ -394,7 +403,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
         </div>
 
         {/* Navigation buttons */}
-        <div className="flex gap-2 pb-2 mb-2 overflow-x-auto flex-nowrap sm:gap-4 hide-scrollbar">
+        <div className="flex gap-2 px-1 pb-2 mb-2 -mx-1 overflow-x-auto flex-nowrap sm:gap-4 hide-scrollbar sm:mx-0 sm:px-0">
           <button
             onClick={() => setActiveTab("info")}
             className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm whitespace-nowrap ${
@@ -592,7 +601,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                     clipRule="evenodd"
                   />
                 </svg>
-                <h3 className="text-base font-medium sm:text-lg">
+                <h3 className="text-sm font-medium sm:text-base">
                   Personal Information
                 </h3>
               </div>
@@ -601,7 +610,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                 <div className="mb-1 text-xs text-gray-500 sm:text-sm">
                   Name
                 </div>
-                <div className="text-sm font-medium sm:text-base">
+                <div className="text-xs font-medium sm:text-sm">
                   {farmerData.name}
                 </div>
               </div>
@@ -610,7 +619,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                 <div className="mb-1 text-xs text-gray-500 sm:text-sm">
                   Contact Number
                 </div>
-                <div className="text-sm sm:text-base">
+                <div className="text-xs sm:text-sm">
                   {farmerData.contact_number || "N/A"}
                 </div>
               </div>
@@ -619,7 +628,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                 <div className="mb-1 text-xs text-gray-500 sm:text-sm">
                   Email
                 </div>
-                <div className="text-sm sm:text-base">
+                <div className="text-xs sm:text-sm">
                   {farmerData.facebook_email || "N/A"}
                 </div>
               </div>
@@ -646,7 +655,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                 >
                   <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
                 </svg>
-                <h3 className="text-base font-medium sm:text-lg">
+                <h3 className="text-sm font-medium sm:text-base">
                   Address Information
                 </h3>
               </div>
@@ -655,7 +664,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                 <div className="mb-1 text-xs text-gray-500 sm:text-sm">
                   Home Address
                 </div>
-                <div className="text-sm sm:text-base">
+                <div className="text-xs sm:text-sm">
                   {farmerData.home_address || "N/A"}
                 </div>
               </div>
@@ -664,7 +673,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                 <div className="mb-1 text-xs text-gray-500 sm:text-sm">
                   Farm Address
                 </div>
-                <div className="text-sm sm:text-base">
+                <div className="text-xs sm:text-sm">
                   {farmerData.farm_address || "N/A"}
                 </div>
               </div>
@@ -673,7 +682,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                 <div className="mb-1 text-xs text-gray-500 sm:text-sm">
                   Farm Location
                 </div>
-                <div className="text-sm sm:text-base">
+                <div className="text-xs sm:text-sm">
                   {farmerData.farm_location_longitude &&
                   farmerData.farm_location_latitude
                     ? `${farmerData.farm_location_longitude}, ${farmerData.farm_location_latitude}`
@@ -700,13 +709,13 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                 clipRule="evenodd"
               />
             </svg>
-            <h3 className="text-base font-medium sm:text-lg">
+            <h3 className="text-sm font-medium sm:text-base">
               Rice Information
             </h3>
           </div>
 
           {hasRice ? (
-            <div className="overflow-x-auto">
+            <div className="px-3 overflow-x-auto sm:px-4">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -757,7 +766,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                   d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
                 />
               </svg>
-              <p className="text-sm sm:text-base">
+              <p className="text-xs sm:text-sm">
                 No rice information available
               </p>
             </div>
@@ -780,48 +789,192 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                 clipRule="evenodd"
               />
             </svg>
-            <h3 className="text-base font-medium sm:text-lg">
+            <h3 className="text-sm font-medium sm:text-base">
               Crop Information
             </h3>
           </div>
 
+          {/* Sub-tabs for crops */}
+          <div className="flex border-b">
+            <button
+              className={`px-4 py-2 font-medium ${
+                cropSubTab === "regular"
+                  ? "text-emerald-700 border-b-2 border-emerald-700"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+              onClick={() => setCropSubTab("regular")}
+            >
+              Regular Crops
+            </button>
+            <button
+              className={`px-4 py-2 font-medium ${
+                cropSubTab === "highValue"
+                  ? "text-emerald-700 border-b-2 border-emerald-700"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+              onClick={() => setCropSubTab("highValue")}
+            >
+              High Value Crops
+            </button>
+          </div>
+
           {hasCrops ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    {cropColumns.map((column) => (
-                      <th
-                        key={column.key || column.dataIndex}
-                        className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3"
+            <div className="px-3 overflow-x-auto sm:px-4">
+              {cropSubTab === "regular" ? (
+                // Regular crops table
+                <>
+                  {farmerData.crops.filter(
+                    (crop) => crop.crop_type !== "High Value Crops"
+                  ).length > 0 ? (
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          {cropColumns.map((column) => (
+                            <th
+                              key={column.key || column.dataIndex}
+                              className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3"
+                            >
+                              {column.title}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {farmerData.crops
+                          .filter(
+                            (crop) => crop.crop_type !== "High Value Crops"
+                          )
+                          .map((crop, index) => (
+                            <tr
+                              key={crop.crop_id || index}
+                              className={
+                                index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                              }
+                            >
+                              {cropColumns.map((column) => (
+                                <td
+                                  key={`${crop.crop_id || index}-${
+                                    column.key || column.dataIndex
+                                  }`}
+                                  className="px-2 py-2 text-xs text-gray-500 sm:px-6 sm:py-4 sm:text-sm whitespace-nowrap"
+                                >
+                                  {column.render
+                                    ? column.render(crop, crop)
+                                    : crop[column.dataIndex]}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-gray-500 sm:py-10">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-10 h-10 mb-2 text-gray-300 sm:w-12 sm:h-12"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
                       >
-                        {column.title}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {farmerData.crops.map((crop, index) => (
-                    <tr
-                      key={crop.crop_id || index}
-                      className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                    >
-                      {cropColumns.map((column) => (
-                        <td
-                          key={`${crop.crop_id || index}-${
-                            column.key || column.dataIndex
-                          }`}
-                          className="px-2 py-2 text-xs text-gray-500 sm:px-6 sm:py-4 sm:text-sm whitespace-nowrap"
-                        >
-                          {column.render
-                            ? column.render(crop, crop)
-                            : crop[column.dataIndex]}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1}
+                          d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                        />
+                      </svg>
+                      <p className="text-xs sm:text-sm">
+                        No regular crop information available
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                // High value crops table
+                <>
+                  {farmerData.crops.filter(
+                    (crop) => crop.crop_type === "High Value Crops"
+                  ).length > 0 ? (
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+                            Crop
+                          </th>
+                          <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+                            Variety/Clone
+                          </th>
+                          <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+                            Area (Hectare)
+                          </th>
+                          <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+                            Production Type
+                          </th>
+                          <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+                            Month
+                          </th>
+                          <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+                            Quantity
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {farmerData.crops
+                          .filter(
+                            (crop) => crop.crop_type === "High Value Crops"
+                          )
+                          .map((crop, index) => (
+                            <tr
+                              key={crop.crop_id || index}
+                              className={
+                                index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                              }
+                            >
+                              <td className="px-2 py-2 text-xs text-gray-500 sm:px-6 sm:py-4 sm:text-sm whitespace-nowrap">
+                                {crop.crop_value}
+                              </td>
+                              <td className="px-2 py-2 text-xs text-gray-500 sm:px-6 sm:py-4 sm:text-sm whitespace-nowrap">
+                                {crop.variety_clone || "-"}
+                              </td>
+                              <td className="px-2 py-2 text-xs text-gray-500 sm:px-6 sm:py-4 sm:text-sm whitespace-nowrap">
+                                {crop.area_hectare}
+                              </td>
+                              <td className="px-2 py-2 text-xs text-gray-500 sm:px-6 sm:py-4 sm:text-sm whitespace-nowrap">
+                                {crop.production_type}
+                              </td>
+                              <td className="px-2 py-2 text-xs text-gray-500 sm:px-6 sm:py-4 sm:text-sm whitespace-nowrap">
+                                {crop.month_value}
+                              </td>
+                              <td className="px-2 py-2 text-xs text-gray-500 sm:px-6 sm:py-4 sm:text-sm whitespace-nowrap">
+                                {crop.quantity_value}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-gray-500 sm:py-10">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-10 h-10 mb-2 text-gray-300 sm:w-12 sm:h-12"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1}
+                          d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                        />
+                      </svg>
+                      <p className="text-xs sm:text-sm">
+                        No high value crop information available
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-gray-500 sm:py-10">
@@ -839,7 +992,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                   d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
                 />
               </svg>
-              <p className="text-sm sm:text-base">
+              <p className="text-xs sm:text-sm">
                 No crop information available
               </p>
             </div>
@@ -862,7 +1015,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                 clipRule="evenodd"
               />
             </svg>
-            <h3 className="text-base font-medium sm:text-lg">
+            <h3 className="text-sm font-medium sm:text-base">
               Livestock Records
             </h3>
           </div>
@@ -870,12 +1023,12 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
           {livestockLoading ? (
             <div className="flex justify-center py-8 sm:py-10">
               <div className="w-6 h-6 border-t-2 border-b-2 border-green-500 rounded-full sm:w-8 sm:h-8 animate-spin"></div>
-              <span className="ml-2 text-sm sm:text-base">
+              <span className="ml-2 text-xs sm:text-sm">
                 Loading livestock records...
               </span>
             </div>
           ) : hasLivestock ? (
-            <div className="overflow-x-auto">
+            <div className="px-3 overflow-x-auto sm:px-4">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -929,7 +1082,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                   d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
                 />
               </svg>
-              <p className="text-sm sm:text-base">
+              <p className="text-xs sm:text-sm">
                 No livestock records available
               </p>
             </div>
@@ -952,7 +1105,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                 clipRule="evenodd"
               />
             </svg>
-            <h3 className="text-base font-medium sm:text-lg">
+            <h3 className="text-sm font-medium sm:text-base">
               Operator Information
             </h3>
           </div>
@@ -960,12 +1113,12 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
           {operatorLoading ? (
             <div className="flex justify-center py-8 sm:py-10">
               <div className="w-6 h-6 border-t-2 border-b-2 border-green-500 rounded-full sm:w-8 sm:h-8 animate-spin"></div>
-              <span className="ml-2 text-sm sm:text-base">
+              <span className="ml-2 text-xs sm:text-sm">
                 Loading operator records...
               </span>
             </div>
           ) : hasOperators ? (
-            <div className="overflow-x-auto">
+            <div className="px-3 overflow-x-auto sm:px-4">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -1020,7 +1173,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                   d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
                 />
               </svg>
-              <p className="text-sm sm:text-base">
+              <p className="text-xs sm:text-sm">
                 No operator information available
               </p>
             </div>
@@ -1030,17 +1183,17 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
 
       {/* View Full Remarks Modal */}
       {viewingRemarks && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="w-full max-w-md mx-3 bg-white rounded-lg shadow-xl sm:max-w-2xl">
-            <div className="flex items-center justify-between p-3 border-b sm:p-4">
-              <h3 className="text-base font-medium sm:text-lg">Remarks</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="w-full max-w-md bg-white rounded-lg shadow-xl sm:max-w-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between p-4 bg-white border-b">
+              <h3 className="text-lg font-medium">Remarks</h3>
               <button
                 onClick={() => setViewingRemarks(null)}
                 className="text-gray-400 hover:text-gray-500"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="w-5 h-5 sm:w-6 sm:h-6"
+                  className="w-6 h-6"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -1054,15 +1207,19 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                 </svg>
               </button>
             </div>
-            <div className="p-4 overflow-y-auto sm:p-6 max-h-60 sm:max-h-96">
+            <div className="p-4 sm:p-6 overflow-y-auto max-h-[50vh] sm:max-h-96">
               <p className="text-sm whitespace-pre-wrap sm:text-base">
                 {viewingRemarks}
               </p>
             </div>
-            <div className="flex justify-end p-3 border-t sm:p-4">
+            <div className="sticky bottom-0 z-10 flex justify-end p-4 bg-white border-t">
               <button
                 onClick={() => setViewingRemarks(null)}
-                className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-gray-800 bg-gray-100 rounded-md hover:bg-gray-200"
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+                style={{
+                  backgroundColor: colors.primary,
+                  borderColor: colors.primary,
+                }}
               >
                 Close
               </button>

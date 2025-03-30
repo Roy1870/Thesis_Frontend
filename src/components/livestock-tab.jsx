@@ -373,7 +373,7 @@ const LivestockTab = ({ farmerId, farmerData, colors, onDataChange }) => {
             </span>
           </div>
         ) : hasLivestock ? (
-          <div className="-mx-3 overflow-x-auto sm:mx-0">
+          <div className="px-3 overflow-x-auto sm:px-4">
             <table className="min-w-full text-xs divide-y divide-gray-200 sm:text-sm">
               <thead className="bg-gray-50">
                 <tr>
@@ -444,8 +444,8 @@ const LivestockTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       {/* Add Livestock Modal */}
       {isLivestockModalVisible && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="w-full max-w-md bg-white rounded-lg shadow-xl sm:max-w-2xl">
-            <div className="flex items-center justify-between p-3 border-b sm:p-4">
+          <div className="w-full max-w-md bg-white rounded-lg shadow-xl sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 z-10 flex items-center justify-between p-3 bg-white border-b sm:p-4">
               <h3 className="text-base font-medium sm:text-lg">
                 {isEditingLivestock ? "Edit Livestock" : "Add New Livestock"}
               </h3>
@@ -470,7 +470,7 @@ const LivestockTab = ({ farmerId, farmerData, colors, onDataChange }) => {
               </button>
             </div>
 
-            <div className="p-4 sm:p-6">
+            <div className="p-4 sm:p-6 overflow-y-auto max-h-[60vh]">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="mb-4">
                   <label className="block mb-1 text-xs font-medium text-gray-700 sm:text-sm">
@@ -541,7 +541,7 @@ const LivestockTab = ({ farmerId, farmerData, colors, onDataChange }) => {
               </div>
             </div>
 
-            <div className="flex justify-end p-3 border-t sm:p-4">
+            <div className="sticky bottom-0 z-10 flex justify-end p-3 bg-white border-t sm:p-4">
               <button
                 onClick={handleLivestockModalCancel}
                 className="px-3 py-1 mr-2 text-xs font-medium text-gray-800 bg-gray-100 rounded-md sm:px-4 sm:py-2 sm:text-sm hover:bg-gray-200"

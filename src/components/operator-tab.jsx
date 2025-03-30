@@ -392,7 +392,7 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
             <span className="ml-2">Loading operator records...</span>
           </div>
         ) : hasOperator ? (
-          <div className="overflow-x-auto">
+          <div className="-mx-3 overflow-x-auto sm:mx-0">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -463,9 +463,9 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
       {/* Add Operator Modal */}
       {isOperatorModalVisible && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="w-full max-w-2xl bg-white rounded-lg shadow-xl">
-            <div className="flex items-center justify-between p-4 border-b">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="w-full max-w-md bg-white rounded-lg shadow-xl sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 z-10 flex items-center justify-between p-4 bg-white border-b">
               <h3 className="text-lg font-medium">
                 {isEditingOperator ? "Edit Operator" : "Add New Operator"}
               </h3>
@@ -490,9 +490,9 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
               </button>
             </div>
 
-            <div className="p-6">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="mb-4">
+            <div className="p-4 sm:p-6">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 sm:gap-4">
+                <div className="mb-3 sm:mb-4">
                   <label className="block mb-1 text-sm font-medium text-gray-700">
                     Fishpond Location <span className="text-red-500">*</span>
                   </label>
@@ -501,13 +501,13 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                     name="fishpond_location"
                     value={formValues.fishpond_location}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                     placeholder="Enter fishpond location"
                     required
                   />
                 </div>
 
-                <div className="mb-4">
+                <div className="mb-3 sm:mb-4">
                   <label className="block mb-1 text-sm font-medium text-gray-700">
                     Cultured Species <span className="text-red-500">*</span>
                   </label>
@@ -515,7 +515,7 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                     name="cultured_species"
                     value={formValues.cultured_species}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                     required
                   >
                     <option value="">Select Species</option>
@@ -529,7 +529,7 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                   </select>
                 </div>
 
-                <div className="mb-4">
+                <div className="mb-3 sm:mb-4">
                   <label className="block mb-1 text-sm font-medium text-gray-700">
                     Productive Area (sqm){" "}
                     <span className="text-red-500">*</span>
@@ -540,13 +540,13 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                     value={formValues.productive_area_sqm}
                     onChange={handleInputChange}
                     min="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                     placeholder="Enter productive area in square meters"
                     required
                   />
                 </div>
 
-                <div className="mb-4">
+                <div className="mb-3 sm:mb-4">
                   <label className="block mb-1 text-sm font-medium text-gray-700">
                     Stocking Density <span className="text-red-500">*</span>
                   </label>
@@ -556,13 +556,13 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                     value={formValues.stocking_density}
                     onChange={handleInputChange}
                     min="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                     placeholder="Enter stocking density"
                     required
                   />
                 </div>
 
-                <div className="mb-4">
+                <div className="mb-3 sm:mb-4">
                   <label className="block mb-1 text-sm font-medium text-gray-700">
                     Date of Stocking <span className="text-red-500">*</span>
                   </label>
@@ -571,12 +571,12 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                     name="date_of_stocking"
                     value={formValues.date_of_stocking}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                     required
                   />
                 </div>
 
-                <div className="mb-4">
+                <div className="mb-3 sm:mb-4">
                   <label className="block mb-1 text-sm font-medium text-gray-700">
                     Production (kg) <span className="text-red-500">*</span>
                   </label>
@@ -586,13 +586,13 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                     value={formValues.production_kg}
                     onChange={handleInputChange}
                     min="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                     placeholder="Enter production in kilograms"
                     required
                   />
                 </div>
 
-                <div className="mb-4">
+                <div className="mb-3 sm:mb-4">
                   <label className="block mb-1 text-sm font-medium text-gray-700">
                     Date of Harvest
                   </label>
@@ -601,11 +601,11 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                     name="date_of_harvest"
                     value={formValues.date_of_harvest}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                   />
                 </div>
 
-                <div className="mb-4">
+                <div className="mb-3 sm:mb-4">
                   <label className="block mb-1 text-sm font-medium text-gray-700">
                     Operational Status <span className="text-red-500">*</span>
                   </label>
@@ -613,7 +613,7 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                     name="operational_status"
                     value={formValues.operational_status}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                     required
                   >
                     <option value="">Select Status</option>
@@ -624,7 +624,7 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                   </select>
                 </div>
 
-                <div className="col-span-2 mb-4">
+                <div className="col-span-1 mb-3 md:col-span-2 sm:mb-4">
                   <label className="block mb-1 text-sm font-medium text-gray-700">
                     Geotagged Photo URL
                   </label>
@@ -633,12 +633,12 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                     name="geotagged_photo_url"
                     value={formValues.geotagged_photo_url}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                     placeholder="Enter photo URL"
                   />
                 </div>
 
-                <div className="col-span-2 mb-4">
+                <div className="col-span-1 mb-3 md:col-span-2 sm:mb-4">
                   <label className="block mb-1 text-sm font-medium text-gray-700">
                     Remarks
                   </label>
@@ -646,15 +646,15 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                     name="remarks"
                     value={formValues.remarks}
                     onChange={handleInputChange}
-                    rows="4"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    rows="3"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                     placeholder="Enter any additional notes or remarks"
                   ></textarea>
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end p-4 border-t">
+            <div className="sticky bottom-0 z-10 flex justify-end p-4 bg-white border-t">
               <button
                 onClick={handleOperatorModalCancel}
                 className="px-4 py-2 mr-2 text-sm font-medium text-gray-800 bg-gray-100 rounded-md hover:bg-gray-200"
@@ -664,7 +664,7 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
               <button
                 onClick={handleOperatorModalSubmit}
                 disabled={operatorModalLoading}
-                className="flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+                className="flex items-center px-4 py-2 text-sm font-medium text-white rounded-md bg-emerald-700 hover:bg-emerald-800"
                 style={{
                   backgroundColor: colors.primary,
                   borderColor: colors.primary,
@@ -700,9 +700,9 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       )}
       {/* View Full Remarks Modal */}
       {viewingRemarks && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="w-full max-w-2xl bg-white rounded-lg shadow-xl">
-            <div className="flex items-center justify-between p-4 border-b">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="w-full max-w-md bg-white rounded-lg shadow-xl sm:max-w-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between p-4 bg-white border-b">
               <h3 className="text-lg font-medium">Remarks</h3>
               <button
                 onClick={() => setViewingRemarks(null)}
@@ -724,13 +724,19 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                 </svg>
               </button>
             </div>
-            <div className="p-6 overflow-y-auto max-h-96">
-              <p className="whitespace-pre-wrap">{viewingRemarks}</p>
+            <div className="p-4 sm:p-6 overflow-y-auto max-h-[50vh] sm:max-h-96">
+              <p className="text-sm whitespace-pre-wrap sm:text-base">
+                {viewingRemarks}
+              </p>
             </div>
-            <div className="flex justify-end p-4 border-t">
+            <div className="sticky bottom-0 z-10 flex justify-end p-4 bg-white border-t">
               <button
                 onClick={() => setViewingRemarks(null)}
-                className="px-4 py-2 text-sm font-medium text-gray-800 bg-gray-100 rounded-md hover:bg-gray-200"
+                className="px-4 py-2 text-sm font-medium text-white rounded-md bg-emerald-700 hover:bg-emerald-800"
+                style={{
+                  backgroundColor: colors.primary,
+                  borderColor: colors.primary,
+                }}
               >
                 Close
               </button>

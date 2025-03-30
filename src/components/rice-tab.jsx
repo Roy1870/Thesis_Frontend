@@ -301,7 +301,7 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
             >
               <path
                 fillRule="evenodd"
-                d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 011-1z"
                 clipRule="evenodd"
               />
             </svg>
@@ -317,7 +317,7 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
             </span>
           </div>
         ) : hasRice ? (
-          <div className="-mx-3 overflow-x-auto sm:mx-0">
+          <div className="px-3 overflow-x-auto sm:px-4">
             <table className="min-w-full text-xs divide-y divide-gray-200 sm:text-sm">
               <thead className="bg-gray-50">
                 <tr>
@@ -382,7 +382,7 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       {/* Add Rice Modal */}
       {isRiceModalVisible && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="w-full max-w-md bg-white rounded-lg shadow-xl sm:max-w-2xl">
+          <div className="w-full max-w-md bg-white rounded-lg shadow-xl sm:max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-3 border-b sm:p-4">
               <h3 className="text-base font-medium sm:text-lg">{modalTitle}</h3>
               <button
@@ -407,7 +407,7 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
             </div>
 
             <div className="p-4 sm:p-6">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 sm:gap-4">
                 <div className="mb-4">
                   <label className="block mb-1 text-xs font-medium text-gray-700 sm:text-sm">
                     Area Type <span className="text-red-500">*</span>
