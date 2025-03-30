@@ -18,6 +18,56 @@ import {
 } from "recharts";
 import { farmerAPI, livestockAPI, operatorAPI } from "./services/api";
 
+// Add the missing LivestockInsights component
+const LivestockInsights = () => {
+  return (
+    <div className="p-4 bg-white rounded-lg shadow">
+      <div className="mb-4">
+        <h3 className="text-lg font-medium">Livestock Insights</h3>
+        <p className="text-sm text-gray-500">
+          Key metrics and trends for livestock
+        </p>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="p-4 rounded-lg bg-gray-50">
+          <h4 className="mb-2 text-base font-medium">Top Livestock Types</h4>
+          <ul className="space-y-2">
+            <li className="flex justify-between">
+              <span>Chicken</span>
+              <span className="font-medium">42%</span>
+            </li>
+            <li className="flex justify-between">
+              <span>Swine</span>
+              <span className="font-medium">28%</span>
+            </li>
+            <li className="flex justify-between">
+              <span>Cattle</span>
+              <span className="font-medium">15%</span>
+            </li>
+          </ul>
+        </div>
+        <div className="p-4 rounded-lg bg-gray-50">
+          <h4 className="mb-2 text-base font-medium">Growth Trends</h4>
+          <ul className="space-y-2">
+            <li className="flex justify-between">
+              <span>Year-over-year</span>
+              <span className="font-medium text-green-600">+12%</span>
+            </li>
+            <li className="flex justify-between">
+              <span>Quarter-over-quarter</span>
+              <span className="font-medium text-green-600">+4%</span>
+            </li>
+            <li className="flex justify-between">
+              <span>Month-over-month</span>
+              <span className="font-medium text-green-600">+1.5%</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 function Analytics() {
   const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
@@ -203,14 +253,14 @@ function Analytics() {
   if (loading) {
     return (
       <div className="flex h-[400px] w-full items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-500"></div>
+        <div className="w-8 h-8 border-t-2 border-b-2 border-green-500 rounded-full animate-spin"></div>
         <span className="ml-2">Loading analytics data...</span>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
+    <div className="container max-h-screen p-4 mx-auto space-y-6 overflow-auto">
       <div className="flex flex-col space-y-2">
         <h1 className="text-3xl font-bold">Agricultural Analytics</h1>
         <p className="text-gray-600">
@@ -271,8 +321,8 @@ function Analytics() {
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {/* Stat Cards */}
-                <div className="bg-white p-4 rounded-lg shadow">
-                  <div className="text-sm font-medium text-gray-500 mb-1">
+                <div className="p-4 bg-white rounded-lg shadow">
+                  <div className="mb-1 text-sm font-medium text-gray-500">
                     Total Farmers
                   </div>
                   <div className="text-2xl font-bold">
@@ -281,8 +331,8 @@ function Analytics() {
                   <p className="text-xs text-gray-500">Registered farmers</p>
                 </div>
 
-                <div className="bg-white p-4 rounded-lg shadow">
-                  <div className="text-sm font-medium text-gray-500 mb-1">
+                <div className="p-4 bg-white rounded-lg shadow">
+                  <div className="mb-1 text-sm font-medium text-gray-500">
                     Total Crops
                   </div>
                   <div className="text-2xl font-bold">
@@ -294,8 +344,8 @@ function Analytics() {
                   <p className="text-xs text-gray-500">Registered crops</p>
                 </div>
 
-                <div className="bg-white p-4 rounded-lg shadow">
-                  <div className="text-sm font-medium text-gray-500 mb-1">
+                <div className="p-4 bg-white rounded-lg shadow">
+                  <div className="mb-1 text-sm font-medium text-gray-500">
                     Livestock Count
                   </div>
                   <div className="text-2xl font-bold">
@@ -307,8 +357,8 @@ function Analytics() {
                   <p className="text-xs text-gray-500">Total animals</p>
                 </div>
 
-                <div className="bg-white p-4 rounded-lg shadow">
-                  <div className="text-sm font-medium text-gray-500 mb-1">
+                <div className="p-4 bg-white rounded-lg shadow">
+                  <div className="mb-1 text-sm font-medium text-gray-500">
                     Operators
                   </div>
                   <div className="text-2xl font-bold">
@@ -320,7 +370,7 @@ function Analytics() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 {/* Monthly Registrations Chart */}
-                <div className="bg-white p-4 rounded-lg shadow">
+                <div className="p-4 bg-white rounded-lg shadow">
                   <div className="mb-4">
                     <h3 className="text-lg font-medium">
                       Monthly Farmer Registrations
@@ -349,7 +399,7 @@ function Analytics() {
                 </div>
 
                 {/* Barangay Distribution Chart */}
-                <div className="bg-white p-4 rounded-lg shadow">
+                <div className="p-4 bg-white rounded-lg shadow">
                   <div className="mb-4">
                     <h3 className="text-lg font-medium">
                       Barangay Distribution
@@ -378,7 +428,7 @@ function Analytics() {
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 {/* Crop Type Distribution Chart */}
-                <div className="bg-white p-4 rounded-lg shadow">
+                <div className="p-4 bg-white rounded-lg shadow">
                   <div className="mb-4">
                     <h3 className="text-lg font-medium">
                       Crop Type Distribution
@@ -417,7 +467,7 @@ function Analytics() {
                 </div>
 
                 {/* Rice Variety Distribution Chart */}
-                <div className="bg-white p-4 rounded-lg shadow">
+                <div className="p-4 bg-white rounded-lg shadow">
                   <div className="mb-4">
                     <h3 className="text-lg font-medium">
                       Rice Variety Distribution
@@ -457,7 +507,7 @@ function Analytics() {
               </div>
 
               {/* Crop Area Analysis Chart */}
-              <div className="bg-white p-4 rounded-lg shadow">
+              <div className="p-4 bg-white rounded-lg shadow">
                 <div className="mb-4">
                   <h3 className="text-lg font-medium">Crop Area Analysis</h3>
                   <p className="text-sm text-gray-500">
@@ -484,7 +534,7 @@ function Analytics() {
           {activeTab === "livestock" && (
             <div className="space-y-4">
               {/* Livestock Distribution Chart */}
-              <div className="bg-white p-4 rounded-lg shadow">
+              <div className="p-4 bg-white rounded-lg shadow">
                 <div className="mb-4">
                   <h3 className="text-lg font-medium">
                     Livestock Distribution
@@ -507,7 +557,7 @@ function Analytics() {
                 </div>
               </div>
 
-              {/* Include the existing LivestockInsights component */}
+              {/* Include the LivestockInsights component */}
               <LivestockInsights />
             </div>
           )}
@@ -516,7 +566,7 @@ function Analytics() {
           {activeTab === "operators" && (
             <div className="space-y-4">
               {/* Operator Role Distribution Chart */}
-              <div className="bg-white p-4 rounded-lg shadow">
+              <div className="p-4 bg-white rounded-lg shadow">
                 <div className="mb-4">
                   <h3 className="text-lg font-medium">
                     Operator Role Distribution
@@ -557,7 +607,7 @@ function Analytics() {
               </div>
 
               {/* Operators per Farmer Chart */}
-              <div className="bg-white p-4 rounded-lg shadow">
+              <div className="p-4 bg-white rounded-lg shadow">
                 <div className="mb-4">
                   <h3 className="text-lg font-medium">Operators per Farmer</h3>
                   <p className="text-sm text-gray-500">

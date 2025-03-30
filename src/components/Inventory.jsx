@@ -239,22 +239,24 @@ const Inventory = () => {
   }
 
   return (
-    <div className="p-3 bg-[#F5F7F9] min-h-screen max-w-full overflow-hidden">
-      <div className="bg-white rounded-lg shadow-md mb-4">
-        <div className="flex justify-between items-center p-4 border-b">
-          <h4 className="text-lg font-semibold m-0">Farmer Inventory</h4>
+    <div className="p-2 sm:p-3 bg-[#F5F7F9] min-h-screen max-w-full overflow-hidden">
+      <div className="mb-4 bg-white rounded-lg shadow-md">
+        <div className="flex flex-col items-start justify-between p-3 border-b sm:flex-row sm:items-center sm:p-4">
+          <h4 className="m-0 mb-2 text-base font-semibold sm:text-lg sm:mb-0">
+            Farmer Inventory
+          </h4>
           <button
             onClick={() => (window.location.href = "/add-data")}
-            className="flex items-center gap-1 bg-[#6A9C89] text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-opacity-90 transition-colors"
+            className="flex items-center gap-1 bg-[#6A9C89] text-white px-2 py-1 sm:px-3 sm:py-2 rounded-md text-xs sm:text-sm font-medium hover:bg-opacity-90 transition-colors w-full sm:w-auto justify-center sm:justify-start"
           >
-            <PlusIcon className="w-4 h-4" />
+            <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
             Add New Farmer
           </button>
         </div>
 
-        <div className="p-4">
-          <div className="flex justify-between items-center mb-4 w-full">
-            <div className="relative">
+        <div className="p-3 sm:p-4">
+          <div className="flex flex-col items-start justify-between w-full gap-2 mb-4 sm:flex-row sm:items-center sm:gap-0">
+            <div className="relative w-full sm:w-auto">
               <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                 <SearchIcon className="w-4 h-4 text-[#6A9C89]" />
               </div>
@@ -263,7 +265,7 @@ const Inventory = () => {
                 placeholder="Search farmers"
                 value={searchText}
                 onChange={handleSearchInputChange}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-md w-[250px] focus:outline-none focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent"
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-md w-full sm:w-[250px] focus:outline-none focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm"
               />
               {searchText && (
                 <button
@@ -275,46 +277,46 @@ const Inventory = () => {
               )}
             </div>
 
-            <div className="flex items-center">
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-sm font-medium bg-[#6A9C89] text-white">
+            <div className="flex items-center justify-end w-full sm:w-auto">
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs sm:text-sm font-medium bg-[#6A9C89] text-white">
                 <span className="px-2">Total Records: {totalRecords}</span>
               </span>
             </div>
           </div>
 
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <div className="px-3 py-2 mb-4 text-xs text-red-700 bg-red-100 border border-red-400 rounded sm:px-4 sm:py-3 sm:text-sm">
               {error}
             </div>
           )}
 
           <div className="relative">
             {loading && (
-              <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center z-10">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#6A9C89]"></div>
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-white bg-opacity-70">
+                <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-t-2 border-b-2 border-[#6A9C89]"></div>
               </div>
             )}
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 border">
+            <div className="-mx-3 overflow-x-auto sm:mx-0">
+              <table className="min-w-full text-xs border divide-y divide-gray-200 sm:text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
                       Name
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
                       Contact
                     </th>
-                    <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase md:table-cell sm:px-6 sm:py-3">
                       Email
                     </th>
-                    <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase lg:table-cell sm:px-6 sm:py-3">
                       Address
                     </th>
-                    <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase md:table-cell sm:px-6 sm:py-3">
                       Barangay
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[180px]">
+                    <th className="px-2 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] sm:w-[180px]">
                       Actions
                     </th>
                   </tr>
@@ -322,10 +324,10 @@ const Inventory = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {farmerData.map((farmer) => (
                     <tr key={farmer.farmer_id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <UserIcon className="w-4 h-4 mr-2 text-[#6A9C89]" />
-                          <span className="text-sm text-gray-900">
+                          <UserIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-[#6A9C89]" />
+                          <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[100px] sm:max-w-none">
                             {searchedColumn === "name" ? (
                               <Highlighter
                                 highlightStyle={{
@@ -344,50 +346,50 @@ const Inventory = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <PhoneIcon className="w-4 h-4 mr-2 text-[#4F6F7D]" />
-                          <span className="text-sm text-gray-900">
+                          <PhoneIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-[#4F6F7D]" />
+                          <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[80px] sm:max-w-none">
                             {farmer.contact_number || "N/A"}
                           </span>
                         </div>
                       </td>
-                      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap">
+                      <td className="hidden px-2 py-2 md:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <MailIcon className="w-4 h-4 mr-2 text-[#4F6F7D]" />
-                          <span className="text-sm text-gray-900">
+                          <MailIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-[#4F6F7D]" />
+                          <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
                             {farmer.facebook_email || "N/A"}
                           </span>
                         </div>
                       </td>
-                      <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap">
+                      <td className="hidden px-2 py-2 lg:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <HomeIcon className="w-4 h-4 mr-2 text-[#4F6F7D]" />
-                          <span className="text-sm text-gray-900">
+                          <HomeIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-[#4F6F7D]" />
+                          <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
                             {farmer.home_address || "N/A"}
                           </span>
                         </div>
                       </td>
-                      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap">
+                      <td className="hidden px-2 py-2 md:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
                         <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-md bg-[#E6F5E4] text-[#6A9C89]">
                           {farmer.barangay || "N/A"}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
+                      <td className="px-2 py-2 text-xs font-medium sm:px-6 sm:py-4 whitespace-nowrap sm:text-sm">
+                        <div className="flex space-x-1 sm:space-x-2">
                           <button
                             onClick={() => handleView(farmer)}
                             className="text-[#6A9C89] hover:text-opacity-70"
                             title="View Details"
                           >
-                            <EyeIcon className="w-5 h-5" />
+                            <EyeIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                           </button>
                           <button
                             onClick={() => handleEdit(farmer)}
                             className="text-[#FFA000] hover:text-opacity-70"
                             title="Edit"
                           >
-                            <PencilIcon className="w-5 h-5" />
+                            <PencilIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                           </button>
                           <button
                             onClick={() =>
@@ -396,22 +398,22 @@ const Inventory = () => {
                             className="text-[#D32F2F] hover:text-opacity-70"
                             title="Delete"
                           >
-                            <TrashIcon className="w-5 h-5" />
+                            <TrashIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                           </button>
 
                           {showDeleteConfirm === farmer.farmer_id && (
-                            <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-                              <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
-                                <h3 className="text-lg font-medium mb-2">
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-30">
+                              <div className="w-full max-w-sm p-4 bg-white rounded-lg shadow-xl sm:p-6">
+                                <h3 className="mb-2 text-base font-medium sm:text-lg">
                                   Delete this farmer?
                                 </h3>
-                                <p className="text-gray-500 mb-4">
+                                <p className="mb-4 text-xs text-gray-500 sm:text-sm">
                                   This action cannot be undone.
                                 </p>
                                 <div className="flex justify-end space-x-2">
                                   <button
                                     onClick={() => setShowDeleteConfirm(null)}
-                                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                    className="px-3 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-md sm:px-4 sm:py-2 sm:text-sm hover:bg-gray-50"
                                   >
                                     No
                                   </button>
@@ -419,7 +421,7 @@ const Inventory = () => {
                                     onClick={() =>
                                       handleDelete(farmer.farmer_id)
                                     }
-                                    className="px-4 py-2 bg-[#D32F2F] text-white rounded-md text-sm font-medium hover:bg-opacity-90"
+                                    className="px-3 py-1 sm:px-4 sm:py-2 bg-[#D32F2F] text-white rounded-md text-xs sm:text-sm font-medium hover:bg-opacity-90"
                                   >
                                     Yes
                                   </button>
@@ -436,7 +438,7 @@ const Inventory = () => {
                     <tr>
                       <td
                         colSpan={6}
-                        className="px-6 py-4 text-center text-gray-500"
+                        className="px-2 py-2 text-xs text-center text-gray-500 sm:px-6 sm:py-4 sm:text-sm"
                       >
                         No data found
                       </td>
@@ -451,21 +453,21 @@ const Inventory = () => {
                 <button
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="px-2 py-1 rounded-md mr-2 border border-gray-300 disabled:opacity-50"
+                  className="px-1 py-1 mr-1 border border-gray-300 rounded-md sm:px-2 sm:py-1 sm:mr-2 disabled:opacity-50"
                 >
-                  <ChevronLeftIcon className="w-5 h-5" />
+                  <ChevronLeftIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
 
                 <div className="flex space-x-1">
                   {[
-                    ...Array(Math.min(5, Math.ceil(totalRecords / pageSize))),
+                    ...Array(Math.min(3, Math.ceil(totalRecords / pageSize))),
                   ].map((_, i) => {
                     const pageNum = i + 1;
                     return (
                       <button
                         key={i}
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`w-8 h-8 flex items-center justify-center rounded-md ${
+                        className={`w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center rounded-md text-xs sm:text-sm ${
                           currentPage === pageNum
                             ? "bg-[#6A9C89] text-white"
                             : "border border-gray-300 hover:bg-gray-50"
@@ -476,8 +478,10 @@ const Inventory = () => {
                     );
                   })}
 
-                  {Math.ceil(totalRecords / pageSize) > 5 && (
-                    <span className="flex items-center px-2">...</span>
+                  {Math.ceil(totalRecords / pageSize) > 3 && (
+                    <span className="flex items-center px-1 text-xs sm:px-2 sm:text-sm">
+                      ...
+                    </span>
                   )}
                 </div>
 
@@ -491,9 +495,9 @@ const Inventory = () => {
                     )
                   }
                   disabled={currentPage >= Math.ceil(totalRecords / pageSize)}
-                  className="px-2 py-1 rounded-md ml-2 border border-gray-300 disabled:opacity-50"
+                  className="px-1 py-1 ml-1 border border-gray-300 rounded-md sm:px-2 sm:py-1 sm:ml-2 disabled:opacity-50"
                 >
-                  <ChevronRightIcon className="w-5 h-5" />
+                  <ChevronRightIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
               </nav>
             </div>

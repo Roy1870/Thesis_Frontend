@@ -1,42 +1,30 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  Button,
-  Card,
-  Table,
-  Popconfirm,
-  Empty,
-  Space,
-  Modal,
-  Form,
-  Input,
-  Select,
-  InputNumber,
-  DatePicker,
-  Badge,
-  Spin,
-  message,
-} from "antd";
-import {
-  PlusOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  EnvironmentOutlined,
-} from "@ant-design/icons";
 import { operatorAPI } from "./services/api";
-import moment from "moment";
-
-const { Option } = Select;
 
 const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
-  const [operatorForm] = Form.useForm();
   const [operatorData, setOperatorData] = useState([]);
   const [isOperatorModalVisible, setIsOperatorModalVisible] = useState(false);
   const [isEditingOperator, setIsEditingOperator] = useState(false);
   const [currentOperator, setCurrentOperator] = useState(null);
   const [operatorModalLoading, setOperatorModalLoading] = useState(false);
   const [operatorLoading, setOperatorLoading] = useState(true);
+  const [viewingRemarks, setViewingRemarks] = useState(null);
+
+  // Form state
+  const [formValues, setFormValues] = useState({
+    fishpond_location: "",
+    cultured_species: "",
+    productive_area_sqm: "",
+    stocking_density: "",
+    date_of_stocking: "",
+    production_kg: "",
+    date_of_harvest: "",
+    operational_status: "",
+    remarks: "",
+    geotagged_photo_url: "",
+  });
 
   useEffect(() => {
     if (farmerId) {
@@ -51,7 +39,7 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
         setOperatorLoading(true);
       }
 
-      // Get all livestock records
+      // Get all operators
       const response = await operatorAPI.getAllOperators();
 
       // Filter records for this farmer
@@ -71,7 +59,18 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
   const showAddOperatorModal = () => {
     setIsEditingOperator(false);
     setCurrentOperator(null);
-    operatorForm.resetFields();
+    setFormValues({
+      fishpond_location: "",
+      cultured_species: "",
+      productive_area_sqm: "",
+      stocking_density: "",
+      date_of_stocking: "",
+      production_kg: "",
+      date_of_harvest: "",
+      operational_status: "",
+      remarks: "",
+      geotagged_photo_url: "",
+    });
     setIsOperatorModalVisible(true);
   };
 
@@ -79,21 +78,17 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
     setIsEditingOperator(true);
     setCurrentOperator(operator);
 
-    operatorForm.setFieldsValue({
-      fishpond_location: operator.fishpond_location,
-      cultured_species: operator.cultured_species,
-      productive_area_sqm: operator.productive_area_sqm,
-      stocking_density: operator.stocking_density,
-      date_of_stocking: operator.date_of_stocking
-        ? moment(operator.date_of_stocking)
-        : null,
-      production_kg: operator.production_kg,
-      date_of_harvest: operator.date_of_harvest
-        ? moment(operator.date_of_harvest)
-        : null,
-      operational_status: operator.operational_status,
-      remarks: operator.remarks,
-      geotagged_photo_url: operator.geotagged_photo_url,
+    setFormValues({
+      fishpond_location: operator.fishpond_location || "",
+      cultured_species: operator.cultured_species || "",
+      productive_area_sqm: operator.productive_area_sqm || "",
+      stocking_density: operator.stocking_density || "",
+      date_of_stocking: operator.date_of_stocking || "",
+      production_kg: operator.production_kg || "",
+      date_of_harvest: operator.date_of_harvest || "",
+      operational_status: operator.operational_status || "",
+      remarks: operator.remarks || "",
+      geotagged_photo_url: operator.geotagged_photo_url || "",
     });
 
     setIsOperatorModalVisible(true);
@@ -101,24 +96,45 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
   const handleOperatorModalCancel = () => {
     setIsOperatorModalVisible(false);
-    operatorForm.resetFields();
+    setFormValues({
+      fishpond_location: "",
+      cultured_species: "",
+      productive_area_sqm: "",
+      stocking_density: "",
+      date_of_stocking: "",
+      production_kg: "",
+      date_of_harvest: "",
+      operational_status: "",
+      remarks: "",
+      geotagged_photo_url: "",
+    });
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormValues({
+      ...formValues,
+      [name]: value,
+    });
   };
 
   const handleOperatorModalSubmit = async () => {
-    try {
-      const values = await operatorForm.validateFields();
-      setOperatorModalLoading(true);
+    // Basic validation
+    if (
+      !formValues.fishpond_location ||
+      !formValues.cultured_species ||
+      !formValues.productive_area_sqm ||
+      !formValues.stocking_density ||
+      !formValues.date_of_stocking ||
+      !formValues.production_kg ||
+      !formValues.operational_status
+    ) {
+      alert("Please fill in all required fields");
+      return;
+    }
 
-      // Format dates properly
-      const formattedValues = {
-        ...values,
-        date_of_stocking: values.date_of_stocking
-          ? values.date_of_stocking.format("YYYY-MM-DD")
-          : null,
-        date_of_harvest: values.date_of_harvest
-          ? values.date_of_harvest.format("YYYY-MM-DD")
-          : null,
-      };
+    try {
+      setOperatorModalLoading(true);
 
       // Structure the data with farmer and operator objects
       const FarmersData = {
@@ -130,20 +146,16 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
         barangay: farmerData.barangay || "",
         operators: [
           {
-            fishpond_location: values.fishpond_location,
-            cultured_species: values.cultured_species,
-            productive_area_sqm: values.productive_area_sqm,
-            stocking_density: values.stocking_density,
-            date_of_stocking: values.date_of_stocking
-              ? moment(values.date_of_stocking)
-              : null,
-            production_kg: values.production_kg,
-            date_of_harvest: values.date_of_harvest
-              ? moment(values.date_of_harvest)
-              : null,
-            operational_status: values.operational_status,
-            remarks: values.remarks,
-            geotagged_photo_url: values.geotagged_photo_url,
+            fishpond_location: formValues.fishpond_location,
+            cultured_species: formValues.cultured_species,
+            productive_area_sqm: formValues.productive_area_sqm,
+            stocking_density: formValues.stocking_density,
+            date_of_stocking: formValues.date_of_stocking,
+            production_kg: formValues.production_kg,
+            date_of_harvest: formValues.date_of_harvest,
+            operational_status: formValues.operational_status,
+            remarks: formValues.remarks,
+            geotagged_photo_url: formValues.geotagged_photo_url,
           },
         ],
       };
@@ -158,7 +170,7 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
           currentOperator.farmer_id || currentOperator.id,
           FarmersData
         );
-        message.success("Operator data updated successfully.");
+        alert("Operator data updated successfully.");
       } else {
         // Add new operator
         console.log(
@@ -166,7 +178,7 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
           JSON.stringify(FarmersData, null, 2)
         );
         await operatorAPI.addOperator(FarmersData);
-        message.success("Operator data added successfully.");
+        alert("Operator data added successfully.");
       }
 
       // Refresh operator data
@@ -179,10 +191,21 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
       setOperatorModalLoading(false);
       setIsOperatorModalVisible(false);
-      operatorForm.resetFields();
+      setFormValues({
+        fishpond_location: "",
+        cultured_species: "",
+        productive_area_sqm: "",
+        stocking_density: "",
+        date_of_stocking: "",
+        production_kg: "",
+        date_of_harvest: "",
+        operational_status: "",
+        remarks: "",
+        geotagged_photo_url: "",
+      });
     } catch (error) {
       console.error("Error submitting operator form:", error);
-      message.error(
+      alert(
         `Failed to ${isEditingOperator ? "update" : "add"} operator data. ${
           error.message
         }`
@@ -192,9 +215,15 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
   };
 
   const handleDeleteOperator = async (operatorId) => {
+    if (
+      !confirm("Delete this operator record? This action cannot be undone.")
+    ) {
+      return;
+    }
+
     try {
       await operatorAPI.deleteOperator(operatorId);
-      message.success("Operator data deleted successfully.");
+      alert("Operator data deleted successfully.");
 
       // Refresh operator data
       await fetchOperatorData();
@@ -204,7 +233,7 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
         onDataChange();
       }
     } catch (error) {
-      message.error(`Failed to delete operator data. ${error.message}`);
+      alert(`Failed to delete operator data. ${error.message}`);
     }
   };
 
@@ -239,48 +268,75 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       dataIndex: "operational_status",
       key: "operational_status",
       render: (status) => (
-        <Badge
-          status={status === "Active" ? "success" : "default"}
-          text={status}
-        />
+        <span
+          className={`px-2 py-1 rounded-full text-xs ${
+            status === "Active"
+              ? "bg-green-100 text-green-800"
+              : "bg-gray-100 text-gray-800"
+          }`}
+        >
+          {status}
+        </span>
+      ),
+    },
+    {
+      title: "Remarks",
+      dataIndex: "remarks",
+      key: "remarks",
+      render: (remarks) => (
+        <div className="max-w-xs">
+          {remarks ? (
+            <div
+              className="text-blue-600 truncate cursor-pointer hover:text-blue-800 hover:underline"
+              title="Click to view full remarks"
+              onClick={() => setViewingRemarks(remarks)}
+            >
+              {remarks}
+            </div>
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </div>
       ),
     },
     {
       title: "Actions",
       key: "actions",
-      width: 120,
       render: (_, record) => (
-        <Space size="small">
-          <Button
-            type="text"
-            icon={<EditOutlined />}
+        <div className="flex space-x-2">
+          <button
             onClick={() => showEditOperatorModal(record)}
-            className="action-button"
-            style={{ color: colors.warning }}
-          />
-          <Popconfirm
-            title="Delete this operator record?"
-            description="This action cannot be undone."
-            onConfirm={() =>
+            className="text-yellow-500 hover:text-yellow-700"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-5 h-5"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+            </svg>
+          </button>
+          <button
+            onClick={() =>
               handleDeleteOperator(record.operator_id || record.id)
             }
-            okText="Yes"
-            cancelText="No"
-            okButtonProps={{
-              style: {
-                backgroundColor: colors.error,
-                borderColor: colors.error,
-              },
-            }}
+            className="text-red-500 hover:text-red-700"
           >
-            <Button
-              type="text"
-              icon={<DeleteOutlined />}
-              danger
-              className="action-button"
-            />
-          </Popconfirm>
-        </Space>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-5 h-5"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+        </div>
       ),
     },
   ];
@@ -289,201 +345,399 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
   return (
     <>
-      <Card
-        title={
+      <div className="mt-4 bg-white rounded-lg shadow-sm">
+        <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center">
-            <EnvironmentOutlined className="mr-2 text-green-600" />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-5 h-5 mr-2 text-green-600"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                clipRule="evenodd"
+              />
+            </svg>
             <span className="text-base font-medium">Operator Information</span>
           </div>
-        }
-        extra={
-          <Button
-            type="primary"
-            size="small"
-            icon={<PlusOutlined />}
+          <button
             onClick={showAddOperatorModal}
+            className="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
             style={{
               backgroundColor: colors.primary,
               borderColor: colors.primary,
             }}
           >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-4 h-4 mr-1"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                clipRule="evenodd"
+              />
+            </svg>
             Add Operator
-          </Button>
-        }
-        bordered={false}
-        className="rounded-lg shadow-sm mt-4"
-        bodyStyle={{ padding: "0" }}
-      >
+          </button>
+        </div>
+
         {operatorLoading ? (
-          <div className="py-10 flex justify-center">
-            <Spin tip="Loading operator records..." />
+          <div className="flex justify-center py-10">
+            <div className="w-8 h-8 border-t-2 border-b-2 border-green-500 rounded-full animate-spin"></div>
+            <span className="ml-2">Loading operator records...</span>
           </div>
         ) : hasOperator ? (
-          <Table
-            columns={operatorColumns}
-            dataSource={operatorData}
-            rowKey={(record) =>
-              record.operator_id || record.id || Math.random().toString()
-            }
-            pagination={false}
-            size="small"
-            scroll={{
-              y: "calc(100vh - 300px)",
-              x: operatorData.length > 0 ? "max-content" : undefined,
-            }}
-          />
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  {operatorColumns.slice(0, -1).map((column) => (
+                    <th
+                      key={column.key || column.dataIndex}
+                      className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
+                    >
+                      {column.title}
+                    </th>
+                  ))}
+                  <th className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {operatorData.map((record, index) => (
+                  <tr
+                    key={
+                      record.operator_id ||
+                      record.id ||
+                      Math.random().toString()
+                    }
+                    className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                  >
+                    {operatorColumns.slice(0, -1).map((column) => (
+                      <td
+                        key={`${index}-${column.key || column.dataIndex}`}
+                        className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap"
+                      >
+                        {column.render && column.dataIndex
+                          ? column.render(record[column.dataIndex], record)
+                          : record[column.dataIndex]}
+                      </td>
+                    ))}
+                    <td className="px-6 py-4 text-sm font-medium text-right whitespace-nowrap">
+                      {operatorColumns[operatorColumns.length - 1].render(
+                        null,
+                        record
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
-          <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="No operator information available"
-            className="py-10"
-            style={{ marginBottom: "20px" }}
-          ></Empty>
+          <div className="flex flex-col items-center justify-center py-10 text-gray-500">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-12 h-12 mb-2 text-gray-300"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1}
+                d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+              />
+            </svg>
+            <p>No operator information available</p>
+          </div>
         )}
-      </Card>
+      </div>
 
       {/* Add Operator Modal */}
-      <Modal
-        title={isEditingOperator ? "Edit Operator" : "Add New Operator"}
-        open={isOperatorModalVisible}
-        onCancel={handleOperatorModalCancel}
-        width={700}
-        footer={[
-          <Button key="cancel" onClick={handleOperatorModalCancel}>
-            Cancel
-          </Button>,
-          <Button
-            key="submit"
-            type="primary"
-            loading={operatorModalLoading}
-            onClick={handleOperatorModalSubmit}
-            style={{
-              backgroundColor: colors.primary,
-              borderColor: colors.primary,
-            }}
-          >
-            {isEditingOperator ? "Update" : "Add"}
-          </Button>,
-        ]}
-      >
-        <Form form={operatorForm} layout="vertical">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Form.Item
-              name="fishpond_location"
-              label="Fishpond Location"
-              rules={[
-                { required: true, message: "Please enter fishpond location" },
-              ]}
-            >
-              <Input placeholder="Enter fishpond location" />
-            </Form.Item>
+      {isOperatorModalVisible && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="w-full max-w-2xl bg-white rounded-lg shadow-xl">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-medium">
+                {isEditingOperator ? "Edit Operator" : "Add New Operator"}
+              </h3>
+              <button
+                onClick={handleOperatorModalCancel}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-6 h-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
 
-            <Form.Item
-              name="cultured_species"
-              label="Cultured Species"
-              rules={[
-                { required: true, message: "Please enter cultured species" },
-              ]}
-            >
-              <Select placeholder="Select Species">
-                <Option value="Tilapia">Tilapia</Option>
-                <Option value="Bangus (Milkfish)">Bangus (Milkfish)</Option>
-                <Option value="Catfish">Catfish</Option>
-                <Option value="Carp">Carp</Option>
-                <Option value="Shrimp">Shrimp</Option>
-                <Option value="Prawn">Prawn</Option>
-                <Option value="Mudcrab">Mudcrab</Option>
-              </Select>
-            </Form.Item>
+            <div className="p-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="mb-4">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Fishpond Location <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="fishpond_location"
+                    value={formValues.fishpond_location}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    placeholder="Enter fishpond location"
+                    required
+                  />
+                </div>
 
-            <Form.Item
-              name="productive_area_sqm"
-              label="Productive Area (sqm)"
-              rules={[
-                { required: true, message: "Please enter productive area" },
-              ]}
-            >
-              <InputNumber
-                className="w-full"
-                min={0}
-                placeholder="Enter productive area in square meters"
-              />
-            </Form.Item>
+                <div className="mb-4">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Cultured Species <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="cultured_species"
+                    value={formValues.cultured_species}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    required
+                  >
+                    <option value="">Select Species</option>
+                    <option value="Tilapia">Tilapia</option>
+                    <option value="Bangus (Milkfish)">Bangus (Milkfish)</option>
+                    <option value="Catfish">Catfish</option>
+                    <option value="Carp">Carp</option>
+                    <option value="Shrimp">Shrimp</option>
+                    <option value="Prawn">Prawn</option>
+                    <option value="Mudcrab">Mudcrab</option>
+                  </select>
+                </div>
 
-            <Form.Item
-              name="stocking_density"
-              label="Stocking Density"
-              rules={[
-                { required: true, message: "Please enter stocking density" },
-              ]}
-            >
-              <InputNumber
-                className="w-full"
-                min={0}
-                placeholder="Enter stocking density"
-              />
-            </Form.Item>
+                <div className="mb-4">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Productive Area (sqm){" "}
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="productive_area_sqm"
+                    value={formValues.productive_area_sqm}
+                    onChange={handleInputChange}
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    placeholder="Enter productive area in square meters"
+                    required
+                  />
+                </div>
 
-            <Form.Item
-              name="date_of_stocking"
-              label="Date of Stocking"
-              rules={[
-                { required: true, message: "Please select date of stocking" },
-              ]}
-            >
-              <DatePicker className="w-full" />
-            </Form.Item>
+                <div className="mb-4">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Stocking Density <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="stocking_density"
+                    value={formValues.stocking_density}
+                    onChange={handleInputChange}
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    placeholder="Enter stocking density"
+                    required
+                  />
+                </div>
 
-            <Form.Item
-              name="production_kg"
-              label="Production (kg)"
-              rules={[
-                { required: true, message: "Please enter production in kg" },
-              ]}
-            >
-              <InputNumber
-                className="w-full"
-                min={0}
-                placeholder="Enter production in kilograms"
-              />
-            </Form.Item>
+                <div className="mb-4">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Date of Stocking <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="date_of_stocking"
+                    value={formValues.date_of_stocking}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    required
+                  />
+                </div>
 
-            <Form.Item name="date_of_harvest" label="Date of Harvest">
-              <DatePicker className="w-full" />
-            </Form.Item>
+                <div className="mb-4">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Production (kg) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="production_kg"
+                    value={formValues.production_kg}
+                    onChange={handleInputChange}
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    placeholder="Enter production in kilograms"
+                    required
+                  />
+                </div>
 
-            <Form.Item
-              name="operational_status"
-              label="Operational Status"
-              rules={[
-                { required: true, message: "Please select operational status" },
-              ]}
-            >
-              <Select placeholder="Select Status">
-                <Option value="Active">Active</Option>
-                <Option value="Inactive">Inactive</Option>
-                <Option value="Under Maintenance">Under Maintenance</Option>
-                <Option value="Abandoned">Abandoned</Option>
-              </Select>
-            </Form.Item>
+                <div className="mb-4">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Date of Harvest
+                  </label>
+                  <input
+                    type="date"
+                    name="date_of_harvest"
+                    value={formValues.date_of_harvest}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
 
-            <Form.Item
-              name="geotagged_photo_url"
-              label="Geotagged Photo"
-              className="col-span-2"
-            >
-              <Input placeholder="Enter photo URL" />
-            </Form.Item>
+                <div className="mb-4">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Operational Status <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="operational_status"
+                    value={formValues.operational_status}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    required
+                  >
+                    <option value="">Select Status</option>
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                    <option value="Under Maintenance">Under Maintenance</option>
+                    <option value="Abandoned">Abandoned</option>
+                  </select>
+                </div>
 
-            <Form.Item name="remarks" label="Remarks" className="col-span-2">
-              <Input.TextArea
-                rows={4}
-                placeholder="Enter any additional notes or remarks"
-              />
-            </Form.Item>
+                <div className="col-span-2 mb-4">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Geotagged Photo URL
+                  </label>
+                  <input
+                    type="text"
+                    name="geotagged_photo_url"
+                    value={formValues.geotagged_photo_url}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    placeholder="Enter photo URL"
+                  />
+                </div>
+
+                <div className="col-span-2 mb-4">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Remarks
+                  </label>
+                  <textarea
+                    name="remarks"
+                    value={formValues.remarks}
+                    onChange={handleInputChange}
+                    rows="4"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    placeholder="Enter any additional notes or remarks"
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end p-4 border-t">
+              <button
+                onClick={handleOperatorModalCancel}
+                className="px-4 py-2 mr-2 text-sm font-medium text-gray-800 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleOperatorModalSubmit}
+                disabled={operatorModalLoading}
+                className="flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+                style={{
+                  backgroundColor: colors.primary,
+                  borderColor: colors.primary,
+                }}
+              >
+                {operatorModalLoading && (
+                  <svg
+                    className="w-4 h-4 mr-2 -ml-1 text-white animate-spin"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                )}
+                {isEditingOperator ? "Update" : "Add"}
+              </button>
+            </div>
           </div>
-        </Form>
-      </Modal>
+        </div>
+      )}
+      {/* View Full Remarks Modal */}
+      {viewingRemarks && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="w-full max-w-2xl bg-white rounded-lg shadow-xl">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-medium">Remarks</h3>
+              <button
+                onClick={() => setViewingRemarks(null)}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-6 h-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-96">
+              <p className="whitespace-pre-wrap">{viewingRemarks}</p>
+            </div>
+            <div className="flex justify-end p-4 border-t">
+              <button
+                onClick={() => setViewingRemarks(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-800 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

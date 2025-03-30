@@ -187,8 +187,10 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center">
-          <Loader className="w-10 h-10 animate-spin text-[#6A9C89] mb-2" />
-          <p className="text-gray-600">Loading farmer details...</p>
+          <Loader className="w-8 h-8 sm:w-10 sm:h-10 animate-spin text-[#6A9C89] mb-2" />
+          <p className="text-sm text-gray-600 sm:text-base">
+            Loading farmer details...
+          </p>
         </div>
       </div>
     );
@@ -196,16 +198,16 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
 
   if (error) {
     return (
-      <div className="p-5">
+      <div className="p-3 sm:p-5">
         <div
-          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4"
+          className="relative px-3 py-2 mb-4 text-red-700 bg-red-100 border border-red-400 rounded sm:px-4 sm:py-3"
           role="alert"
         >
-          <strong className="font-bold">Error!</strong>
-          <span className="block sm:inline"> {error}</span>
+          <strong className="text-sm font-bold sm:text-base">Error!</strong>
+          <span className="block text-sm sm:inline sm:text-base"> {error}</span>
           <button
             onClick={onClose}
-            className="mt-3 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+            className="px-3 py-1 mt-2 text-sm font-bold text-white bg-red-600 rounded sm:mt-3 hover:bg-red-700 sm:py-2 sm:px-4"
           >
             Go Back
           </button>
@@ -223,21 +225,21 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
   return (
     <div className="min-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden">
       {/* Header with back button and farmer name */}
-      <div className="bg-white rounded-lg shadow-sm mb-3 p-3">
-        <div className="flex justify-between items-center w-full">
+      <div className="p-2 mb-3 bg-white rounded-lg shadow-sm sm:p-3">
+        <div className="flex items-center justify-between w-full">
           <button
-            className="flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            className="flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm sm:px-3 sm:py-2 sm:text-sm hover:bg-gray-50"
             onClick={onClose}
           >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
+            <ArrowLeft className="w-3 h-3 mr-1 sm:w-4 sm:h-4 sm:mr-2" />
+            <span>Back</span>
           </button>
         </div>
 
-        {/* Navigation buttons */}
-        <div className="flex flex-wrap gap-5 mb-2 mt-3">
+        {/* Navigation buttons - scrollable on mobile */}
+        <div className="flex gap-2 px-2 pb-2 mt-3 mb-2 -mx-2 overflow-x-auto flex-nowrap sm:gap-5 sm:mx-0 sm:px-0 sm:flex-wrap">
           <button
-            className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+            className={`flex items-center px-2 py-1 sm:px-3 sm:py-2 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap ${
               activeTab === "info"
                 ? `bg-[${colors.primary}] text-white`
                 : "bg-white text-gray-700 border border-gray-300"
@@ -248,12 +250,12 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
               borderColor: activeTab === "info" ? colors.primary : "",
             }}
           >
-            <User className="w-4 h-4 mr-2" />
-            Farmer Information
+            <User className="w-3 h-3 mr-1 sm:w-4 sm:h-4 sm:mr-2" />
+            <span>Farmer Info</span>
           </button>
 
           <button
-            className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+            className={`flex items-center px-2 py-1 sm:px-3 sm:py-2 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap ${
               activeTab === "crops"
                 ? `bg-[${colors.primary}] text-white`
                 : "bg-white text-gray-700 border border-gray-300"
@@ -264,11 +266,11 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
               borderColor: activeTab === "crops" ? colors.primary : "",
             }}
           >
-            <Info className="w-4 h-4 mr-2" />
-            Crop Information
+            <Info className="w-3 h-3 mr-1 sm:w-4 sm:h-4 sm:mr-2" />
+            <span>Crops</span>
             {hasCrops && (
               <span
-                className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
+                className={`ml-1 px-1 py-0.5 text-xs rounded-full ${
                   activeTab === "crops"
                     ? "bg-white text-[#6A9C89]"
                     : `bg-[${colors.primary}] text-white`
@@ -285,7 +287,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
           </button>
 
           <button
-            className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+            className={`flex items-center px-2 py-1 sm:px-3 sm:py-2 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap ${
               activeTab === "rice"
                 ? `bg-[${colors.primary}] text-white`
                 : "bg-white text-gray-700 border border-gray-300"
@@ -296,11 +298,11 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
               borderColor: activeTab === "rice" ? colors.primary : "",
             }}
           >
-            <Info className="w-4 h-4 mr-2" />
-            Rice Information
+            <Info className="w-3 h-3 mr-1 sm:w-4 sm:h-4 sm:mr-2" />
+            <span>Rice</span>
             {hasRice && (
               <span
-                className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
+                className={`ml-1 px-1 py-0.5 text-xs rounded-full ${
                   activeTab === "rice"
                     ? "bg-white text-[#6A9C89]"
                     : `bg-[${colors.primary}] text-white`
@@ -317,7 +319,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
           </button>
 
           <button
-            className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+            className={`flex items-center px-2 py-1 sm:px-3 sm:py-2 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap ${
               activeTab === "livestock"
                 ? `bg-[${colors.primary}] text-white`
                 : "bg-white text-gray-700 border border-gray-300"
@@ -328,11 +330,11 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
               borderColor: activeTab === "livestock" ? colors.primary : "",
             }}
           >
-            <Info className="w-4 h-4 mr-2" />
-            Livestock Records
+            <Info className="w-3 h-3 mr-1 sm:w-4 sm:h-4 sm:mr-2" />
+            <span>Livestock</span>
             {hasLivestock && (
               <span
-                className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
+                className={`ml-1 px-1 py-0.5 text-xs rounded-full ${
                   activeTab === "livestock"
                     ? "bg-white text-[#6A9C89]"
                     : `bg-[${colors.primary}] text-white`
@@ -349,7 +351,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
           </button>
 
           <button
-            className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+            className={`flex items-center px-2 py-1 sm:px-3 sm:py-2 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap ${
               activeTab === "operator"
                 ? `bg-[${colors.primary}] text-white`
                 : "bg-white text-gray-700 border border-gray-300"
@@ -360,11 +362,11 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
               borderColor: activeTab === "operator" ? colors.primary : "",
             }}
           >
-            <MapPin className="w-4 h-4 mr-2" />
-            Operator Information
+            <MapPin className="w-3 h-3 mr-1 sm:w-4 sm:h-4 sm:mr-2" />
+            <span>Operators</span>
             {hasOperators && (
               <span
-                className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
+                className={`ml-1 px-1 py-0.5 text-xs rounded-full ${
                   activeTab === "operator"
                     ? "bg-white text-[#6A9C89]"
                     : `bg-[${colors.primary}] text-white`
@@ -384,17 +386,19 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
 
       {/* Content based on active tab */}
       {activeTab === "info" && (
-        <div className="bg-white rounded-lg shadow-sm mb-4 p-4">
+        <div className="p-3 mb-4 bg-white rounded-lg shadow-sm sm:p-4">
           <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white rounded-lg shadow p-4">
-                <div className="flex items-center mb-3">
-                  <User className="w-5 h-5 mr-2 text-[#6A9C89]" />
-                  <h3 className="text-lg font-medium">Personal Information</h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 sm:gap-6">
+              <div className="p-3 bg-white rounded-lg shadow sm:p-4">
+                <div className="flex items-center mb-2 sm:mb-3">
+                  <User className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 text-[#6A9C89]" />
+                  <h3 className="text-base font-medium sm:text-lg">
+                    Personal Information
+                  </h3>
                 </div>
 
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                <div className="mb-3 sm:mb-4">
+                  <label className="block mb-1 text-xs font-medium text-gray-500 sm:text-sm">
                     Name
                   </label>
                   <input
@@ -402,13 +406,13 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-base"
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm sm:text-base"
                     required
                   />
                 </div>
 
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                <div className="mb-3 sm:mb-4">
+                  <label className="block mb-1 text-xs font-medium text-gray-500 sm:text-sm">
                     Contact Number
                   </label>
                   <input
@@ -416,12 +420,12 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
                     name="contact_number"
                     value={formData.contact_number}
                     onChange={handleInputChange}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-base"
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm sm:text-base"
                   />
                 </div>
 
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                <div className="mb-3 sm:mb-4">
+                  <label className="block mb-1 text-xs font-medium text-gray-500 sm:text-sm">
                     Email
                   </label>
                   <input
@@ -429,12 +433,12 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
                     name="facebook_email"
                     value={formData.facebook_email}
                     onChange={handleInputChange}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-base"
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm sm:text-base"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <label className="block mb-1 text-xs font-medium text-gray-500 sm:text-sm">
                     Barangay
                   </label>
                   <input
@@ -442,19 +446,21 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
                     name="barangay"
                     value={formData.barangay}
                     onChange={handleInputChange}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-base"
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm sm:text-base"
                   />
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg shadow p-4">
-                <div className="flex items-center mb-3">
-                  <Home className="w-5 h-5 mr-2 text-[#6A9C89]" />
-                  <h3 className="text-lg font-medium">Address Information</h3>
+              <div className="p-3 bg-white rounded-lg shadow sm:p-4">
+                <div className="flex items-center mb-2 sm:mb-3">
+                  <Home className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 text-[#6A9C89]" />
+                  <h3 className="text-base font-medium sm:text-lg">
+                    Address Information
+                  </h3>
                 </div>
 
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                <div className="mb-3 sm:mb-4">
+                  <label className="block mb-1 text-xs font-medium text-gray-500 sm:text-sm">
                     Home Address
                   </label>
                   <input
@@ -462,12 +468,12 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
                     name="home_address"
                     value={formData.home_address}
                     onChange={handleInputChange}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-base"
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm sm:text-base"
                   />
                 </div>
 
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                <div className="mb-3 sm:mb-4">
+                  <label className="block mb-1 text-xs font-medium text-gray-500 sm:text-sm">
                     Farm Address
                   </label>
                   <input
@@ -475,22 +481,22 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
                     name="farm_address"
                     value={formData.farm_address}
                     onChange={handleInputChange}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-base"
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm sm:text-base"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <label className="block mb-1 text-xs font-medium text-gray-500 sm:text-sm">
                     Farm Location
                   </label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <input
                       type="text"
                       name="farm_location_longitude"
                       value={formData.farm_location_longitude}
                       onChange={handleInputChange}
                       placeholder="Longitude"
-                      className="w-1/2 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-base"
+                      className="w-full sm:w-1/2 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm sm:text-base"
                     />
                     <input
                       type="text"
@@ -498,7 +504,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
                       value={formData.farm_location_latitude}
                       onChange={handleInputChange}
                       placeholder="Latitude"
-                      className="w-1/2 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-base"
+                      className="w-full sm:w-1/2 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm sm:text-base"
                     />
                   </div>
                 </div>
@@ -507,13 +513,13 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
 
             <button
               type="submit"
-              className="mt-6 flex items-center px-4 py-2 bg-[#6A9C89] text-white rounded-md hover:bg-opacity-90 transition-colors"
+              className="mt-4 sm:mt-6 flex items-center px-3 py-2 sm:px-4 sm:py-2 bg-[#6A9C89] text-white rounded-md hover:bg-opacity-90 transition-colors text-sm sm:text-base"
               disabled={loading}
             >
               {loading ? (
-                <Loader className="w-4 h-4 mr-2 animate-spin" />
+                <Loader className="w-3 h-3 mr-1 sm:w-4 sm:h-4 sm:mr-2 animate-spin" />
               ) : (
-                <Save className="w-4 h-4 mr-2" />
+                <Save className="w-3 h-3 mr-1 sm:w-4 sm:h-4 sm:mr-2" />
               )}
               Save Changes
             </button>

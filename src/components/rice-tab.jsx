@@ -1,32 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import {
-  Button,
-  Card,
-  Table,
-  Popconfirm,
-  Empty,
-  Space,
-  Modal,
-  Form,
-  Select,
-  InputNumber,
-  message,
-  Spin,
-} from "antd";
-import {
-  PlusOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  InfoCircleOutlined,
-} from "@ant-design/icons";
 import { farmerAPI } from "./services/api";
 
-const { Option } = Select;
-
 const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
-  const [riceForm] = Form.useForm();
   const [rice, setRice] = useState([]);
   const [isRiceModalVisible, setIsRiceModalVisible] = useState(false);
   const [isEditingRice, setIsEditingRice] = useState(false);
@@ -34,6 +11,15 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
   const [riceModalLoading, setRiceModalLoading] = useState(false);
   const [riceLoading, setRiceLoading] = useState(true);
   const [modalTitle, setModalTitle] = useState("Add New Rice");
+
+  // Form state
+  const [formValues, setFormValues] = useState({
+    area_type: "",
+    seed_type: "",
+    area_harvested: "",
+    production: "",
+    ave_yield: "",
+  });
 
   const fetchRiceData = useCallback(async () => {
     try {
@@ -64,7 +50,13 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
     setIsEditingRice(false);
     setCurrentRice(null);
     setModalTitle("Add New Rice");
-    riceForm.resetFields();
+    setFormValues({
+      area_type: "",
+      seed_type: "",
+      area_harvested: "",
+      production: "",
+      ave_yield: "",
+    });
     setIsRiceModalVisible(true);
   };
 
@@ -73,7 +65,7 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
     setCurrentRice(rice);
     setModalTitle(`Edit Rice (${rice.area_type} - ${rice.seed_type})`);
 
-    riceForm.setFieldsValue({
+    setFormValues({
       area_type: rice.area_type,
       seed_type: rice.seed_type,
       area_harvested: rice.area_harvested,
@@ -86,12 +78,37 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
   const handleRiceModalCancel = () => {
     setIsRiceModalVisible(false);
-    riceForm.resetFields();
+    setFormValues({
+      area_type: "",
+      seed_type: "",
+      area_harvested: "",
+      production: "",
+      ave_yield: "",
+    });
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormValues({
+      ...formValues,
+      [name]: value,
+    });
   };
 
   const handleRiceModalSubmit = async () => {
+    // Basic validation
+    if (
+      !formValues.area_type ||
+      !formValues.seed_type ||
+      !formValues.area_harvested ||
+      !formValues.production ||
+      !formValues.ave_yield
+    ) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
     try {
-      const values = await riceForm.validateFields();
       setRiceModalLoading(true);
 
       if (isEditingRice && currentRice) {
@@ -99,35 +116,35 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
         const riceData = {
           rice: [
             {
-              area_type: values.area_type,
-              seed_type: values.seed_type,
-              area_harvested: values.area_harvested,
-              production: values.production,
-              ave_yield: values.ave_yield,
+              area_type: formValues.area_type,
+              seed_type: formValues.seed_type,
+              area_harvested: formValues.area_harvested,
+              production: formValues.production,
+              ave_yield: formValues.ave_yield,
             },
           ],
         };
 
         console.log("Updating rice data:", JSON.stringify(riceData, null, 2));
         await farmerAPI.updateRice(farmerId, currentRice.rice_id, riceData);
-        message.success("Rice data updated successfully.");
+        alert("Rice data updated successfully.");
       } else {
         // For new entries, use the same format
         const riceData = {
           rice: [
             {
-              area_type: values.area_type,
-              seed_type: values.seed_type,
-              area_harvested: values.area_harvested,
-              production: values.production,
-              ave_yield: values.ave_yield,
+              area_type: formValues.area_type,
+              seed_type: formValues.seed_type,
+              area_harvested: formValues.area_harvested,
+              production: formValues.production,
+              ave_yield: formValues.ave_yield,
             },
           ],
         };
 
         console.log("Creating rice data:", JSON.stringify(riceData, null, 2));
         await farmerAPI.addRice(farmerId, riceData);
-        message.success("Rice data added successfully.");
+        alert("Rice data added successfully.");
       }
 
       // Refresh rice data
@@ -140,10 +157,16 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
       setRiceModalLoading(false);
       setIsRiceModalVisible(false);
-      riceForm.resetFields();
+      setFormValues({
+        area_type: "",
+        seed_type: "",
+        area_harvested: "",
+        production: "",
+        ave_yield: "",
+      });
     } catch (error) {
       console.error("Error submitting rice form:", error);
-      message.error(
+      alert(
         `Failed to ${isEditingRice ? "update" : "add"} rice data. ${
           error.message
         }`
@@ -153,9 +176,13 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
   };
 
   const handleDeleteRice = async (riceId) => {
+    if (!confirm("Delete this rice entry? This action cannot be undone.")) {
+      return;
+    }
+
     try {
       await farmerAPI.deleteRice(farmerId, riceId);
-      message.success("Rice entry deleted successfully.");
+      alert("Rice entry deleted successfully.");
 
       // Refresh rice data
       await fetchRiceData();
@@ -165,7 +192,7 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
         onDataChange();
       }
     } catch (error) {
-      message.error(`Failed to delete rice entry. ${error.message}`);
+      alert(`Failed to delete rice entry. ${error.message}`);
     }
   };
 
@@ -198,37 +225,39 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
     {
       title: "Actions",
       key: "actions",
-      width: 120,
       render: (_, record) => (
-        <Space size="small">
-          <Button
-            type="text"
-            icon={<EditOutlined />}
+        <div className="flex space-x-2">
+          <button
             onClick={() => showEditRiceModal(record)}
-            className="action-button"
-            style={{ color: colors.warning }}
-          />
-          <Popconfirm
-            title="Delete this rice entry?"
-            description="This action cannot be undone."
-            onConfirm={() => handleDeleteRice(record.rice_id)}
-            okText="Yes"
-            cancelText="No"
-            okButtonProps={{
-              style: {
-                backgroundColor: colors.error,
-                borderColor: colors.error,
-              },
-            }}
+            className="text-yellow-500 hover:text-yellow-700"
           >
-            <Button
-              type="text"
-              icon={<DeleteOutlined />}
-              danger
-              className="action-button"
-            />
-          </Popconfirm>
-        </Space>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-4 h-4 sm:w-5 sm:h-5"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+            </svg>
+          </button>
+          <button
+            onClick={() => handleDeleteRice(record.rice_id)}
+            className="text-red-500 hover:text-red-700"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-4 h-4 sm:w-5 sm:h-5"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+        </div>
       ),
     },
   ];
@@ -237,150 +266,279 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
   return (
     <>
-      <Card
-        title={
+      <div className="mt-4 bg-white rounded-lg shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 p-3 border-b sm:p-4">
           <div className="flex items-center">
-            <InfoCircleOutlined className="mr-2 text-green-600" />
-            <span className="text-base font-medium">Rice Information</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-4 h-4 mr-1 text-green-600 sm:w-5 sm:h-5 sm:mr-2"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span className="text-sm font-medium sm:text-base">
+              Rice Information
+            </span>
           </div>
-        }
-        extra={
-          <Button
-            type="primary"
-            size="small"
-            icon={<PlusOutlined />}
+          <button
             onClick={showAddRiceModal}
+            className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-green-600 rounded-md sm:px-3 sm:py-1 sm:text-sm hover:bg-green-700"
             style={{
               backgroundColor: colors.primary,
               borderColor: colors.primary,
             }}
           >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-3 h-3 mr-1 sm:w-4 sm:h-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                clipRule="evenodd"
+              />
+            </svg>
             Add Rice
-          </Button>
-        }
-        bordered={false}
-        className="rounded-lg shadow-sm mt-4"
-        bodyStyle={{ padding: "0" }}
-      >
+          </button>
+        </div>
+
         {riceLoading ? (
-          <div className="py-10 flex justify-center">
-            <Spin tip="Loading rice records..." />
+          <div className="flex justify-center py-8 sm:py-10">
+            <div className="w-6 h-6 border-t-2 border-b-2 border-green-500 rounded-full sm:w-8 sm:h-8 animate-spin"></div>
+            <span className="ml-2 text-xs sm:text-sm">
+              Loading rice records...
+            </span>
           </div>
         ) : hasRice ? (
-          <Table
-            columns={riceColumns}
-            dataSource={rice}
-            rowKey="rice_id"
-            pagination={false}
-            size="small"
-            scroll={{
-              y: "calc(100vh - 300px)",
-              x: rice.length > 0 ? "max-content" : undefined,
-            }}
-          />
+          <div className="-mx-3 overflow-x-auto sm:mx-0">
+            <table className="min-w-full text-xs divide-y divide-gray-200 sm:text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  {riceColumns.slice(0, -1).map((column) => (
+                    <th
+                      key={column.key || column.dataIndex}
+                      className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3"
+                    >
+                      {column.title}
+                    </th>
+                  ))}
+                  <th className="px-2 py-2 text-xs font-medium tracking-wider text-right text-gray-500 uppercase sm:px-6 sm:py-3">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {rice.map((record, index) => (
+                  <tr
+                    key={record.rice_id || index}
+                    className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                  >
+                    {riceColumns.slice(0, -1).map((column) => (
+                      <td
+                        key={`${record.rice_id || index}-${
+                          column.key || column.dataIndex
+                        }`}
+                        className="px-2 py-2 text-xs text-gray-500 sm:px-6 sm:py-4 sm:text-sm whitespace-nowrap"
+                      >
+                        {record[column.dataIndex]}
+                      </td>
+                    ))}
+                    <td className="px-2 py-2 text-xs font-medium text-right sm:px-6 sm:py-4 sm:text-sm whitespace-nowrap">
+                      {riceColumns[riceColumns.length - 1].render(null, record)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
-          <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="No rice information available"
-            className="py-10"
-            style={{ marginBottom: "20px" }}
-          ></Empty>
+          <div className="flex flex-col items-center justify-center py-8 text-gray-500 sm:py-10">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-8 h-8 mb-2 text-gray-300 sm:w-12 sm:h-12"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1}
+                d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+              />
+            </svg>
+            <p className="text-xs sm:text-sm">No rice information available</p>
+          </div>
         )}
-      </Card>
+      </div>
 
       {/* Add Rice Modal */}
-      <Modal
-        title={modalTitle}
-        open={isRiceModalVisible}
-        onCancel={handleRiceModalCancel}
-        width={700}
-        footer={[
-          <Button key="cancel" onClick={handleRiceModalCancel}>
-            Cancel
-          </Button>,
-          <Button
-            key="submit"
-            type="primary"
-            loading={riceModalLoading}
-            onClick={handleRiceModalSubmit}
-            style={{
-              backgroundColor: colors.primary,
-              borderColor: colors.primary,
-            }}
-          >
-            {isEditingRice ? "Update" : "Add"}
-          </Button>,
-        ]}
-      >
-        <Form form={riceForm} layout="vertical">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Form.Item
-              name="area_type"
-              label="Area Type"
-              rules={[{ required: true, message: "Please select area type" }]}
-            >
-              <Select placeholder="Select Area Type">
-                <Option value="Irrigated">Irrigated</Option>
-                <Option value="Rainfed">Rainfed</Option>
-              </Select>
-            </Form.Item>
+      {isRiceModalVisible && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="w-full max-w-md bg-white rounded-lg shadow-xl sm:max-w-2xl">
+            <div className="flex items-center justify-between p-3 border-b sm:p-4">
+              <h3 className="text-base font-medium sm:text-lg">{modalTitle}</h3>
+              <button
+                onClick={handleRiceModalCancel}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-5 h-5 sm:w-6 sm:h-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
 
-            <Form.Item
-              name="seed_type"
-              label="Seed Type"
-              rules={[{ required: true, message: "Please select seed type" }]}
-            >
-              <Select placeholder="Select Seed Type">
-                <Option value="Hybrid Seeds">Hybrid Seeds</Option>
-                <Option value="Certified Seeds">Certified Seeds</Option>
-                <Option value="Good Seeds">Good Seeds</Option>
-              </Select>
-            </Form.Item>
+            <div className="p-4 sm:p-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="mb-4">
+                  <label className="block mb-1 text-xs font-medium text-gray-700 sm:text-sm">
+                    Area Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="area_type"
+                    value={formValues.area_type}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 text-xs border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                    required
+                  >
+                    <option value="">Select Area Type</option>
+                    <option value="Irrigated">Irrigated</option>
+                    <option value="Rainfed">Rainfed</option>
+                  </select>
+                </div>
 
-            <Form.Item
-              name="area_harvested"
-              label="Area Harvested"
-              rules={[
-                { required: true, message: "Please enter area harvested" },
-              ]}
-            >
-              <InputNumber
-                className="w-full"
-                min={0}
-                step={0.01}
-                placeholder="Enter area harvested"
-              />
-            </Form.Item>
+                <div className="mb-4">
+                  <label className="block mb-1 text-xs font-medium text-gray-700 sm:text-sm">
+                    Seed Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="seed_type"
+                    value={formValues.seed_type}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 text-xs border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                    required
+                  >
+                    <option value="">Select Seed Type</option>
+                    <option value="Hybrid Seeds">Hybrid Seeds</option>
+                    <option value="Certified Seeds">Certified Seeds</option>
+                    <option value="Good Seeds">Good Seeds</option>
+                  </select>
+                </div>
 
-            <Form.Item
-              name="production"
-              label="Production"
-              rules={[{ required: true, message: "Please enter production" }]}
-            >
-              <InputNumber
-                className="w-full"
-                min={0}
-                placeholder="Enter production"
-              />
-            </Form.Item>
+                <div className="mb-4">
+                  <label className="block mb-1 text-xs font-medium text-gray-700 sm:text-sm">
+                    Area Harvested <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="area_harvested"
+                    value={formValues.area_harvested}
+                    onChange={handleInputChange}
+                    min="0"
+                    step="0.01"
+                    className="w-full px-3 py-2 text-xs border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                    placeholder="Enter area harvested"
+                    required
+                  />
+                </div>
 
-            <Form.Item
-              name="ave_yield"
-              label="Average Yield"
-              rules={[
-                { required: true, message: "Please enter average yield" },
-              ]}
-            >
-              <InputNumber
-                className="w-full"
-                min={0}
-                step={0.01}
-                placeholder="Enter average yield"
-              />
-            </Form.Item>
+                <div className="mb-4">
+                  <label className="block mb-1 text-xs font-medium text-gray-700 sm:text-sm">
+                    Production <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="production"
+                    value={formValues.production}
+                    onChange={handleInputChange}
+                    min="0"
+                    className="w-full px-3 py-2 text-xs border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                    placeholder="Enter production"
+                    required
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block mb-1 text-xs font-medium text-gray-700 sm:text-sm">
+                    Average Yield <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="ave_yield"
+                    value={formValues.ave_yield}
+                    onChange={handleInputChange}
+                    min="0"
+                    step="0.01"
+                    className="w-full px-3 py-2 text-xs border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                    placeholder="Enter average yield"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end p-3 border-t sm:p-4">
+              <button
+                onClick={handleRiceModalCancel}
+                className="px-3 py-1 mr-2 text-xs font-medium text-gray-800 bg-gray-100 rounded-md sm:px-4 sm:py-2 sm:text-sm hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRiceModalSubmit}
+                disabled={riceModalLoading}
+                className="flex items-center px-3 py-1 text-xs font-medium text-white bg-green-600 rounded-md sm:px-4 sm:py-2 sm:text-sm hover:bg-green-700"
+                style={{
+                  backgroundColor: colors.primary,
+                  borderColor: colors.primary,
+                }}
+              >
+                {riceModalLoading && (
+                  <svg
+                    className="w-3 h-3 mr-1 -ml-1 text-white sm:w-4 sm:h-4 sm:mr-2 animate-spin"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                )}
+                {isEditingRice ? "Update" : "Add"}
+              </button>
+            </div>
           </div>
-        </Form>
-      </Modal>
+        </div>
+      )}
     </>
   );
 };

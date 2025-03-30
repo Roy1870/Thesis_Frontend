@@ -1,35 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import {
-  Button,
-  Card,
-  Table,
-  Popconfirm,
-  Empty,
-  Space,
-  Modal,
-  Form,
-  Input,
-  Select,
-  InputNumber,
-  message,
-  Spin,
-  Row,
-  Col,
-} from "antd";
-import {
-  PlusOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  InfoCircleOutlined,
-} from "@ant-design/icons";
 import { farmerAPI } from "./services/api";
 
-const { Option } = Select;
-
 const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
-  const [cropForm] = Form.useForm();
   const [cropDataType, setCropDataType] = useState("Crop");
   const [isCropModalVisible, setIsCropModalVisible] = useState(false);
   const [isEditingCrop, setIsEditingCrop] = useState(false);
@@ -39,7 +13,17 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
   const [cropLoading, setCropLoading] = useState(true);
   const [selectedCropType, setSelectedCropType] = useState(null);
   const [modalTitle, setModalTitle] = useState("Add New Crop");
-  const [isEditingRice, setIsEditingRice] = useState(false); // Declare isEditingRice
+
+  // Form state
+  const [formValues, setFormValues] = useState({
+    crop_type: "",
+    variety_clone: "",
+    area_hectare: "",
+    production_type: "seasonal",
+    crop_value: "",
+    month_value: "",
+    quantity: "",
+  });
 
   const fetchCropData = useCallback(async () => {
     try {
@@ -114,7 +98,15 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
     setCurrentCrop(null);
     setSelectedCropType(null);
     setModalTitle("Add New Crop");
-    cropForm.resetFields();
+    setFormValues({
+      crop_type: "",
+      variety_clone: "",
+      area_hectare: "",
+      production_type: "seasonal",
+      crop_value: "",
+      month_value: "",
+      quantity: "",
+    });
     setIsCropModalVisible(true);
   };
 
@@ -154,8 +146,8 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       console.error("Error parsing production data:", e);
     }
 
-    // Set form values based on crop type
-    cropForm.setFieldsValue({
+    // Set form values
+    setFormValues({
       crop_type: crop.crop_type,
       variety_clone: crop.variety_clone || "",
       area_hectare: crop.area_hectare,
@@ -170,38 +162,78 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
   const handleCropModalCancel = () => {
     setIsCropModalVisible(false);
-    cropForm.resetFields();
+    setFormValues({
+      crop_type: "",
+      variety_clone: "",
+      area_hectare: "",
+      production_type: "seasonal",
+      crop_value: "",
+      month_value: "",
+      quantity: "",
+    });
     setSelectedCropType(null);
   };
 
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormValues({
+      ...formValues,
+      [name]: value,
+    });
+  };
+
+  const handleSelectChange = (name, value) => {
+    setFormValues({
+      ...formValues,
+      [name]: value,
+    });
+
+    if (name === "crop_type") {
+      setSelectedCropType(value);
+    }
+  };
+
   const handleCropModalSubmit = async () => {
+    // Basic validation
+    if (
+      !formValues.crop_type ||
+      !formValues.area_hectare ||
+      !formValues.production_type ||
+      (selectedCropType === "Cacao" &&
+        (!formValues.variety_clone || !formValues.month_value)) ||
+      (selectedCropType !== "Cacao" && !formValues.crop_value) ||
+      !formValues.quantity
+    ) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
     try {
-      const values = await cropForm.validateFields();
       setCropModalLoading(true);
 
       if (isEditingCrop && currentCrop) {
         // Update existing crop
         let productionData = {};
 
-        if (values.crop_type === "Cacao") {
+        if (formValues.crop_type === "Cacao") {
           productionData = {
-            month: values.month_value,
-            quantity: values.quantity,
+            month: formValues.month_value,
+            quantity: formValues.quantity,
           };
         } else {
           productionData = {
-            crop: values.crop_value,
-            quantity: values.quantity,
+            crop: formValues.crop_value,
+            quantity: formValues.quantity,
           };
         }
 
         const cropEntry = {
-          crop_type: values.crop_type,
-          variety_clone: values.variety_clone || "",
-          area_hectare: values.area_hectare
-            ? Number.parseFloat(values.area_hectare)
+          crop_type: formValues.crop_type,
+          variety_clone: formValues.variety_clone || "",
+          area_hectare: formValues.area_hectare
+            ? Number.parseFloat(formValues.area_hectare)
             : 0,
-          production_type: values.production_type || "seasonal",
+          production_type: formValues.production_type || "seasonal",
           production_data: JSON.stringify(productionData),
         };
 
@@ -211,30 +243,30 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
         console.log("Updating crop data:", JSON.stringify(cropData, null, 2));
         await farmerAPI.updateCrop(farmerId, currentCrop.crop_id, cropData);
-        message.success("Crop updated successfully.");
+        alert("Crop updated successfully.");
       } else {
         // Add new crop
         let productionData = {};
 
-        if (values.crop_type === "Cacao") {
+        if (formValues.crop_type === "Cacao") {
           productionData = {
-            month: values.month_value,
-            quantity: values.quantity,
+            month: formValues.month_value,
+            quantity: formValues.quantity,
           };
         } else {
           productionData = {
-            crop: values.crop_value,
-            quantity: values.quantity,
+            crop: formValues.crop_value,
+            quantity: formValues.quantity,
           };
         }
 
         const cropEntry = {
-          crop_type: values.crop_type,
-          variety_clone: values.variety_clone || "",
-          area_hectare: values.area_hectare
-            ? Number.parseFloat(values.area_hectare)
+          crop_type: formValues.crop_type,
+          variety_clone: formValues.variety_clone || "",
+          area_hectare: formValues.area_hectare
+            ? Number.parseFloat(formValues.area_hectare)
             : 0,
-          production_type: values.production_type || "seasonal",
+          production_type: formValues.production_type || "seasonal",
           production_data: JSON.stringify(productionData),
         };
 
@@ -244,7 +276,7 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
         console.log("Creating crop data:", JSON.stringify(cropsData, null, 2));
         await farmerAPI.addCrops(farmerId, cropsData);
-        message.success("Crop added successfully.");
+        alert("Crop added successfully.");
       }
 
       // Refresh crop data
@@ -257,11 +289,19 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
       setCropModalLoading(false);
       setIsCropModalVisible(false);
-      cropForm.resetFields();
+      setFormValues({
+        crop_type: "",
+        variety_clone: "",
+        area_hectare: "",
+        production_type: "seasonal",
+        crop_value: "",
+        month_value: "",
+        quantity: "",
+      });
       setSelectedCropType(null);
     } catch (error) {
       console.error("Error submitting crop form:", error);
-      message.error(
+      alert(
         `Failed to ${isEditingCrop ? "update" : "add"} crop. ${error.message}`
       );
       setCropModalLoading(false);
@@ -269,9 +309,13 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
   };
 
   const handleDeleteCrop = async (cropId) => {
+    if (!confirm("Delete this crop entry? This action cannot be undone.")) {
+      return;
+    }
+
     try {
       await farmerAPI.deleteCrop(farmerId, cropId);
-      message.success("Crop entry deleted successfully.");
+      alert("Crop entry deleted successfully.");
 
       // Refresh crop data
       await fetchCropData();
@@ -281,7 +325,7 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
         onDataChange();
       }
     } catch (error) {
-      message.error(`Failed to delete crop entry. ${error.message}`);
+      alert(`Failed to delete crop entry. ${error.message}`);
     }
   };
 
@@ -321,37 +365,39 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
     {
       title: "Actions",
       key: "actions",
-      width: 120,
       render: (_, record) => (
-        <Space size="small">
-          <Button
-            type="text"
-            icon={<EditOutlined />}
+        <div className="flex space-x-2">
+          <button
             onClick={() => showEditCropModal(record)}
-            className="action-button"
-            style={{ color: colors.warning }}
-          />
-          <Popconfirm
-            title="Delete this crop entry?"
-            description="This action cannot be undone."
-            onConfirm={() => handleDeleteCrop(record.crop_id)}
-            okText="Yes"
-            cancelText="No"
-            okButtonProps={{
-              style: {
-                backgroundColor: colors.error,
-                borderColor: colors.error,
-              },
-            }}
+            className="text-yellow-500 hover:text-yellow-700"
           >
-            <Button
-              type="text"
-              icon={<DeleteOutlined />}
-              danger
-              className="action-button"
-            />
-          </Popconfirm>
-        </Space>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-5 h-5"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+            </svg>
+          </button>
+          <button
+            onClick={() => handleDeleteCrop(record.crop_id)}
+            className="text-red-500 hover:text-red-700"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-5 h-5"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+        </div>
       ),
     },
   ];
@@ -360,221 +406,338 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
   return (
     <>
-      <Card
-        title={
+      <div className="mt-4 bg-white rounded-lg shadow-sm">
+        <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center">
-            <InfoCircleOutlined className="mr-2 text-green-600" />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-5 h-5 mr-2 text-green-600"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                clipRule="evenodd"
+              />
+            </svg>
             <span className="text-base font-medium">Crop Information</span>
           </div>
-        }
-        extra={
-          <Button
-            type="primary"
-            size="small"
-            icon={<PlusOutlined />}
+          <button
             onClick={showAddCropModal}
+            className="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
             style={{
               backgroundColor: colors.primary,
               borderColor: colors.primary,
             }}
           >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-4 h-4 mr-1"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                clipRule="evenodd"
+              />
+            </svg>
             Add Crop
-          </Button>
-        }
-        bordered={false}
-        className="rounded-lg shadow-sm mt-4"
-        bodyStyle={{ padding: "0" }}
-      >
+          </button>
+        </div>
+
         {cropLoading ? (
-          <div className="py-10 flex justify-center">
-            <Spin tip="Loading crop records..." />
+          <div className="flex justify-center py-10">
+            <div className="w-8 h-8 border-t-2 border-b-2 border-green-500 rounded-full animate-spin"></div>
+            <span className="ml-2">Loading crop records...</span>
           </div>
         ) : hasCrops ? (
-          <Table
-            columns={cropColumns}
-            dataSource={crops}
-            rowKey="crop_id"
-            pagination={false}
-            size="small"
-            scroll={{
-              x: crops.length > 0 ? "max-content" : undefined,
-            }}
-          />
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  {cropColumns.slice(0, -1).map((column) => (
+                    <th
+                      key={column.key || column.dataIndex}
+                      className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
+                    >
+                      {column.title}
+                    </th>
+                  ))}
+                  <th className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {crops.map((record, index) => (
+                  <tr
+                    key={record.crop_id || index}
+                    className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                  >
+                    {cropColumns.slice(0, -1).map((column) => (
+                      <td
+                        key={`${record.crop_id || index}-${
+                          column.key || column.dataIndex
+                        }`}
+                        className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap"
+                      >
+                        {column.render && column.key === "crop_or_month"
+                          ? column.render(null, record)
+                          : record[column.dataIndex]}
+                      </td>
+                    ))}
+                    <td className="px-6 py-4 text-sm font-medium text-right whitespace-nowrap">
+                      {cropColumns[cropColumns.length - 1].render(null, record)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
-          <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="No crop information available"
-            className="py-10"
-            style={{ marginBottom: "20px" }}
-          ></Empty>
+          <div className="flex flex-col items-center justify-center py-10 text-gray-500">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-12 h-12 mb-2 text-gray-300"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1}
+                d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+              />
+            </svg>
+            <p>No crop information available</p>
+          </div>
         )}
-      </Card>
+      </div>
 
       {/* Add Crop Modal */}
-      <Modal
-        title={modalTitle}
-        open={isCropModalVisible}
-        onCancel={handleCropModalCancel}
-        width={700}
-        footer={[
-          <Button key="cancel" onClick={handleCropModalCancel}>
-            Cancel
-          </Button>,
-          <Button
-            key="submit"
-            type="primary"
-            loading={cropModalLoading}
-            onClick={handleCropModalSubmit}
-            style={{
-              backgroundColor: colors.primary,
-              borderColor: colors.primary,
-            }}
-          >
-            {isEditingCrop ? "Update" : "Add"}
-          </Button>,
-        ]}
-      >
-        <Form
-          form={cropForm}
-          layout="vertical"
-          initialValues={{
-            production_type: "seasonal",
-          }}
-        >
-          <Row gutter={[16, 16]}>
-            <Col xs={24} sm={12}>
-              <Form.Item
-                name="crop_type"
-                label="Crop Type"
-                rules={[{ required: true, message: "Please select crop type" }]}
+      {isCropModalVisible && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="w-full max-w-2xl bg-white rounded-lg shadow-xl">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-medium">{modalTitle}</h3>
+              <button
+                onClick={handleCropModalCancel}
+                className="text-gray-400 hover:text-gray-500"
               >
-                <Select
-                  placeholder="Select Crop Type"
-                  onChange={(value) => setSelectedCropType(value)}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-6 h-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
                 >
-                  <Option value="Spices">Spices</Option>
-                  <Option value="Legumes">Legumes</Option>
-                  <Option value="Vegetable">Vegetable</Option>
-                  <Option value="Cacao">Cacao</Option>
-                  <Option value="Banana">Banana</Option>
-                </Select>
-              </Form.Item>
-            </Col>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
 
-            {/* Common fields for all crop types */}
-            <Col xs={24} sm={12}>
-              <Form.Item
-                label="Area (Hectare)"
-                name="area_hectare"
-                rules={[
-                  { required: true, message: "Please enter area in hectares" },
-                ]}
-              >
-                <InputNumber
-                  className="w-full"
-                  min={0}
-                  step={0.01}
-                  placeholder="Enter area in hectares"
-                />
-              </Form.Item>
-            </Col>
-
-            <Col xs={24} sm={12}>
-              <Form.Item
-                name="production_type"
-                label="Cropping Intensity"
-                rules={[
-                  {
-                    required: true,
-                    message: "Please select cropping intensity",
-                  },
-                ]}
-              >
-                <Select placeholder="Select Cropping Intensity">
-                  <Option value="year_round">Year Round</Option>
-                  <Option value="quarterly">Quarterly</Option>
-                  <Option value="seasonal">Seasonal</Option>
-                  <Option value="annually">Annually</Option>
-                  <Option value="twice_a_month">Twice a Month</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-
-            {/* Variety/Clone field only for Cacao */}
-            {selectedCropType === "Cacao" && (
-              <Col xs={24} sm={12}>
-                <Form.Item
-                  name="variety_clone"
-                  label="Variety/Clone"
-                  rules={[
-                    { required: true, message: "Please enter variety/clone" },
-                  ]}
-                >
-                  <Input placeholder="Enter variety or clone" />
-                </Form.Item>
-              </Col>
-            )}
-
-            {/* Cacao specific fields */}
-            {selectedCropType === "Cacao" && (
-              <>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    name="month_value"
-                    label="Month"
-                    rules={[{ required: true, message: "Please select month" }]}
+            <div className="p-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="mb-4">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Crop Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="crop_type"
+                    value={formValues.crop_type}
+                    onChange={(e) =>
+                      handleSelectChange("crop_type", e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    required
                   >
-                    <Select placeholder="Select month">
-                      <Option value="January">January</Option>
-                      <Option value="February">February</Option>
-                      <Option value="March">March</Option>
-                      <Option value="April">April</Option>
-                      <Option value="May">May</Option>
-                      <Option value="June">June</Option>
-                      <Option value="July">July</Option>
-                      <Option value="August">August</Option>
-                      <Option value="September">September</Option>
-                      <Option value="October">October</Option>
-                      <Option value="November">November</Option>
-                      <Option value="December">December</Option>
-                    </Select>
-                  </Form.Item>
-                </Col>
-              </>
-            )}
+                    <option value="">Select Crop Type</option>
+                    <option value="Spices">Spices</option>
+                    <option value="Legumes">Legumes</option>
+                    <option value="Vegetable">Vegetable</option>
+                    <option value="Cacao">Cacao</option>
+                    <option value="Banana">Banana</option>
+                  </select>
+                </div>
 
-            {/* Fields for other crop types */}
-            {selectedCropType !== "Cacao" && (
-              <>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    name="crop_value"
-                    label="Crop"
-                    rules={[{ required: true, message: "Please enter crop" }]}
+                {/* Common fields for all crop types */}
+                <div className="mb-4">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Area (Hectare) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="area_hectare"
+                    value={formValues.area_hectare}
+                    onChange={handleInputChange}
+                    min="0"
+                    step="0.01"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    placeholder="Enter area in hectares"
+                    required
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Cropping Intensity <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="production_type"
+                    value={formValues.production_type}
+                    onChange={(e) =>
+                      handleSelectChange("production_type", e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    required
                   >
-                    <Input placeholder="Enter crop" />
-                  </Form.Item>
-                </Col>
-              </>
-            )}
+                    <option value="year_round">Year Round</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="seasonal">Seasonal</option>
+                    <option value="annually">Annually</option>
+                    <option value="twice_a_month">Twice a Month</option>
+                  </select>
+                </div>
 
-            {/* Quantity field for all crop types */}
-            <Col xs={24} sm={12}>
-              <Form.Item
-                name="quantity"
-                label="Quantity"
-                rules={[{ required: true, message: "Please enter quantity" }]}
+                {/* Variety/Clone field only for Cacao */}
+                {selectedCropType === "Cacao" && (
+                  <div className="mb-4">
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Variety/Clone <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="variety_clone"
+                      value={formValues.variety_clone}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                      placeholder="Enter variety or clone"
+                      required
+                    />
+                  </div>
+                )}
+
+                {/* Cacao specific fields */}
+                {selectedCropType === "Cacao" && (
+                  <div className="mb-4">
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Month <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="month_value"
+                      value={formValues.month_value}
+                      onChange={(e) =>
+                        handleSelectChange("month_value", e.target.value)
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                      required
+                    >
+                      <option value="">Select month</option>
+                      <option value="January">January</option>
+                      <option value="February">February</option>
+                      <option value="March">March</option>
+                      <option value="April">April</option>
+                      <option value="May">May</option>
+                      <option value="June">June</option>
+                      <option value="July">July</option>
+                      <option value="August">August</option>
+                      <option value="September">September</option>
+                      <option value="October">October</option>
+                      <option value="November">November</option>
+                      <option value="December">December</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Fields for other crop types */}
+                {selectedCropType && selectedCropType !== "Cacao" && (
+                  <div className="mb-4">
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Crop <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="crop_value"
+                      value={formValues.crop_value}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                      placeholder="Enter crop"
+                      required
+                    />
+                  </div>
+                )}
+
+                {/* Quantity field for all crop types */}
+                <div className="mb-4">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Quantity <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="quantity"
+                    value={formValues.quantity}
+                    onChange={handleInputChange}
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    placeholder="Enter quantity"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end p-4 border-t">
+              <button
+                onClick={handleCropModalCancel}
+                className="px-4 py-2 mr-2 text-sm font-medium text-gray-800 bg-gray-100 rounded-md hover:bg-gray-200"
               >
-                <InputNumber
-                  className="w-full"
-                  min={0}
-                  placeholder="Enter quantity"
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-        </Form>
-      </Modal>
+                Cancel
+              </button>
+              <button
+                onClick={handleCropModalSubmit}
+                disabled={cropModalLoading}
+                className="flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+                style={{
+                  backgroundColor: colors.primary,
+                  borderColor: colors.primary,
+                }}
+              >
+                {cropModalLoading && (
+                  <svg
+                    className="w-4 h-4 mr-2 -ml-1 text-white animate-spin"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                )}
+                {isEditingCrop ? "Update" : "Add"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

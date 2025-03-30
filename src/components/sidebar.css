@@ -53,7 +53,7 @@
 /* Profile Section */
 .profile {
   position: absolute;
-  bottom: 10px;  /* Adjusted to keep it within the view */
+  bottom: 10px; /* Adjusted to keep it within the view */
   left: 20px;
   display: flex;
   align-items: center;
@@ -150,7 +150,7 @@
 
 /* Ensure Sidebar Takes Full Height of the Screen */
 .sidebar {
-  height: 90vh;  /* Full viewport height */
+  height: 90vh; /* Full viewport height */
   display: flex;
   flex-direction: column;
 }
@@ -162,6 +162,5 @@
 /* Adjust Profile and Menu to Fit */
 .profile {
   position: absolute;
-  bottom: 20px;  /* Ensure it's at the bottom of the sidebar */
+  bottom: 20px; /* Ensure it's at the bottom of the sidebar */
 }
-
