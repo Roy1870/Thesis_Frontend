@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
+import { useState, useEffect } from "react";
 import {
   DashboardOutlined,
   FormOutlined,
@@ -14,72 +14,137 @@ import {
   LogoutOutlined,
   DownOutlined,
   UpOutlined,
-} from "@ant-design/icons"
-import { useNavigate, useLocation } from "react-router-dom"
-import logo from "../images/logo.png"
+} from "@ant-design/icons";
+import { useNavigate, useLocation } from "react-router-dom";
+import logo from "../images/logo.png";
+import axios from "axios";
 
-const SIDEBAR_COLLAPSED_KEY = "sidebar_collapsed"
+const SIDEBAR_COLLAPSED_KEY = "sidebar_collapsed";
 
 const Sidebar = () => {
-  const location = useLocation()
+  const location = useLocation();
   // Initialize collapsed state from localStorage or default to false
   const [collapsed, setCollapsed] = useState(() => {
-    const savedState = localStorage.getItem(SIDEBAR_COLLAPSED_KEY)
-    return savedState ? JSON.parse(savedState) : false
-  })
-  const [selectedKey, setSelectedKey] = useState(location.pathname)
-  const [dropdownVisible, setDropdownVisible] = useState(false)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const navigate = useNavigate()
+    const savedState = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    return savedState ? JSON.parse(savedState) : false;
+  });
+  const [selectedKey, setSelectedKey] = useState(location.pathname);
+  const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [userName, setUserName] = useState("User");
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   // Update selected key when location changes
   useEffect(() => {
-    setSelectedKey(location.pathname)
-  }, [location])
+    setSelectedKey(location.pathname);
+  }, [location]);
 
   // Check if we're on mobile
-  const isMobile = () => window.innerWidth < 768
-  const [mobile, setMobile] = useState(isMobile())
+  const isMobile = () => window.innerWidth < 768;
+  const [mobile, setMobile] = useState(isMobile());
+
+  // Fetch user data and check admin status
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const authToken = localStorage.getItem("authToken");
+        if (!authToken) {
+          setLoading(false);
+          return;
+        }
+
+        // Get current user info from API
+        const userResponse = await axios.get("http://localhost:8000/api/user", {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        console.log("User API response:", userResponse.data);
+
+        // Extract user data from the nested response
+        if (userResponse.data && userResponse.data.user) {
+          const userData = userResponse.data.user;
+
+          // Set user name from API response
+          setUserName(userData.name || "User");
+
+          // Check if user is admin
+          const adminStatus = userData.role === "admin";
+          console.log(
+            "Is admin check:",
+            userData.role,
+            "===",
+            "admin",
+            "Result:",
+            adminStatus
+          );
+          setIsAdmin(adminStatus);
+
+          // Store in localStorage for other components
+          localStorage.setItem("userEmail", userData.email);
+          localStorage.setItem("userId", userData.id.toString());
+          localStorage.setItem("userName", userData.name);
+          localStorage.setItem("role", userData.role);
+        }
+      } catch (err) {
+        console.error("Error fetching user data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, []);
 
   // Update mobile state on resize
   useEffect(() => {
     const handleResize = () => {
-      setMobile(isMobile())
+      setMobile(isMobile());
       if (!isMobile() && mobileMenuOpen) {
-        setMobileMenuOpen(false)
+        setMobileMenuOpen(false);
       }
-    }
+    };
 
-    window.addEventListener("resize", handleResize)
-    return () => window.removeEventListener("resize", handleResize)
-  }, [mobileMenuOpen])
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [mobileMenuOpen]);
 
   const toggleSidebar = () => {
     if (mobile) {
       // On mobile, toggle the mobile menu
-      setMobileMenuOpen(!mobileMenuOpen)
+      setMobileMenuOpen(!mobileMenuOpen);
     } else {
       // On desktop, toggle the collapsed state
-      const newCollapsedState = !collapsed
-      setCollapsed(newCollapsedState)
+      const newCollapsedState = !collapsed;
+      setCollapsed(newCollapsedState);
       // Save to localStorage so App component can access it
-      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, JSON.stringify(newCollapsedState))
+      localStorage.setItem(
+        SIDEBAR_COLLAPSED_KEY,
+        JSON.stringify(newCollapsedState)
+      );
       // Dispatch custom event so App can react to changes
       window.dispatchEvent(
         new CustomEvent("sidebarToggle", {
           detail: { collapsed: newCollapsedState },
-        }),
-      )
+        })
+      );
     }
-  }
+  };
 
   const handleLogout = () => {
-    localStorage.removeItem("authToken")
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("userEmail");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("role");
 
     // Custom message implementation
-    const messageDiv = document.createElement("div")
+    const messageDiv = document.createElement("div");
     messageDiv.className =
-      "fixed z-50 flex items-center px-4 py-3 text-green-700 bg-green-100 border border-green-400 rounded top-4 right-4"
+      "fixed z-50 flex items-center px-4 py-3 text-green-700 bg-green-100 border border-green-400 rounded top-4 right-4";
     messageDiv.innerHTML = `
       <span class="mr-2">
         <svg viewBox="64 64 896 896" data-icon="check-circle" width="1em" height="1em" fill="#52c41a" aria-hidden="true" focusable="false">
@@ -87,31 +152,27 @@ const Sidebar = () => {
         </svg>
       </span>
       <span>Logout success!</span>
-    `
-    document.body.appendChild(messageDiv)
+    `;
+    document.body.appendChild(messageDiv);
 
     setTimeout(() => {
-      document.body.removeChild(messageDiv)
-      window.location.reload()
-    }, 2000)
-  }
-
-  // Get userType from localStorage, default to "admin" for testing if not set
-  const userType = localStorage.getItem("userType") || "admin"
-  const userName = localStorage.getItem("userName") || "User"
+      document.body.removeChild(messageDiv);
+      window.location.reload();
+    }, 2000);
+  };
 
   const handleMenuClick = (path) => {
-    setSelectedKey(path)
-    navigate(path)
+    setSelectedKey(path);
+    navigate(path);
     if (mobile) {
-      setMobileMenuOpen(false)
+      setMobileMenuOpen(false);
     }
-  }
+  };
 
   const toggleDropdown = (e) => {
-    e.preventDefault()
-    setDropdownVisible(!dropdownVisible)
-  }
+    e.preventDefault();
+    setDropdownVisible(!dropdownVisible);
+  };
 
   // Mobile menu overlay
   const mobileMenuOverlay = (
@@ -121,21 +182,39 @@ const Sidebar = () => {
       }`}
       onClick={() => setMobileMenuOpen(false)}
     />
-  )
+  );
+
+  // Show loading state while fetching user data
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="w-8 h-8 border-t-2 border-b-2 border-green-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  // Calculate the number of menu items to adjust height
+  const menuItemCount = 5 + (isAdmin ? 1 : 0); // 5 standard items + 1 if admin
 
   // Sidebar content - reused for both mobile and desktop
   const sidebarContent = (
-    <>
+    <div className="flex flex-col h-full">
       {/* Sidebar Header */}
-      <div className="flex items-center justify-between p-4 border-b border-[#5A8C79]">
+      <div className="flex items-center justify-between p-3 border-b border-[#5A8C79]">
         {!collapsed && (
           <div className="flex items-center space-x-2">
-            <img src={logo || "/placeholder.svg"} alt="Logo" className="w-8 h-8" />
+            <img
+              src={logo || "/placeholder.svg"}
+              alt="Logo"
+              className="w-8 h-8"
+            />
             <span className="font-bold text-white">AgriTrack</span>
           </div>
         )}
         <button
-          className={`text-white hover:bg-[#5A8C79] p-2 rounded ${collapsed && !mobile ? "mx-auto" : ""}`}
+          className={`text-white hover:bg-[#5A8C79] p-2 rounded ${
+            collapsed && !mobile ? "mx-auto" : ""
+          }`}
           onClick={toggleSidebar}
         >
           {collapsed && !mobile ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
@@ -144,16 +223,21 @@ const Sidebar = () => {
 
       {/* Welcome Message */}
       {(!collapsed || mobile) && (
-        <div className="p-4 border-b border-[#5A8C79]">
+        <div className="p-2 border-b border-[#5A8C79]">
           <h3 className="text-sm text-white">
             Welcome, <span className="font-bold">{userName}</span>!
           </h3>
+          {isAdmin && (
+            <span className="inline-block px-2 py-0.5 mt-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">
+              Admin Access
+            </span>
+          )}
         </div>
       )}
 
       {/* Navigation Menu */}
-      <div className="flex-grow py-4 overflow-y-auto" style={{ height: "calc(100vh - 180px)" }}>
-        <ul>
+      <div className="flex-grow overflow-y-auto">
+        <ul className="py-2">
           <li>
             <button
               onClick={() => handleMenuClick("/")}
@@ -199,18 +283,20 @@ const Sidebar = () => {
             </button>
           </li>
 
-          {/* User Management - Always visible for testing */}
-          <li>
-            <button
-              onClick={() => handleMenuClick("/user-management")}
-              className={`w-full flex items-center px-4 py-2 text-white hover:bg-[#5A8C79] ${
-                selectedKey === "/user-management" ? "bg-[#5A8C79]" : ""
-              }`}
-            >
-              <TeamOutlined className="mr-3" />
-              {(!collapsed || mobile) && <span>User Management</span>}
-            </button>
-          </li>
+          {/* User Management - Only visible for admin users */}
+          {isAdmin && (
+            <li>
+              <button
+                onClick={() => handleMenuClick("/user-management")}
+                className={`w-full flex items-center px-4 py-2 text-white hover:bg-[#5A8C79] ${
+                  selectedKey === "/user-management" ? "bg-[#5A8C79]" : ""
+                }`}
+              >
+                <TeamOutlined className="mr-3" />
+                {(!collapsed || mobile) && <span>User Management</span>}
+              </button>
+            </li>
+          )}
 
           <li>
             <button
@@ -227,7 +313,7 @@ const Sidebar = () => {
       </div>
 
       {/* Profile Dropdown */}
-      <div className="border-t border-[#5A8C79] mt-auto">
+      <div className="border-t border-[#5A8C79] mt-auto bg-[#6A9C89]">
         <div className="relative">
           <button
             onClick={toggleDropdown}
@@ -239,7 +325,9 @@ const Sidebar = () => {
             {(!collapsed || mobile) && (
               <>
                 <span>Profile</span>
-                <span className="ml-auto">{dropdownVisible ? <UpOutlined /> : <DownOutlined />}</span>
+                <span className="ml-auto">
+                  {dropdownVisible ? <UpOutlined /> : <DownOutlined />}
+                </span>
               </>
             )}
           </button>
@@ -254,8 +342,8 @@ const Sidebar = () => {
             >
               <button
                 onClick={() => {
-                  handleMenuClick("/profile")
-                  setDropdownVisible(false)
+                  handleMenuClick("/profile");
+                  setDropdownVisible(false);
                 }}
                 className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100"
               >
@@ -264,8 +352,8 @@ const Sidebar = () => {
               </button>
               <button
                 onClick={() => {
-                  handleLogout()
-                  setDropdownVisible(false)
+                  handleLogout();
+                  setDropdownVisible(false);
                 }}
                 className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100"
               >
@@ -276,8 +364,8 @@ const Sidebar = () => {
           )}
         </div>
       </div>
-    </>
-  )
+    </div>
+  );
 
   return (
     <>
@@ -295,7 +383,7 @@ const Sidebar = () => {
 
       {/* Desktop sidebar */}
       <div
-        className={`hidden md:block h-screen ${
+        className={`hidden md:flex flex-col h-screen ${
           collapsed ? "w-20" : "w-64"
         } bg-[#6A9C89] transition-all duration-300 fixed left-0 top-0 z-10`}
       >
@@ -308,7 +396,11 @@ const Sidebar = () => {
           <MenuUnfoldOutlined />
         </button>
         <div className="flex items-center ml-3">
-          <img src={logo || "/placeholder.svg"} alt="Logo" className="w-8 h-8" />
+          <img
+            src={logo || "/placeholder.svg"}
+            alt="Logo"
+            className="w-8 h-8"
+          />
           <span className="ml-2 font-bold text-white">AgriTrack</span>
         </div>
       </div>
@@ -316,8 +408,7 @@ const Sidebar = () => {
       {/* Spacer for mobile header */}
       <div className="h-14 md:hidden"></div>
     </>
-  )
-}
+  );
+};
 
-export default Sidebar
-
+export default Sidebar;

@@ -13,30 +13,23 @@ import {
   PieChart,
   Pie,
   Cell,
+  LineChart,
+  Line,
 } from "recharts";
-import {
-  UserIcon,
-  InfoIcon,
-  ClipboardCheckIcon,
-  UsersIcon,
-  LoaderPinwheelIcon as SpinnerIcon,
-} from "lucide-react";
+import { BarChart2, TrendingUp, Sprout, Wheat, Loader2 } from "lucide-react";
 
-import { farmerAPI, livestockAPI, operatorAPI } from "./services/api"; // Import the API services
+import { farmerAPI } from "./services/api"; // Import the API services
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dashboardData, setDashboardData] = useState({
-    farmers: [],
-    totalFarmers: 0,
-    totalCrops: 0,
-    totalLivestock: 0,
-    totalOperators: 0,
-    recentFarmers: [],
-    cropDistribution: [],
-    livestockDistribution: [],
-    barangayDistribution: [],
+    totalProduction: 0,
+    cropProduction: [],
+    monthlyProduction: [],
+    productionByBarangay: [],
+    topPerformingCrops: [],
+    recentHarvests: [],
   });
 
   // Theme colors - matching your existing color scheme
@@ -79,96 +72,187 @@ export default function Dashboard() {
           ? farmersResponse
           : farmersResponse.data || [];
 
-        // Fetch livestock data
-        const livestockResponse = await livestockAPI.getAllLivestockRecords(
-          1,
-          100
-        );
-        const livestock = Array.isArray(livestockResponse)
-          ? livestockResponse
-          : livestockResponse.data || [];
+        // Process data for production metrics
+        let totalProduction = 0;
+        const cropProductionMap = {};
+        const barangayProductionMap = {};
+        const monthlyProductionMap = {
+          Jan: 0,
+          Feb: 0,
+          Mar: 0,
+          Apr: 0,
+          May: 0,
+          Jun: 0,
+          Jul: 0,
+          Aug: 0,
+          Sep: 0,
+          Oct: 0,
+          Nov: 0,
+          Dec: 0,
+        };
 
-        // Fetch operators data
-        const operatorsResponse = await operatorAPI.getAllOperators(1, 100);
-        const operators = Array.isArray(operatorsResponse)
-          ? operatorsResponse
-          : operatorsResponse.data || [];
+        // Recent harvests array
+        const allHarvests = [];
 
-        // Process data for dashboard
-        const totalFarmers = farmers.length;
-
-        // Calculate total crops (assuming each farmer has a crops array)
-        let totalCrops = 0;
-        const cropTypes = {};
+        // Process farmer data to extract production information
         farmers.forEach((farmer) => {
+          // Process crops for production data
           if (farmer.crops && Array.isArray(farmer.crops)) {
-            totalCrops += farmer.crops.length;
-
-            // Count crop types for distribution chart
             farmer.crops.forEach((crop) => {
-              const cropType = crop.crop_type || "Unknown";
-              cropTypes[cropType] = (cropTypes[cropType] || 0) + 1;
+              const cropType = crop.crop_type || crop.name || "Unknown";
+              const yield_amount = Number.parseFloat(
+                crop.yield_amount || crop.production || 0
+              );
+              const area = Number.parseFloat(crop.area || 0);
+              const harvest_date =
+                crop.harvest_date ||
+                crop.created_at ||
+                new Date().toISOString();
+
+              // Add to total production
+              totalProduction += yield_amount;
+
+              // Add to crop production map
+              cropProductionMap[cropType] =
+                (cropProductionMap[cropType] || 0) + yield_amount;
+
+              // Add to barangay production map
+              const barangay = farmer.barangay || "Unknown";
+              barangayProductionMap[barangay] =
+                (barangayProductionMap[barangay] || 0) + yield_amount;
+
+              // Add to monthly production
+              const harvestDate = new Date(harvest_date);
+              const month = harvestDate.toLocaleString("en-US", {
+                month: "short",
+              });
+              monthlyProductionMap[month] =
+                (monthlyProductionMap[month] || 0) + yield_amount;
+
+              // Add to harvests array for recent harvests table
+              if (yield_amount > 0) {
+                allHarvests.push({
+                  id: crop.id || Math.random().toString(),
+                  farmer_name:
+                    farmer.name ||
+                    `${farmer.first_name || ""} ${
+                      farmer.last_name || ""
+                    }`.trim() ||
+                    "Unknown",
+                  crop_type: cropType,
+                  yield_amount: yield_amount,
+                  area: area,
+                  yield_per_hectare:
+                    area > 0 ? (yield_amount / area).toFixed(2) : "N/A",
+                  harvest_date: harvestDate,
+                  barangay: barangay,
+                });
+              }
+            });
+          }
+
+          // Process rice data if available
+          if (farmer.rice && Array.isArray(farmer.rice)) {
+            farmer.rice.forEach((rice) => {
+              const variety = rice.variety || "Rice";
+              const yield_amount = Number.parseFloat(
+                rice.yield_amount || rice.production || 0
+              );
+              const area = Number.parseFloat(rice.area || 0);
+              const harvest_date =
+                rice.harvest_date ||
+                rice.created_at ||
+                new Date().toISOString();
+
+              // Add to total production
+              totalProduction += yield_amount;
+
+              // Add to crop production map
+              cropProductionMap[variety] =
+                (cropProductionMap[variety] || 0) + yield_amount;
+
+              // Add to barangay production map
+              const barangay = farmer.barangay || "Unknown";
+              barangayProductionMap[barangay] =
+                (barangayProductionMap[barangay] || 0) + yield_amount;
+
+              // Add to monthly production
+              const harvestDate = new Date(harvest_date);
+              const month = harvestDate.toLocaleString("en-US", {
+                month: "short",
+              });
+              monthlyProductionMap[month] =
+                (monthlyProductionMap[month] || 0) + yield_amount;
+
+              // Add to harvests array
+              if (yield_amount > 0) {
+                allHarvests.push({
+                  id: rice.id || Math.random().toString(),
+                  farmer_name:
+                    farmer.name ||
+                    `${farmer.first_name || ""} ${
+                      farmer.last_name || ""
+                    }`.trim() ||
+                    "Unknown",
+                  crop_type: variety,
+                  yield_amount: yield_amount,
+                  area: area,
+                  yield_per_hectare:
+                    area > 0 ? (yield_amount / area).toFixed(2) : "N/A",
+                  harvest_date: harvestDate,
+                  barangay: barangay,
+                });
+              }
             });
           }
         });
 
-        // Create crop distribution data for chart
-        const cropDistribution = Object.keys(cropTypes).map((type) => ({
-          name: type,
-          value: cropTypes[type],
+        // Convert crop production map to array for chart
+        const cropProduction = Object.entries(cropProductionMap)
+          .map(([name, value]) => ({ name, value }))
+          .sort((a, b) => b.value - a.value);
+
+        // Get top performing crops (by yield)
+        const topPerformingCrops = [...cropProduction].slice(0, 5);
+
+        // Convert barangay production map to array for chart
+        const productionByBarangay = Object.entries(barangayProductionMap)
+          .map(([name, value]) => ({ name, value }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 8); // Top 8 barangays by production
+
+        // Convert monthly production to array for chart
+        const monthOrder = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+        const monthlyProduction = monthOrder.map((month) => ({
+          name: month,
+          production: monthlyProductionMap[month] || 0,
         }));
 
-        // Calculate total livestock
-        const totalLivestock = livestock.length;
-
-        // Count livestock types for distribution
-        const livestockTypes = {};
-        livestock.forEach((record) => {
-          const type = record.animal_type || "Unknown";
-          livestockTypes[type] = (livestockTypes[type] || 0) + 1;
-        });
-
-        // Create livestock distribution data for chart
-        const livestockDistribution = Object.keys(livestockTypes).map(
-          (type) => ({
-            name: type,
-            value: livestockTypes[type],
-          })
-        );
-
-        // Count farmers by barangay
-        const barangays = {};
-        farmers.forEach((farmer) => {
-          const barangay = farmer.barangay || "Unknown";
-          barangays[barangay] = (barangays[barangay] || 0) + 1;
-        });
-
-        // Create barangay distribution data
-        const barangayDistribution = Object.keys(barangays).map((barangay) => ({
-          name: barangay,
-          value: barangays[barangay],
-        }));
-
-        // Get 5 most recent farmers
-        const recentFarmers = [...farmers]
-          .sort((a, b) => {
-            // Sort by created_at or registration_date if available
-            const dateA = a.created_at || a.registration_date || 0;
-            const dateB = b.created_at || b.registration_date || 0;
-            return new Date(dateB) - new Date(dateA);
-          })
+        // Sort harvests by date (most recent first) and take top 5
+        const recentHarvests = allHarvests
+          .sort((a, b) => b.harvest_date - a.harvest_date)
           .slice(0, 5);
 
         setDashboardData({
-          farmers,
-          totalFarmers,
-          totalCrops,
-          totalLivestock,
-          totalOperators: operators.length,
-          recentFarmers,
-          cropDistribution,
-          livestockDistribution,
-          barangayDistribution,
+          totalProduction,
+          cropProduction,
+          monthlyProduction,
+          productionByBarangay,
+          topPerformingCrops,
+          recentHarvests,
         });
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
@@ -183,10 +267,10 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
+      <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center">
-          <SpinnerIcon className="w-10 h-10 animate-spin text-[#6A9C89] mb-2" />
-          <p className="text-gray-600">Loading dashboard data...</p>
+          <Loader2 className="w-10 h-10 animate-spin text-[#6A9C89] mb-2" />
+          <p className="text-gray-600">Loading production data...</p>
         </div>
       </div>
     );
@@ -206,73 +290,89 @@ export default function Dashboard() {
   return (
     <div className="p-5 bg-[#F5F7F9] h-screen overflow-y-auto">
       <h2 className="text-2xl font-bold mb-6 text-[#333333]">
-        Agricultural Management Dashboard
+        Agricultural Production Dashboard
       </h2>
       <p className="mb-6 block text-[#666666]">
-        Overview of farmers, crops, and livestock as of {formattedDate}
+        Overview of crop production and yields as of {formattedDate}
       </p>
 
       {/* Top Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2 lg:grid-cols-4">
         <div className="bg-[#6A9C89] rounded-lg text-white p-4 shadow">
           <div className="flex items-center mb-2">
-            <UserIcon className="w-5 h-5 mr-2" />
-            <p className="text-white text-lg font-semibold">Total Farmers</p>
+            <BarChart2 className="w-5 h-5 mr-2" />
+            <p className="text-lg font-semibold text-white">Total Production</p>
           </div>
-          <p className="text-3xl font-bold mb-1">
-            {dashboardData.totalFarmers}
+          <p className="mb-1 text-3xl font-bold">
+            {dashboardData.totalProduction.toFixed(2)}
           </p>
           <p className="text-sm text-white opacity-80">
-            Registered in the system
+            Metric tons of produce
           </p>
         </div>
 
         <div className="bg-[#4F6F7D] rounded-lg text-white p-4 shadow">
           <div className="flex items-center mb-2">
-            <InfoIcon className="w-5 h-5 mr-2" />
-            <p className="text-white text-lg font-semibold">Total Crops</p>
+            <TrendingUp className="w-5 h-5 mr-2" />
+            <p className="text-lg font-semibold text-white">Avg. Yield</p>
           </div>
-          <p className="text-3xl font-bold mb-1">{dashboardData.totalCrops}</p>
-          <p className="text-sm text-white opacity-80">Across all farmers</p>
+          <p className="mb-1 text-3xl font-bold">
+            {dashboardData.recentHarvests.length > 0
+              ? (
+                  dashboardData.recentHarvests.reduce(
+                    (sum, harvest) =>
+                      sum +
+                      (harvest.yield_per_hectare !== "N/A"
+                        ? Number.parseFloat(harvest.yield_per_hectare)
+                        : 0),
+                    0
+                  ) /
+                  dashboardData.recentHarvests.filter(
+                    (h) => h.yield_per_hectare !== "N/A"
+                  ).length
+                ).toFixed(2)
+              : "0.00"}
+          </p>
+          <p className="text-sm text-white opacity-80">Tons per hectare</p>
         </div>
 
         <div className="bg-[#388E3C] rounded-lg text-white p-4 shadow">
           <div className="flex items-center mb-2">
-            <ClipboardCheckIcon className="w-5 h-5 mr-2" />
-            <p className="text-white text-lg font-semibold">
-              Livestock Records
-            </p>
+            <Sprout className="w-5 h-5 mr-2" />
+            <p className="text-lg font-semibold text-white">Crop Varieties</p>
           </div>
-          <p className="text-3xl font-bold mb-1">
-            {dashboardData.totalLivestock}
+          <p className="mb-1 text-3xl font-bold">
+            {dashboardData.cropProduction.length}
           </p>
-          <p className="text-sm text-white opacity-80">
-            Total livestock entries
-          </p>
+          <p className="text-sm text-white opacity-80">Different crops grown</p>
         </div>
 
         <div className="bg-[#8884d8] rounded-lg text-white p-4 shadow">
           <div className="flex items-center mb-2">
-            <UsersIcon className="w-5 h-5 mr-2" />
-            <p className="text-white text-lg font-semibold">Operators</p>
+            <Wheat className="w-5 h-5 mr-2" />
+            <p className="text-lg font-semibold text-white">Top Crop</p>
           </div>
-          <p className="text-3xl font-bold mb-1">
-            {dashboardData.totalOperators}
+          <p className="mb-1 text-3xl font-bold">
+            {dashboardData.topPerformingCrops.length > 0
+              ? dashboardData.topPerformingCrops[0].name
+              : "None"}
           </p>
-          <p className="text-sm text-white opacity-80">Registered operators</p>
+          <p className="text-sm text-white opacity-80">Highest production</p>
         </div>
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white rounded-lg shadow p-4">
-          <h4 className="text-lg font-semibold mb-4">Crop Distribution</h4>
-          {dashboardData.cropDistribution.length > 0 ? (
+      <div className="grid grid-cols-1 gap-6 mb-6 lg:grid-cols-2">
+        <div className="p-4 bg-white rounded-lg shadow">
+          <h4 className="mb-4 text-lg font-semibold">
+            Crop Production Distribution
+          </h4>
+          {dashboardData.cropProduction.length > 0 ? (
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={dashboardData.cropDistribution}
+                    data={dashboardData.cropProduction}
                     cx="50%"
                     cy="50%"
                     labelLine={true}
@@ -283,7 +383,7 @@ export default function Dashboard() {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {dashboardData.cropDistribution.map((entry, index) => (
+                    {dashboardData.cropProduction.map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
                         fill={COLORS[index % COLORS.length]}
@@ -291,7 +391,10 @@ export default function Dashboard() {
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value, name) => [`${value} crops`, name]}
+                    formatter={(value, name) => [
+                      `${value.toFixed(2)} tons`,
+                      name,
+                    ]}
                   />
                   <Legend />
                 </PieChart>
@@ -313,28 +416,41 @@ export default function Dashboard() {
                   d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 ></path>
               </svg>
-              <p>No crop data available</p>
+              <p>No production data available</p>
             </div>
           )}
         </div>
 
-        <div className="bg-white rounded-lg shadow p-4">
-          <h4 className="text-lg font-semibold mb-4">Livestock Distribution</h4>
-          {dashboardData.livestockDistribution.length > 0 ? (
+        <div className="p-4 bg-white rounded-lg shadow">
+          <h4 className="mb-4 text-lg font-semibold">Monthly Production</h4>
+          {dashboardData.monthlyProduction.some(
+            (item) => item.production > 0
+          ) ? (
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={dashboardData.livestockDistribution}
+                <LineChart
+                  data={dashboardData.monthlyProduction}
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                  layout="vertical"
                 >
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="name" type="category" />
-                  <Tooltip />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip
+                    formatter={(value) => [
+                      `${value.toFixed(2)} tons`,
+                      "Production",
+                    ]}
+                  />
                   <Legend />
-                  <Bar dataKey="value" name="Count" fill={colors.accent} />
-                </BarChart>
+                  <Line
+                    type="monotone"
+                    dataKey="production"
+                    name="Production (tons)"
+                    stroke={colors.primary}
+                    activeDot={{ r: 8 }}
+                    strokeWidth={2}
+                  />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           ) : (
@@ -353,28 +469,37 @@ export default function Dashboard() {
                   d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 ></path>
               </svg>
-              <p>No livestock data available</p>
+              <p>No monthly production data available</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Barangay Distribution */}
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
-        <h4 className="text-lg font-semibold mb-4">Farmers by Barangay</h4>
-        {dashboardData.barangayDistribution.length > 0 ? (
+      {/* Barangay Production Distribution */}
+      <div className="p-4 mb-6 bg-white rounded-lg shadow">
+        <h4 className="mb-4 text-lg font-semibold">Production by Barangay</h4>
+        {dashboardData.productionByBarangay.length > 0 ? (
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={dashboardData.barangayDistribution}
+                data={dashboardData.productionByBarangay}
                 margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip />
+                <Tooltip
+                  formatter={(value) => [
+                    `${value.toFixed(2)} tons`,
+                    "Production",
+                  ]}
+                />
                 <Legend />
-                <Bar dataKey="value" name="Farmers" fill={colors.primary} />
+                <Bar
+                  dataKey="value"
+                  name="Production (tons)"
+                  fill={colors.primary}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -394,107 +519,82 @@ export default function Dashboard() {
                 d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               ></path>
             </svg>
-            <p>No barangay data available</p>
+            <p>No barangay production data available</p>
           </div>
         )}
       </div>
 
-      {/* Recent Farmers */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <h4 className="text-lg font-semibold mb-4">
-          Recently Registered Farmers
-        </h4>
-        {dashboardData.recentFarmers.length > 0 ? (
+      {/* Recent Harvests */}
+      <div className="p-4 bg-white rounded-lg shadow">
+        <h4 className="mb-4 text-lg font-semibold">Recent Harvests</h4>
+        {dashboardData.recentHarvests.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
                   >
-                    Name
+                    Farmer
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
                   >
-                    Barangay
+                    Crop
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
                   >
-                    Crops
+                    Yield (tons)
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
                   >
-                    Registered
+                    Area (ha)
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
+                  >
+                    Yield/ha
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
+                  >
+                    Harvest Date
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {dashboardData.recentFarmers.map((farmer) => {
-                  const fullName =
-                    [
-                      farmer.first_name || "",
-                      farmer.middle_name || "",
-                      farmer.last_name || "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ") ||
-                    farmer.name ||
-                    "N/A";
-
-                  return (
-                    <tr
-                      key={
-                        farmer.farmer_id ||
-                        farmer.id ||
-                        Math.random().toString()
-                      }
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {fullName}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {farmer.barangay || "N/A"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {farmer.crops &&
-                        Array.isArray(farmer.crops) &&
-                        farmer.crops.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {farmer.crops.slice(0, 2).map((crop, index) => (
-                              <span
-                                key={index}
-                                className="px-2 py-1 text-xs rounded-full bg-[#E6F5E4] text-[#6A9C89]"
-                              >
-                                {crop.crop_type || "Crop"}
-                              </span>
-                            ))}
-                            {farmer.crops.length > 2 && (
-                              <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
-                                +{farmer.crops.length - 2} more
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          "None"
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {farmer.created_at || farmer.registration_date
-                          ? new Date(
-                              farmer.created_at || farmer.registration_date
-                            ).toLocaleDateString()
-                          : "N/A"}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {dashboardData.recentHarvests.map((harvest) => (
+                  <tr key={harvest.id}>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
+                      {harvest.farmer_name}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                      <span className="px-2 py-1 text-xs rounded-full bg-[#E6F5E4] text-[#6A9C89]">
+                        {harvest.crop_type}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                      {harvest.yield_amount.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                      {harvest.area.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                      {harvest.yield_per_hectare}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                      {harvest.harvest_date.toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -514,7 +614,7 @@ export default function Dashboard() {
                 d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               ></path>
             </svg>
-            <p>No recent farmers</p>
+            <p>No recent harvests</p>
           </div>
         )}
       </div>
