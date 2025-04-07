@@ -240,162 +240,149 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
         }
       `}</style>
       {/* Header with back button and farmer name */}
-      <div className="p-2 mb-3 bg-white rounded-lg shadow-sm sm:p-3">
-        <div className="flex items-center justify-between w-full">
+      <div className="p-3 mb-3 bg-white rounded-lg shadow-sm sm:p-4">
+        <div className="flex flex-col justify-between w-full gap-2 mb-4 sm:flex-row sm:items-center">
           <button
-            className="flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm sm:px-3 sm:py-2 sm:text-sm hover:bg-gray-50"
             onClick={onClose}
+            className="flex items-center text-gray-700 hover:text-gray-900"
           >
-            <ArrowLeft className="w-3 h-3 mr-1 sm:w-4 sm:h-4 sm:mr-2" />
-            <span>Back</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-4 h-4 mr-1 sm:w-5 sm:h-5"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+                clipRule="evenodd"
+              />
+            </svg>
+            Back
           </button>
         </div>
 
-        {/* Navigation buttons - scrollable on mobile */}
-        <div className="flex gap-2 px-2 pb-2 mt-3 mb-2 -mx-2 overflow-x-auto flex-nowrap sm:gap-5 sm:mx-0 sm:px-0 sm:flex-wrap hide-scrollbar">
+        {/* Navigation buttons */}
+        <div className="flex gap-2 px-1 pb-2 mb-2 -mx-1 overflow-x-auto flex-nowrap sm:gap-4 hide-scrollbar sm:mx-0 sm:px-0">
           <button
-            className={`flex items-center px-2 py-1 sm:px-3 sm:py-2 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap ${
-              activeTab === "info"
-                ? `bg-[${colors.primary}] text-white`
-                : "bg-white text-gray-700 border border-gray-300"
-            }`}
             onClick={() => setActiveTab("info")}
+            className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm whitespace-nowrap ${
+              activeTab === "info"
+                ? "bg-[#5A8C79] text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
             style={{
               backgroundColor: activeTab === "info" ? colors.primary : "",
-              borderColor: activeTab === "info" ? colors.primary : "",
             }}
           >
-            <User className="w-3 h-3 mr-1 sm:w-4 sm:h-4 sm:mr-2" />
-            <span>Farmer Info</span>
+            <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
+            <span>Info</span>
           </button>
 
-          <button
-            className={`flex items-center px-2 py-1 sm:px-3 sm:py-2 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap ${
-              activeTab === "crops"
-                ? `bg-[${colors.primary}] text-white`
-                : "bg-white text-gray-700 border border-gray-300"
-            }`}
-            onClick={() => setActiveTab("crops")}
-            style={{
-              backgroundColor: activeTab === "crops" ? colors.primary : "",
-              borderColor: activeTab === "crops" ? colors.primary : "",
-            }}
-          >
-            <Info className="w-3 h-3 mr-1 sm:w-4 sm:h-4 sm:mr-2" />
-            <span>Crops</span>
-            {hasCrops && (
+          {hasCrops && (
+            <button
+              onClick={() => setActiveTab("crops")}
+              className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm whitespace-nowrap ${
+                activeTab === "crops"
+                  ? "bg-[#5A8C79] text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+              style={{
+                backgroundColor: activeTab === "crops" ? colors.primary : "",
+              }}
+            >
+              <Info className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
+              <span>Crops</span>
               <span
-                className={`ml-1 px-1 py-0.5 text-xs rounded-full ${
+                className={`ml-1 sm:ml-1.5 px-1 sm:px-1.5 py-0.5 text-xs rounded-full ${
                   activeTab === "crops"
-                    ? "bg-white text-[#6A9C89]"
-                    : `bg-[${colors.primary}] text-white`
+                    ? "bg-white text-green-600"
+                    : "bg-[#5A8C79] text-white"
                 }`}
-                style={{
-                  backgroundColor:
-                    activeTab === "crops" ? "#fff" : colors.primary,
-                  color: activeTab === "crops" ? colors.primary : "#fff",
-                }}
               >
                 {farmerData.crops.length}
               </span>
-            )}
-          </button>
+            </button>
+          )}
 
-          <button
-            className={`flex items-center px-2 py-1 sm:px-3 sm:py-2 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap ${
-              activeTab === "rice"
-                ? `bg-[${colors.primary}] text-white`
-                : "bg-white text-gray-700 border border-gray-300"
-            }`}
-            onClick={() => setActiveTab("rice")}
-            style={{
-              backgroundColor: activeTab === "rice" ? colors.primary : "",
-              borderColor: activeTab === "rice" ? colors.primary : "",
-            }}
-          >
-            <Info className="w-3 h-3 mr-1 sm:w-4 sm:h-4 sm:mr-2" />
-            <span>Rice</span>
-            {hasRice && (
+          {hasRice && (
+            <button
+              onClick={() => setActiveTab("rice")}
+              className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm whitespace-nowrap ${
+                activeTab === "rice"
+                  ? "bg-[#5A8C79] text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+              style={{
+                backgroundColor: activeTab === "rice" ? colors.primary : "",
+              }}
+            >
+              <Info className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
+              <span>Rice</span>
               <span
-                className={`ml-1 px-1 py-0.5 text-xs rounded-full ${
+                className={`ml-1 sm:ml-1.5 px-1 sm:px-1.5 py-0.5 text-xs rounded-full ${
                   activeTab === "rice"
-                    ? "bg-white text-[#6A9C89]"
-                    : `bg-[${colors.primary}] text-white`
+                    ? "bg-white text-green-600"
+                    : "bg-[#5A8C79] text-white"
                 }`}
-                style={{
-                  backgroundColor:
-                    activeTab === "rice" ? "#fff" : colors.primary,
-                  color: activeTab === "rice" ? colors.primary : "#fff",
-                }}
               >
                 {farmerData.rice.length}
               </span>
-            )}
-          </button>
+            </button>
+          )}
 
-          <button
-            className={`flex items-center px-2 py-1 sm:px-3 sm:py-2 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap ${
-              activeTab === "livestock"
-                ? `bg-[${colors.primary}] text-white`
-                : "bg-white text-gray-700 border border-gray-300"
-            }`}
-            onClick={() => setActiveTab("livestock")}
-            style={{
-              backgroundColor: activeTab === "livestock" ? colors.primary : "",
-              borderColor: activeTab === "livestock" ? colors.primary : "",
-            }}
-          >
-            <Info className="w-3 h-3 mr-1 sm:w-4 sm:h-4 sm:mr-2" />
-            <span>Livestock</span>
-            {hasLivestock && (
+          {hasLivestock && (
+            <button
+              onClick={() => setActiveTab("livestock")}
+              className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm whitespace-nowrap ${
+                activeTab === "livestock"
+                  ? "bg-[#5A8C79] text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+              style={{
+                backgroundColor:
+                  activeTab === "livestock" ? colors.primary : "",
+              }}
+            >
+              <Info className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
+              <span>Livestock</span>
               <span
-                className={`ml-1 px-1 py-0.5 text-xs rounded-full ${
+                className={`ml-1 sm:ml-1.5 px-1 sm:px-1.5 py-0.5 text-xs rounded-full ${
                   activeTab === "livestock"
-                    ? "bg-white text-[#6A9C89]"
-                    : `bg-[${colors.primary}] text-white`
+                    ? "bg-white text-green-600"
+                    : "bg-[#5A8C79] text-white"
                 }`}
-                style={{
-                  backgroundColor:
-                    activeTab === "livestock" ? "#fff" : colors.primary,
-                  color: activeTab === "livestock" ? colors.primary : "#fff",
-                }}
               >
                 {livestockRecords.length}
               </span>
-            )}
-          </button>
+            </button>
+          )}
 
-          <button
-            className={`flex items-center px-2 py-1 sm:px-3 sm:py-2 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap ${
-              activeTab === "operator"
-                ? `bg-[${colors.primary}] text-white`
-                : "bg-white text-gray-700 border border-gray-300"
-            }`}
-            onClick={() => setActiveTab("operator")}
-            style={{
-              backgroundColor: activeTab === "operator" ? colors.primary : "",
-              borderColor: activeTab === "operator" ? colors.primary : "",
-            }}
-          >
-            <MapPin className="w-3 h-3 mr-1 sm:w-4 sm:h-4 sm:mr-2" />
-            <span>Operators</span>
-            {hasOperators && (
+          {hasOperators && (
+            <button
+              onClick={() => setActiveTab("operator")}
+              className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm whitespace-nowrap ${
+                activeTab === "operator"
+                  ? "bg-[#5A8C79] text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+              style={{
+                backgroundColor: activeTab === "operator" ? colors.primary : "",
+              }}
+            >
+              <MapPin className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
+              <span>Operator</span>
               <span
-                className={`ml-1 px-1 py-0.5 text-xs rounded-full ${
+                className={`ml-1 sm:ml-1.5 px-1 sm:px-1.5 py-0.5 text-xs rounded-full ${
                   activeTab === "operator"
-                    ? "bg-white text-[#6A9C89]"
-                    : `bg-[${colors.primary}] text-white`
+                    ? "bg-white text-green-600"
+                    : "bg-[#5A8C79] text-white"
                 }`}
-                style={{
-                  backgroundColor:
-                    activeTab === "operator" ? "#fff" : colors.primary,
-                  color: activeTab === "operator" ? colors.primary : "#fff",
-                }}
               >
                 {operatorData.length}
               </span>
-            )}
-          </button>
+            </button>
+          )}
         </div>
       </div>
 
@@ -528,7 +515,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
 
             <button
               type="submit"
-              className="mt-6 sm:mt-8 flex items-center justify-center px-6 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-md transition-colors text-sm sm:text-base shadow-md fixed bottom-4 left-0 right-0 mx-auto w-[calc(100%-2rem)] sm:w-auto sm:static"
+              className="mt-6 sm:mt-8 flex items-center justify-center px-6 py-2 bg-[#5A8C79] hover:bg-emerald-800 text-white rounded-md transition-colors text-sm sm:text-base shadow-md fixed bottom-4 left-0 right-0 mx-auto w-[calc(100%-2rem)] sm:w-auto sm:static"
               disabled={loading}
             >
               {loading ? (

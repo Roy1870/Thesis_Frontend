@@ -67,6 +67,27 @@ const Inventory = () => {
   const [currentItem, setCurrentItem] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
 
+  const [barangayFilter, setBarangayFilter] = useState("");
+  const [monthFilter, setMonthFilter] = useState("");
+  const [yearFilter, setYearFilter] = useState("");
+  const [barangayOptions, setBarangayOptions] = useState([]);
+  const [monthOptions] = useState([
+    { value: "1", label: "January" },
+    { value: "2", label: "February" },
+    { value: "3", label: "March" },
+    { value: "4", label: "April" },
+    { value: "5", label: "May" },
+    { value: "6", label: "June" },
+    { value: "7", label: "July" },
+    { value: "8", label: "August" },
+    { value: "9", label: "September" },
+    { value: "10", label: "October" },
+    { value: "11", label: "November" },
+    { value: "12", label: "December" },
+  ]);
+  const [yearOptions, setYearOptions] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
+
   // Data type options
   const dataTypes = [
     {
@@ -113,6 +134,9 @@ const Inventory = () => {
     setCurrentPage(1);
     setSearchText("");
     setDebouncedSearchText("");
+    setBarangayFilter(""); // Clear barangay filter
+    setMonthFilter(""); // Clear month filter
+    setYearFilter(""); // Clear year filter
     setData([]); // Clear current data immediately
     setAllData([]); // Clear all data immediately
     setTotalRecords(0); // Reset total records
@@ -121,14 +145,14 @@ const Inventory = () => {
     fetchAllData();
   }, [selectedDataType]);
 
-  // Handle pagination and debounced search
+  // Handle pagination, debounced search, and filters
   useEffect(() => {
     if (allData.length > 0) {
-      if (debouncedSearchText) {
-        // If search is active, do client-side filtering
+      if (debouncedSearchText || barangayFilter || monthFilter || yearFilter) {
+        // If search or any filter is active, do client-side filtering
         filterData();
       } else {
-        // Only paginate from already fetched data when not searching
+        // Only paginate from already fetched data when not searching or filtering
         paginateData();
       }
     } else if (!loading) {
@@ -136,7 +160,16 @@ const Inventory = () => {
       setData([]);
       setTotalRecords(0);
     }
-  }, [currentPage, pageSize, debouncedSearchText, allData.length, loading]);
+  }, [
+    currentPage,
+    pageSize,
+    debouncedSearchText,
+    barangayFilter,
+    monthFilter,
+    yearFilter,
+    allData.length,
+    loading,
+  ]);
 
   // Paginate data function
   const paginateData = () => {
@@ -381,6 +414,9 @@ const Inventory = () => {
           processedData = [];
       }
 
+      // Extract filter options from the data
+      extractFilterOptions(processedData);
+
       // Set the new data
       setAllData(processedData);
 
@@ -404,112 +440,193 @@ const Inventory = () => {
     }
   };
 
+  // Extract unique barangays and years from data
+  const extractFilterOptions = (data) => {
+    // Extract unique barangays
+    const barangays = [
+      ...new Set(data.map((item) => item.barangay).filter(Boolean)),
+    ].sort();
+    setBarangayOptions(barangays);
+
+    // Extract unique years from created_at dates
+    const years = [
+      ...new Set(
+        data
+          .map((item) =>
+            item.created_at ? new Date(item.created_at).getFullYear() : null
+          )
+          .filter(Boolean)
+      ),
+    ].sort((a, b) => b - a); // Sort descending
+
+    // If no years found, add current year
+    if (years.length === 0) {
+      years.push(new Date().getFullYear());
+    }
+
+    setYearOptions(years);
+  };
+
   // Client-side filtering function
   const filterData = () => {
-    if (!debouncedSearchText.trim()) {
+    if (
+      !debouncedSearchText.trim() &&
+      !barangayFilter &&
+      !monthFilter &&
+      !yearFilter
+    ) {
       paginateData();
       return;
     }
 
     setLoading(true);
     const searchLower = debouncedSearchText.toLowerCase().trim();
-    let filtered = [];
+    let filtered = [...allData]; // Start with all data
 
-    // Filter based on data type
-    switch (selectedDataType) {
-      case "farmers":
-        filtered = allData.filter(
-          (farmer) =>
-            (farmer.name && farmer.name.toLowerCase().includes(searchLower)) ||
-            (farmer.contact_number &&
-              farmer.contact_number.toLowerCase().includes(searchLower)) ||
-            (farmer.facebook_email &&
-              farmer.facebook_email.toLowerCase().includes(searchLower)) ||
-            (farmer.home_address &&
-              farmer.home_address.toLowerCase().includes(searchLower)) ||
-            (farmer.barangay &&
-              farmer.barangay.toLowerCase().includes(searchLower))
-        );
-        break;
+    // Apply text search if provided
+    if (searchLower) {
+      switch (selectedDataType) {
+        case "farmers":
+          filtered = filtered.filter(
+            (farmer) =>
+              (farmer.name &&
+                farmer.name.toLowerCase().includes(searchLower)) ||
+              (farmer.contact_number &&
+                farmer.contact_number.toLowerCase().includes(searchLower)) ||
+              (farmer.facebook_email &&
+                farmer.facebook_email.toLowerCase().includes(searchLower)) ||
+              (farmer.home_address &&
+                farmer.home_address.toLowerCase().includes(searchLower)) ||
+              (farmer.barangay &&
+                farmer.barangay.toLowerCase().includes(searchLower))
+          );
+          break;
 
-      case "crops":
-        filtered = allData.filter(
-          (crop) =>
-            (crop.crop_type &&
-              crop.crop_type.toLowerCase().includes(searchLower)) ||
-            (crop.crop_value &&
-              crop.crop_value.toLowerCase().includes(searchLower)) ||
-            (crop.area_hectare &&
-              crop.area_hectare.toString().includes(searchLower)) ||
-            (crop.farmer_name &&
-              crop.farmer_name.toLowerCase().includes(searchLower)) ||
-            (crop.barangay && crop.barangay.toLowerCase().includes(searchLower))
-        );
-        break;
+        case "crops":
+          filtered = filtered.filter(
+            (crop) =>
+              (crop.crop_type &&
+                crop.crop_type.toLowerCase().includes(searchLower)) ||
+              (crop.crop_value &&
+                crop.crop_value.toLowerCase().includes(searchLower)) ||
+              (crop.area_hectare &&
+                crop.area_hectare.toString().includes(searchLower)) ||
+              (crop.farmer_name &&
+                crop.farmer_name.toLowerCase().includes(searchLower)) ||
+              (crop.barangay &&
+                crop.barangay.toLowerCase().includes(searchLower))
+          );
+          break;
 
-      case "highValueCrops":
-        filtered = allData.filter(
-          (crop) =>
-            (crop.crop_value &&
-              crop.crop_value.toLowerCase().includes(searchLower)) ||
-            (crop.month && crop.month.toLowerCase().includes(searchLower)) ||
-            (crop.variety_clone &&
-              crop.variety_clone.toLowerCase().includes(searchLower)) ||
-            (crop.area_hectare &&
-              crop.area_hectare.toString().includes(searchLower)) ||
-            (crop.farmer_name &&
-              crop.farmer_name.toLowerCase().includes(searchLower)) ||
-            (crop.barangay && crop.barangay.toLowerCase().includes(searchLower))
-        );
-        break;
+        case "highValueCrops":
+          filtered = filtered.filter(
+            (crop) =>
+              (crop.crop_value &&
+                crop.crop_value.toLowerCase().includes(searchLower)) ||
+              (crop.month && crop.month.toLowerCase().includes(searchLower)) ||
+              (crop.variety_clone &&
+                crop.variety_clone.toLowerCase().includes(searchLower)) ||
+              (crop.area_hectare &&
+                crop.area_hectare.toString().includes(searchLower)) ||
+              (crop.farmer_name &&
+                crop.farmer_name.toLowerCase().includes(searchLower)) ||
+              (crop.barangay &&
+                crop.barangay.toLowerCase().includes(searchLower))
+          );
+          break;
 
-      case "rice":
-        filtered = allData.filter(
-          (rice) =>
-            (rice.area_type &&
-              rice.area_type.toLowerCase().includes(searchLower)) ||
-            (rice.seed_type &&
-              rice.seed_type.toLowerCase().includes(searchLower)) ||
-            (rice.area_harvested &&
-              rice.area_harvested.toString().includes(searchLower)) ||
-            (rice.farmer_name &&
-              rice.farmer_name.toLowerCase().includes(searchLower)) ||
-            (rice.barangay && rice.barangay.toLowerCase().includes(searchLower))
-        );
-        break;
+        case "rice":
+          filtered = filtered.filter(
+            (rice) =>
+              (rice.area_type &&
+                rice.area_type.toLowerCase().includes(searchLower)) ||
+              (rice.seed_type &&
+                rice.seed_type.toLowerCase().includes(searchLower)) ||
+              (rice.area_harvested &&
+                rice.area_harvested.toString().includes(searchLower)) ||
+              (rice.farmer_name &&
+                rice.farmer_name.toLowerCase().includes(searchLower)) ||
+              (rice.barangay &&
+                rice.barangay.toLowerCase().includes(searchLower))
+          );
+          break;
 
-      case "livestock":
-        filtered = allData.filter(
-          (livestock) =>
-            (livestock.animal_type &&
-              livestock.animal_type.toLowerCase().includes(searchLower)) ||
-            (livestock.subcategory &&
-              livestock.subcategory.toLowerCase().includes(searchLower)) ||
-            (livestock.quantity &&
-              livestock.quantity.toString().includes(searchLower)) ||
-            (livestock.farmer_name &&
-              livestock.farmer_name.toLowerCase().includes(searchLower))
-        );
-        break;
+        case "livestock":
+          filtered = filtered.filter(
+            (livestock) =>
+              (livestock.animal_type &&
+                livestock.animal_type.toLowerCase().includes(searchLower)) ||
+              (livestock.subcategory &&
+                livestock.subcategory.toLowerCase().includes(searchLower)) ||
+              (livestock.quantity &&
+                livestock.quantity.toString().includes(searchLower)) ||
+              (livestock.farmer_name &&
+                livestock.farmer_name.toLowerCase().includes(searchLower))
+          );
+          break;
 
-      case "operators":
-        filtered = allData.filter(
-          (operator) =>
-            (operator.name &&
-              operator.name.toLowerCase().includes(searchLower)) ||
-            (operator.role &&
-              operator.role.toLowerCase().includes(searchLower)) ||
-            (operator.contact_number &&
-              operator.contact_number.toLowerCase().includes(searchLower)) ||
-            (operator.cultured_species &&
-              operator.cultured_species.toLowerCase().includes(searchLower)) ||
-            (operator.fishpond_location &&
-              operator.fishpond_location.toLowerCase().includes(searchLower))
-        );
-        break;
+        case "operators":
+          filtered = filtered.filter(
+            (operator) =>
+              (operator.fishpond_location &&
+                operator.fishpond_location
+                  .toLowerCase()
+                  .includes(searchLower)) ||
+              (operator.cultured_species &&
+                operator.cultured_species
+                  .toLowerCase()
+                  .includes(searchLower)) ||
+              (operator.productive_area_sqm &&
+                operator.productive_area_sqm
+                  .toString()
+                  .includes(searchLower)) ||
+              (operator.production_kg &&
+                operator.production_kg.toString().includes(searchLower)) ||
+              (operator.operational_status &&
+                operator.operational_status
+                  .toLowerCase()
+                  .includes(searchLower)) ||
+              (operator.farmer_name &&
+                operator.farmer_name.toLowerCase().includes(searchLower))
+          );
+          break;
 
-      default:
-        filtered = [];
+        default:
+          break;
+      }
+    }
+
+    // Apply barangay filter if selected
+    if (barangayFilter) {
+      filtered = filtered.filter(
+        (item) => item.barangay && item.barangay === barangayFilter
+      );
+    }
+
+    // Apply year and month filters if selected
+    if (yearFilter || monthFilter) {
+      filtered = filtered.filter((item) => {
+        if (!item.created_at) return false;
+
+        const date = new Date(item.created_at);
+        const itemYear = date.getFullYear().toString();
+        const itemMonth = (date.getMonth() + 1).toString(); // JavaScript months are 0-indexed
+
+        // If both year and month are specified, both must match
+        if (yearFilter && monthFilter) {
+          return itemYear === yearFilter && itemMonth === monthFilter;
+        }
+        // If only year is specified
+        else if (yearFilter) {
+          return itemYear === yearFilter;
+        }
+        // If only month is specified
+        else if (monthFilter) {
+          return itemMonth === monthFilter;
+        }
+
+        return true;
+      });
     }
 
     // Paginate the filtered results
@@ -610,6 +727,34 @@ const Inventory = () => {
     alert(message);
   };
 
+  const handleFilterChange = (filterType, value) => {
+    setCurrentPage(1); // Reset to first page when filters change
+
+    switch (filterType) {
+      case "barangay":
+        setBarangayFilter(value);
+        break;
+      case "month":
+        setMonthFilter(value);
+        break;
+      case "year":
+        setYearFilter(value);
+        break;
+      default:
+        break;
+    }
+  };
+
+  // Add this function to clear all filters
+  const clearAllFilters = () => {
+    setBarangayFilter("");
+    setMonthFilter("");
+    setYearFilter("");
+    setSearchText("");
+    setDebouncedSearchText("");
+    setCurrentPage(1);
+  };
+
   // If in edit mode, show the edit page instead of the inventory list
   if (isEditMode && currentItem) {
     // For now, we only support editing farmers
@@ -682,17 +827,20 @@ const Inventory = () => {
             <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Crop
             </th>
-            <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase md:table-cell sm:px-6 sm:py-3">
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Area (ha)
             </th>
-            <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase md:table-cell sm:px-6 sm:py-3">
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Quantity
             </th>
-            <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase lg:table-cell sm:px-6 sm:py-3">
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Farmer
             </th>
-            <th className="px-2 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] sm:w-[180px]">
-              Actions
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+              Barangay
+            </th>
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+              Date Recorded
             </th>
           </tr>
         );
@@ -706,17 +854,23 @@ const Inventory = () => {
             <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Variety/Clone
             </th>
-            <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase md:table-cell sm:px-6 sm:py-3">
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Month
             </th>
-            <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase md:table-cell sm:px-6 sm:py-3">
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Area (ha)
             </th>
-            <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase lg:table-cell sm:px-6 sm:py-3">
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+              Quantity
+            </th>
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Farmer
             </th>
-            <th className="px-2 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] sm:w-[180px]">
-              Actions
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+              Barangay
+            </th>
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+              Date Recorded
             </th>
           </tr>
         );
@@ -730,17 +884,20 @@ const Inventory = () => {
             <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Seed Type
             </th>
-            <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase md:table-cell sm:px-6 sm:py-3">
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Area (ha)
             </th>
-            <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase md:table-cell sm:px-6 sm:py-3">
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Production
             </th>
-            <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase lg:table-cell sm:px-6 sm:py-3">
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Farmer
             </th>
-            <th className="px-2 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] sm:w-[180px]">
-              Actions
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+              Barangay
+            </th>
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+              Date Recorded
             </th>
           </tr>
         );
@@ -754,17 +911,17 @@ const Inventory = () => {
             <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Subcategory
             </th>
-            <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase md:table-cell sm:px-6 sm:py-3">
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Quantity
             </th>
-            <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase lg:table-cell sm:px-6 sm:py-3">
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Farmer
             </th>
-            <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase md:table-cell sm:px-6 sm:py-3">
-              Date Recorded
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+              Barangay
             </th>
-            <th className="px-2 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] sm:w-[180px]">
-              Actions
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+              Date Recorded
             </th>
           </tr>
         );
@@ -773,22 +930,28 @@ const Inventory = () => {
         return (
           <tr>
             <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
-              Name
-            </th>
-            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Location
             </th>
-            <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase md:table-cell sm:px-6 sm:py-3">
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Species
             </th>
-            <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase lg:table-cell sm:px-6 sm:py-3">
-              Farmer
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+              Area (sqm)
             </th>
-            <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase md:table-cell sm:px-6 sm:py-3">
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+              Production (kg)
+            </th>
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Status
             </th>
-            <th className="px-2 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] sm:w-[180px]">
-              Actions
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+              Farmer
+            </th>
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+              Barangay
+            </th>
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+              Date Recorded
             </th>
           </tr>
         );
@@ -804,7 +967,7 @@ const Inventory = () => {
       return (
         <tr>
           <td
-            colSpan={6}
+            colSpan={selectedDataType === "farmers" ? 6 : 6}
             className="px-2 py-2 text-xs text-center text-gray-500 sm:px-6 sm:py-4 sm:text-sm"
           >
             No data found
@@ -918,50 +1081,34 @@ const Inventory = () => {
                 {crop.crop_value || "N/A"}
               </span>
             </td>
-            <td className="hidden px-2 py-2 md:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
               <span className="text-xs text-gray-900 sm:text-sm">
                 {crop.area_hectare
                   ? Number.parseFloat(crop.area_hectare).toFixed(2)
                   : "N/A"}
               </span>
             </td>
-            <td className="hidden px-2 py-2 md:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
               <span className="text-xs text-gray-900 sm:text-sm">
                 {crop.quantity || "N/A"}
               </span>
             </td>
-            <td className="hidden px-2 py-2 lg:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
               <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
                 {crop.farmer_name || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 text-xs font-medium sm:px-6 sm:py-4 whitespace-nowrap sm:text-sm">
-              <div className="flex space-x-1 sm:space-x-2">
-                <button
-                  onClick={() => handleView(crop)}
-                  className="text-[#6A9C89] hover:text-opacity-70"
-                  title="View Details"
-                >
-                  <EyeIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-                <button
-                  onClick={() => handleEdit(crop)}
-                  className="text-[#FFA000] hover:text-opacity-70"
-                  title="Edit"
-                >
-                  <PencilIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-                <button
-                  onClick={() => {
-                    setCurrentItem(crop);
-                    setShowDeleteConfirm(crop.id);
-                  }}
-                  className="text-[#D32F2F] hover:text-opacity-70"
-                  title="Delete"
-                >
-                  <TrashIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-              </div>
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-md bg-[#E6F5E4] text-[#6A9C89]">
+                {crop.barangay || "N/A"}
+              </span>
+            </td>
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+              <span className="text-xs text-gray-500 sm:text-sm">
+                {crop.created_at
+                  ? new Date(crop.created_at).toLocaleDateString()
+                  : "N/A"}
+              </span>
             </td>
           </tr>
         ));
@@ -985,50 +1132,39 @@ const Inventory = () => {
                 {crop.variety_clone || "N/A"}
               </span>
             </td>
-            <td className="hidden px-2 py-2 md:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
               <span className="text-xs text-gray-900 sm:text-sm">
                 {crop.month || "N/A"}
               </span>
             </td>
-            <td className="hidden px-2 py-2 md:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
               <span className="text-xs text-gray-900 sm:text-sm">
                 {crop.area_hectare
                   ? Number.parseFloat(crop.area_hectare).toFixed(2)
                   : "N/A"}
               </span>
             </td>
-            <td className="hidden px-2 py-2 lg:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+              <span className="text-xs text-gray-900 sm:text-sm">
+                {crop.quantity || "N/A"}
+              </span>
+            </td>
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
               <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
                 {crop.farmer_name || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 text-xs font-medium sm:px-6 sm:py-4 whitespace-nowrap sm:text-sm">
-              <div className="flex space-x-1 sm:space-x-2">
-                <button
-                  onClick={() => handleView(crop)}
-                  className="text-[#6A9C89] hover:text-opacity-70"
-                  title="View Details"
-                >
-                  <EyeIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-                <button
-                  onClick={() => handleEdit(crop)}
-                  className="text-[#FFA000] hover:text-opacity-70"
-                  title="Edit"
-                >
-                  <PencilIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-                <button
-                  onClick={() => {
-                    setCurrentItem(crop);
-                    setShowDeleteConfirm(crop.id);
-                  }}
-                  className="text-[#D32F2F] hover:text-opacity-70"
-                  title="Delete"
-                >
-                  <TrashIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-              </div>
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-md bg-[#E6F5E4] text-[#6A9C89]">
+                {crop.barangay || "N/A"}
+              </span>
+            </td>
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+              <span className="text-xs text-gray-500 sm:text-sm">
+                {crop.created_at
+                  ? new Date(crop.created_at).toLocaleDateString()
+                  : "N/A"}
+              </span>
             </td>
           </tr>
         ));
@@ -1052,52 +1188,36 @@ const Inventory = () => {
                 {rice.seed_type || "N/A"}
               </span>
             </td>
-            <td className="hidden px-2 py-2 md:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
               <span className="text-xs text-gray-900 sm:text-sm">
                 {rice.area_harvested
                   ? Number.parseFloat(rice.area_harvested).toFixed(2)
                   : "N/A"}
               </span>
             </td>
-            <td className="hidden px-2 py-2 md:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
               <span className="text-xs text-gray-900 sm:text-sm">
                 {rice.production
                   ? Number.parseFloat(rice.production).toFixed(2)
                   : "N/A"}
               </span>
             </td>
-            <td className="hidden px-2 py-2 lg:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
               <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
                 {rice.farmer_name || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 text-xs font-medium sm:px-6 sm:py-4 whitespace-nowrap sm:text-sm">
-              <div className="flex space-x-1 sm:space-x-2">
-                <button
-                  onClick={() => handleView(rice)}
-                  className="text-[#6A9C89] hover:text-opacity-70"
-                  title="View Details"
-                >
-                  <EyeIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-                <button
-                  onClick={() => handleEdit(rice)}
-                  className="text-[#FFA000] hover:text-opacity-70"
-                  title="Edit"
-                >
-                  <PencilIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-                <button
-                  onClick={() => {
-                    setCurrentItem(rice);
-                    setShowDeleteConfirm(rice.id);
-                  }}
-                  className="text-[#D32F2F] hover:text-opacity-70"
-                  title="Delete"
-                >
-                  <TrashIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-              </div>
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-md bg-[#E6F5E4] text-[#6A9C89]">
+                {rice.barangay || "N/A"}
+              </span>
+            </td>
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+              <span className="text-xs text-gray-500 sm:text-sm">
+                {rice.created_at
+                  ? new Date(rice.created_at).toLocaleDateString()
+                  : "N/A"}
+              </span>
             </td>
           </tr>
         ));
@@ -1121,47 +1241,27 @@ const Inventory = () => {
                 {livestock.subcategory || "N/A"}
               </span>
             </td>
-            <td className="hidden px-2 py-2 md:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
               <span className="text-xs text-gray-900 sm:text-sm">
                 {livestock.quantity || "N/A"}
               </span>
             </td>
-            <td className="hidden px-2 py-2 lg:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
               <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
                 {livestock.farmer_name || "N/A"}
               </span>
             </td>
-            <td className="hidden px-2 py-2 md:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-md bg-[#E6F5E4] text-[#6A9C89]">
+                {livestock.barangay || "N/A"}
+              </span>
+            </td>
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
               <span className="text-xs text-gray-500 sm:text-sm">
                 {livestock.created_at
                   ? new Date(livestock.created_at).toLocaleDateString()
                   : "N/A"}
               </span>
-            </td>
-            <td className="px-2 py-2 text-xs font-medium sm:px-6 sm:py-4 whitespace-nowrap sm:text-sm">
-              <div className="flex space-x-1 sm:space-x-2">
-                <button
-                  onClick={() => handleView(livestock)}
-                  className="text-[#6A9C89] hover:text-opacity-70"
-                  title="View Details"
-                >
-                  <EyeIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-                <button
-                  onClick={() => handleEdit(livestock)}
-                  className="text-[#FFA000] hover:text-opacity-70"
-                  title="Edit"
-                >
-                  <PencilIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-                <button
-                  onClick={() => setShowDeleteConfirm(livestock.id)}
-                  className="text-[#D32F2F] hover:text-opacity-70"
-                  title="Delete"
-                >
-                  <TrashIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-              </div>
             </td>
           </tr>
         ));
@@ -1176,54 +1276,52 @@ const Inventory = () => {
               <div className="flex items-center">
                 <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-[#6A9C89]" />
                 <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[100px] sm:max-w-none">
-                  {operator.name || "Unknown"}
+                  {operator.fishpond_location || "N/A"}
                 </span>
               </div>
             </td>
             <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
               <span className="text-xs text-gray-900 sm:text-sm">
-                {operator.fishpond_location || "N/A"}
-              </span>
-            </td>
-            <td className="hidden px-2 py-2 md:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
-              <span className="text-xs text-gray-900 sm:text-sm">
                 {operator.cultured_species || "N/A"}
               </span>
             </td>
-            <td className="hidden px-2 py-2 lg:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+              <span className="text-xs text-gray-900 sm:text-sm">
+                {operator.productive_area_sqm || "N/A"}
+              </span>
+            </td>
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+              <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
+                {operator.production_kg || "N/A"}
+              </span>
+            </td>
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+              <span
+                className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-md ${
+                  operator.operational_status === "Active"
+                    ? "bg-green-100 text-green-800"
+                    : "bg-gray-100 text-gray-800"
+                }`}
+              >
+                {operator.operational_status || "N/A"}
+              </span>
+            </td>
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
               <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
                 {operator.farmer_name || "N/A"}
               </span>
             </td>
-            <td className="hidden px-2 py-2 md:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
               <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-md bg-[#E6F5E4] text-[#6A9C89]">
-                {operator.operational_status || "N/A"}
+                {operator.barangay || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 text-xs font-medium sm:px-6 sm:py-4 whitespace-nowrap sm:text-sm">
-              <div className="flex space-x-1 sm:space-x-2">
-                <button
-                  onClick={() => handleView(operator)}
-                  className="text-[#6A9C89] hover:text-opacity-70"
-                  title="View Details"
-                >
-                  <EyeIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-                <button
-                  onClick={() => handleEdit(operator)}
-                  className="text-[#FFA000] hover:text-opacity-70"
-                  title="Edit"
-                >
-                  <PencilIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-                <button
-                  onClick={() => setShowDeleteConfirm(operator.id)}
-                  className="text-[#D32F2F] hover:text-opacity-70"
-                  title="Delete"
-                >
-                  <TrashIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-              </div>
+            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+              <span className="text-xs text-gray-500 sm:text-sm">
+                {operator.created_at
+                  ? new Date(operator.created_at).toLocaleDateString()
+                  : "N/A"}
+              </span>
             </td>
           </tr>
         ));
@@ -1245,7 +1343,7 @@ const Inventory = () => {
           <div className="relative">
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center justify-between w-full px-3 py-2 text-xs sm:text-sm font-medium text-white bg-[#4F6F7D] rounded-md sm:w-[180px] hover:bg-opacity-90"
+              className="flex items-center justify-between w-full px-3 py-2 text-xs sm:text-sm font-medium text-white bg-[#5A8C79] rounded-md sm:w-[180px] hover:bg-opacity-90"
             >
               <div className="flex items-center">
                 {dataTypes.find((type) => type.id === selectedDataType)?.icon}
@@ -1286,37 +1384,183 @@ const Inventory = () => {
         </div>
 
         <div className="p-3 sm:p-4">
-          <div className="flex flex-col items-start justify-between w-full gap-2 mb-4 sm:flex-row sm:items-center sm:gap-0">
-            <div className="relative w-full sm:w-auto">
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <SearchIcon className="w-4 h-4 text-[#6A9C89]" />
+          <div className="flex flex-wrap items-center justify-between w-full gap-2 mb-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <SearchIcon className="w-4 h-4 text-[#6A9C89]" />
+                </div>
+                <input
+                  type="text"
+                  placeholder={`Search ${
+                    dataTypes.find((type) => type.id === selectedDataType)
+                      ?.label || "items"
+                  }`}
+                  value={searchText}
+                  onChange={handleSearchInputChange}
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-md w-full sm:w-[250px] focus:outline-none focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm"
+                />
+                {searchText && (
+                  <button
+                    onClick={() => setSearchText("")}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3"
+                  >
+                    <span className="text-gray-400 hover:text-gray-600">×</span>
+                  </button>
+                )}
               </div>
-              <input
-                type="text"
-                placeholder={`Search ${
-                  dataTypes.find((type) => type.id === selectedDataType)
-                    ?.label || "items"
-                }`}
-                value={searchText}
-                onChange={handleSearchInputChange}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-md w-full sm:w-[250px] focus:outline-none focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm"
-              />
-              {searchText && (
+
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center px-3 py-2 text-xs font-medium text-white bg-[#6A9C89] rounded-md sm:text-sm hover:bg-opacity-90 transition-colors"
+              >
+                <span>Filters</span>
+                <ChevronDownIcon
+                  className={`w-4 h-4 ml-2 transition-transform ${
+                    showFilters ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {(barangayFilter || monthFilter || yearFilter) && (
                 <button
-                  onClick={() => setSearchText("")}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3"
+                  onClick={clearAllFilters}
+                  className="px-3 py-2 text-xs font-medium text-gray-700 transition-colors border border-gray-300 rounded-md sm:text-sm hover:bg-gray-50"
                 >
-                  <span className="text-gray-400 hover:text-gray-600">×</span>
+                  Clear
                 </button>
               )}
             </div>
 
-            <div className="flex items-center justify-end w-full sm:w-auto">
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs sm:text-sm font-medium bg-[#6A9C89] text-white">
-                <span className="px-2">Total Records: {totalRecords}</span>
+            <div className="flex items-center">
+              <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium bg-[#6A9C89] text-white">
+                Total Records: {totalRecords}
               </span>
             </div>
           </div>
+
+          {showFilters && (
+            <div className="p-3 mb-4 bg-white border border-gray-200 rounded-md shadow-sm">
+              <div className="grid grid-cols-3 gap-2">
+                {/* Barangay Filter */}
+                <div className="space-y-1">
+                  <label className="block text-xs font-medium text-gray-700">
+                    Barangay
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={barangayFilter}
+                      onChange={(e) =>
+                        handleFilterChange("barangay", e.target.value)
+                      }
+                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89] appearance-none bg-white pr-6"
+                    >
+                      <option value="">All</option>
+                      {barangayOptions.map((barangay) => (
+                        <option key={barangay} value={barangay}>
+                          {barangay}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-1 pointer-events-none">
+                      <ChevronDownIcon className="w-3 h-3 text-gray-500" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Month Filter */}
+                <div className="space-y-1">
+                  <label className="block text-xs font-medium text-gray-700">
+                    Month
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={monthFilter}
+                      onChange={(e) =>
+                        handleFilterChange("month", e.target.value)
+                      }
+                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89] appearance-none bg-white pr-6"
+                    >
+                      <option value="">All</option>
+                      {monthOptions.map((month) => (
+                        <option key={month.value} value={month.value}>
+                          {month.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-1 pointer-events-none">
+                      <ChevronDownIcon className="w-3 h-3 text-gray-500" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Year Filter */}
+                <div className="space-y-1">
+                  <label className="block text-xs font-medium text-gray-700">
+                    Year
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={yearFilter}
+                      onChange={(e) =>
+                        handleFilterChange("year", e.target.value)
+                      }
+                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89] appearance-none bg-white pr-6"
+                    >
+                      <option value="">All</option>
+                      {yearOptions.map((year) => (
+                        <option key={year} value={year.toString()}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-1 pointer-events-none">
+                      <ChevronDownIcon className="w-3 h-3 text-gray-500" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Active Filters Display */}
+              {(barangayFilter || monthFilter || yearFilter) && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {barangayFilter && (
+                    <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[#E6F5E4] text-[#6A9C89] rounded-md">
+                      {barangayFilter}
+                      <button
+                        onClick={() => setBarangayFilter("")}
+                        className="ml-1 text-[#6A9C89] hover:text-[#5A8C79] focus:outline-none"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
+                  {monthFilter && (
+                    <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[#E6F5E4] text-[#6A9C89] rounded-md">
+                      {monthOptions.find((m) => m.value === monthFilter)?.label}
+                      <button
+                        onClick={() => setMonthFilter("")}
+                        className="ml-1 text-[#6A9C89] hover:text-[#5A8C79] focus:outline-none"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
+                  {yearFilter && (
+                    <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[#E6F5E4] text-[#6A9C89] rounded-md">
+                      {yearFilter}
+                      <button
+                        onClick={() => setYearFilter("")}
+                        className="ml-1 text-[#6A9C89] hover:text-[#5A8C79] focus:outline-none"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {error && (
             <div className="px-3 py-2 mb-4 text-xs text-red-700 bg-red-100 border border-red-400 rounded sm:px-4 sm:py-3 sm:text-sm">

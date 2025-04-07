@@ -547,7 +547,7 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
             {activeTab === "crops" && (
               <button
                 onClick={() => showAddCropModal("crops")}
-                className="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+                className="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-[#5A8C79] rounded-md hover:bg-green-700"
                 style={{
                   backgroundColor: colors.primary,
                   borderColor: colors.primary,
@@ -571,7 +571,7 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
             {activeTab === "highValueCrops" && (
               <button
                 onClick={() => showAddCropModal("highValueCrops")}
-                className="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+                className="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-[#5A8C79] rounded-md hover:bg-green-700"
                 style={{
                   backgroundColor: colors.primary,
                   borderColor: colors.primary,
@@ -639,7 +639,7 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                         {column.title}
                       </th>
                     ))}
-                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">
+                    <th className="px-2 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] sm:w-[180px]">
                       Actions
                     </th>
                   </tr>
@@ -705,7 +705,7 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                       {column.title}
                     </th>
                   ))}
-                  <th className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">
+                  <th className="px-2 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] sm:w-[180px]">
                     Actions
                   </th>
                 </tr>
@@ -1016,7 +1016,7 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
               <button
                 onClick={handleCropModalSubmit}
                 disabled={cropModalLoading}
-                className="flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+                className="flex items-center px-4 py-2 text-sm font-medium text-white bg-[#5A8C79] rounded-md hover:bg-green-700"
                 style={{
                   backgroundColor: colors.primary,
                   borderColor: colors.primary,

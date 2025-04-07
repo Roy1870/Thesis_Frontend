@@ -181,6 +181,35 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
     },
   ];
 
+  // Define separate columns for regular crops (without Variety/Clone)
+  const regularCropColumns = [
+    {
+      title: "Crop Type",
+      dataIndex: "crop_type",
+      key: "crop_type",
+    },
+    {
+      title: "Crop",
+      dataIndex: "crop_value",
+      key: "crop_value",
+    },
+    {
+      title: "Area (Hectare)",
+      dataIndex: "area_hectare",
+      key: "area_hectare",
+    },
+    {
+      title: "Production Type",
+      dataIndex: "production_type",
+      key: "production_type",
+    },
+    {
+      title: "Quantity",
+      key: "quantity",
+      dataIndex: "quantity_value",
+    },
+  ];
+
   const livestockColumns = [
     {
       title: "Animal Type",
@@ -359,7 +388,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
           <div className="flex gap-2">
             <button
               onClick={() => handleEdit(farmerData)}
-              className="inline-flex items-center rounded-md h-[30px] sm:h-[34px] shadow-sm bg-yellow-500 hover:bg-yellow-600 text-white px-2 sm:px-3 py-1 text-xs sm:text-sm"
+              className="inline-flex items-center rounded-md h-[30px] sm:h-[34px] shadow-sm bg-[#5A8C79] hover:bg-green-600 text-white px-2 sm:px-3 py-1 text-xs sm:text-sm"
               style={{
                 backgroundColor: colors.warning,
                 borderColor: colors.warning,
@@ -408,7 +437,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
             onClick={() => setActiveTab("info")}
             className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm whitespace-nowrap ${
               activeTab === "info"
-                ? "bg-green-600 text-white"
+                ? "bg-[#5A8C79] text-white"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
             style={{
@@ -435,7 +464,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
               onClick={() => setActiveTab("crops")}
               className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm whitespace-nowrap ${
                 activeTab === "crops"
-                  ? "bg-green-600 text-white"
+                  ? "bg-[#5A8C79] text-white"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
               style={{
@@ -459,7 +488,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                 className={`ml-1 sm:ml-1.5 px-1 sm:px-1.5 py-0.5 text-xs rounded-full ${
                   activeTab === "crops"
                     ? "bg-white text-green-600"
-                    : "bg-green-600 text-white"
+                    : "bg-[#5A8C79] text-white"
                 }`}
               >
                 {farmerData.crops.length}
@@ -472,7 +501,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
               onClick={() => setActiveTab("rice")}
               className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm whitespace-nowrap ${
                 activeTab === "rice"
-                  ? "bg-green-600 text-white"
+                  ? "bg-[#5A8C79] text-white"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
               style={{
@@ -496,7 +525,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                 className={`ml-1 sm:ml-1.5 px-1 sm:px-1.5 py-0.5 text-xs rounded-full ${
                   activeTab === "rice"
                     ? "bg-white text-green-600"
-                    : "bg-green-600 text-white"
+                    : "bg-[#5A8C79] text-white"
                 }`}
               >
                 {farmerData.rice.length}
@@ -510,7 +539,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
               onClick={() => setActiveTab("livestock")}
               className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm whitespace-nowrap ${
                 activeTab === "livestock"
-                  ? "bg-green-600 text-white"
+                  ? "bg-[#5A8C79] text-white"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
               style={{
@@ -535,7 +564,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                 className={`ml-1 sm:ml-1.5 px-1 sm:px-1.5 py-0.5 text-xs rounded-full ${
                   activeTab === "livestock"
                     ? "bg-white text-green-600"
-                    : "bg-green-600 text-white"
+                    : "bg-[#5A8C79] text-white"
                 }`}
               >
                 {livestockRecords.length}
@@ -549,7 +578,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
               onClick={() => setActiveTab("operator")}
               className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm whitespace-nowrap ${
                 activeTab === "operator"
-                  ? "bg-green-600 text-white"
+                  ? "bg-[#5A8C79] text-white"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
               style={{
@@ -573,7 +602,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                 className={`ml-1 sm:ml-1.5 px-1 sm:px-1.5 py-0.5 text-xs rounded-full ${
                   activeTab === "operator"
                     ? "bg-white text-green-600"
-                    : "bg-green-600 text-white"
+                    : "bg-[#5A8C79] text-white"
                 }`}
               >
                 {operatorData.length}
@@ -829,7 +858,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          {cropColumns.map((column) => (
+                          {regularCropColumns.map((column) => (
                             <th
                               key={column.key || column.dataIndex}
                               className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3"
@@ -851,7 +880,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                                 index % 2 === 0 ? "bg-white" : "bg-gray-50"
                               }
                             >
-                              {cropColumns.map((column) => (
+                              {regularCropColumns.map((column) => (
                                 <td
                                   key={`${crop.crop_id || index}-${
                                     column.key || column.dataIndex
@@ -1215,7 +1244,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
             <div className="sticky bottom-0 z-10 flex justify-end p-4 bg-white border-t">
               <button
                 onClick={() => setViewingRemarks(null)}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+                className="px-4 py-2 text-sm font-medium text-white bg-[#5A8C79] rounded-md hover:bg-green-700"
                 style={{
                   backgroundColor: colors.primary,
                   borderColor: colors.primary,

@@ -343,7 +343,7 @@ const LivestockTab = ({ farmerId, farmerData, colors, onDataChange }) => {
           </div>
           <button
             onClick={showAddLivestockModal}
-            className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-green-600 rounded-md sm:px-3 sm:py-1 sm:text-sm hover:bg-green-700"
+            className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-[#5A8C79] rounded-md sm:px-3 sm:py-1 sm:text-sm hover:bg-green-700"
             style={{
               backgroundColor: colors.primary,
               borderColor: colors.primary,
@@ -385,7 +385,7 @@ const LivestockTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                       {column.title}
                     </th>
                   ))}
-                  <th className="px-2 py-2 text-xs font-medium tracking-wider text-right text-gray-500 uppercase sm:px-6 sm:py-3">
+                  <th className="px-2 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] sm:w-[180px]">
                     Actions
                   </th>
                 </tr>
@@ -551,7 +551,7 @@ const LivestockTab = ({ farmerId, farmerData, colors, onDataChange }) => {
               <button
                 onClick={handleLivestockModalSubmit}
                 disabled={livestockModalLoading}
-                className="flex items-center px-3 py-1 text-xs font-medium text-white bg-green-600 rounded-md sm:px-4 sm:py-2 sm:text-sm hover:bg-green-700"
+                className="flex items-center px-3 py-1 text-xs font-medium text-white bg-[#5A8C79] rounded-md sm:px-4 sm:py-2 sm:text-sm hover:bg-green-700"
                 style={{
                   backgroundColor: colors.primary,
                   borderColor: colors.primary,
