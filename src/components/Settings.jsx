@@ -1,76 +1,45 @@
-import { useState } from "react";
-import { Button, Card, Typography, Space, Divider, Input } from "antd";
+"use client";
 
-const { Title, Paragraph } = Typography;
+import { useState } from "react";
 
 const Settings = () => {
   const [activeSection, setActiveSection] = useState("about");
 
   return (
-    <div style={{ margin: "10px" }}>
+    <div className="m-2.5">
       {/* Title and Buttons for Section */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Title level={3} style={{ fontWeight: "bold" }}>
-          Settings
-        </Title>
-        <Space>
-          <Button
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-bold">Settings</h3>
+        <div className="flex space-x-2.5">
+          <button
             onClick={() => setActiveSection("about")}
-            style={{
-              marginRight: "10px",
-              backgroundColor: activeSection === "about" ? "#6A9C89" : "#fff",
-              borderColor: "#6A9C89",
-              color: activeSection === "about" ? "#fff" : "#6A9C89",
-              fontWeight: "bold",
-              borderRadius: "5px",
-              boxShadow:
-                activeSection === "about"
-                  ? "0 0 5px 2px rgba(0, 0, 0, 0.1)"
-                  : "none",
-            }}
+            className={`px-4 py-2 font-bold rounded-md border transition-all ${
+              activeSection === "about"
+                ? "bg-[#6A9C89] text-white shadow-md"
+                : "bg-white text-[#6A9C89] border-[#6A9C89]"
+            }`}
           >
             About Us
-          </Button>
-          <Button
+          </button>
+          <button
             onClick={() => setActiveSection("contacts")}
-            style={{
-              backgroundColor:
-                activeSection === "contacts" ? "#6A9C89" : "#fff",
-              borderColor: "#6A9C89",
-              color: activeSection === "contacts" ? "#fff" : "#6A9C89",
-              fontWeight: "bold",
-              borderRadius: "5px",
-              boxShadow:
-                activeSection === "contacts"
-                  ? "0 0 5px 2px rgba(0, 0, 0, 0.1)"
-                  : "none",
-            }}
+            className={`px-4 py-2 font-bold rounded-md border transition-all ${
+              activeSection === "contacts"
+                ? "bg-[#6A9C89] text-white shadow-md"
+                : "bg-white text-[#6A9C89] border-[#6A9C89]"
+            }`}
           >
             Contacts
-          </Button>
-        </Space>
+          </button>
+        </div>
       </div>
 
       {/* Content based on active section */}
-      <Card
-        style={{
-          marginTop: "20px",
-          backgroundColor: "#f9f9f9",
-          borderRadius: "8px",
-          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
-        }}
-        bodyStyle={{ padding: "20px" }}
-      >
-        <Space direction="vertical" size="middle">
+      <div className="mt-5 bg-[#f9f9f9] rounded-lg shadow-md p-5">
+        <div className="flex flex-col space-y-4">
           {activeSection === "about" && (
             <>
-              <Paragraph>
+              <p className="text-base">
                 The{" "}
                 <strong>
                   City Agriculture and Veterinary Department (CAVD) of Butuan
@@ -79,13 +48,13 @@ const Settings = () => {
                 is committed to supporting the agricultural and veterinary needs
                 of our community. We are at the forefront of monitoring and
                 analyzing livestock and poultry production across all barangays.
-              </Paragraph>
-              <Paragraph>
+              </p>
+              <p className="text-base">
                 Our purpose is to <strong>list, tally, and analyze</strong> the
                 total number of livestock and poultry products produced by
                 farmers in each barangay. This data enables us to:
-              </Paragraph>
-              <ul style={{ paddingLeft: "20px" }}>
+              </p>
+              <ul className="pl-5 list-disc">
                 <li>Track and improve agricultural productivity,</li>
                 <li>
                   Support farmers in resource planning and development, and
@@ -95,36 +64,32 @@ const Settings = () => {
                   economic growth.
                 </li>
               </ul>
-              <Divider />
-              <Paragraph style={{ fontWeight: "bold", textAlign: "center" }}>
+              <hr className="my-2 border-gray-300" />
+              <p className="font-bold text-center">
                 Together, we cultivate success!
-              </Paragraph>
+              </p>
             </>
           )}
 
           {activeSection === "contacts" && (
             <>
-              <Title level={4}>Contact Information</Title>
-              <Paragraph>
-                For any inquiries or assistance, feel free to contact us:
-              </Paragraph>
-              <ul style={{ paddingLeft: "20px" }}>
+              <h4 className="text-lg font-bold">Contact Information</h4>
+              <p>For any inquiries or assistance, feel free to contact us:</p>
+              <ul className="pl-5 list-disc">
                 <li>Email: cavd@butuan.gov.ph</li>
                 <li>Phone: (085) 123-4567</li>
                 <li>Address: City Hall, Butuan City, Philippines</li>
               </ul>
-              <Divider />
-              <Paragraph>
-                You can also reach us through the form below:
-              </Paragraph>
-              <Input
+              <hr className="my-2 border-gray-300" />
+              <p>You can also reach us through the form below:</p>
+              <input
                 placeholder="Enter your query..."
-                style={{ width: "100%" }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent"
               />
             </>
           )}
-        </Space>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };

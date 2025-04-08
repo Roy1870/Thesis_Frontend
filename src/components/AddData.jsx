@@ -11,6 +11,13 @@ const AddData = () => {
     barangay: "",
     home_address: "",
     farmer_type: "",
+    // Added new fields for Grower
+    farm_address: "",
+    farm_location_longitude: "",
+    farm_location_latitude: "",
+    market_outlet_location: "",
+    buyer_name: "",
+    association_organization: "",
   });
 
   const [farmerType, setFarmerType] = useState(null);
@@ -225,6 +232,23 @@ const AddData = () => {
         facebook_email: values.facebook_email,
         barangay: values.barangay,
       };
+
+      // Add the new grower fields if they exist
+      if (farmerType === "Grower") {
+        if (values.farm_address)
+          formattedData.farm_address = values.farm_address;
+        if (values.farm_location_longitude)
+          formattedData.farm_location_longitude =
+            values.farm_location_longitude;
+        if (values.farm_location_latitude)
+          formattedData.farm_location_latitude = values.farm_location_latitude;
+        if (values.market_outlet_location)
+          formattedData.market_outlet_location = values.market_outlet_location;
+        if (values.buyer_name) formattedData.buyer_name = values.buyer_name;
+        if (values.association_organization)
+          formattedData.association_organization =
+            values.association_organization;
+      }
 
       // Handle livestock records for Raiser type
       if (farmerType === "Raiser") {
@@ -535,6 +559,12 @@ const AddData = () => {
           barangay: "",
           home_address: "",
           farmer_type: "",
+          farm_address: "",
+          farm_location_longitude: "",
+          farm_location_latitude: "",
+          market_outlet_location: "",
+          buyer_name: "",
+          association_organization: "",
         });
         setFarmerType(null);
         setAnimals([{ animal_type: "", subcategory: "", quantity: "" }]);
@@ -1211,6 +1241,88 @@ const AddData = () => {
                 Grower Details
               </div>
               <div className="p-4 bg-emerald-50 max-h-[calc(100vh-240px)] overflow-y-auto overflow-x-hidden hide-scrollbar">
+                {/* Additional Grower Fields */}
+                <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2">
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Farm Address
+                    </label>
+                    <input
+                      type="text"
+                      name="farm_address"
+                      value={formData.farm_address || ""}
+                      onChange={handleInputChange}
+                      placeholder="Enter Farm Address"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Farm Location (Longitude)
+                    </label>
+                    <input
+                      type="text"
+                      name="farm_location_longitude"
+                      value={formData.farm_location_longitude || ""}
+                      onChange={handleInputChange}
+                      placeholder="Enter Longitude (e.g., 125.5456)"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Farm Location (Latitude)
+                    </label>
+                    <input
+                      type="text"
+                      name="farm_location_latitude"
+                      value={formData.farm_location_latitude || ""}
+                      onChange={handleInputChange}
+                      placeholder="Enter Latitude (e.g., 8.9456)"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Market Outlet Location
+                    </label>
+                    <input
+                      type="text"
+                      name="market_outlet_location"
+                      value={formData.market_outlet_location || ""}
+                      onChange={handleInputChange}
+                      placeholder="Enter Market Outlet Location"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Buyer Name
+                    </label>
+                    <input
+                      type="text"
+                      name="buyer_name"
+                      value={formData.buyer_name || ""}
+                      onChange={handleInputChange}
+                      placeholder="Enter Buyer Name"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Association/Organization
+                    </label>
+                    <input
+                      type="text"
+                      name="association_organization"
+                      value={formData.association_organization || ""}
+                      onChange={handleInputChange}
+                      placeholder="Enter Association or Organization"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
