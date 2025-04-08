@@ -58,7 +58,7 @@ const Inventory = () => {
   const [loading, setLoading] = useState(true); // Start with loading true
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(9);
   const [totalRecords, setTotalRecords] = useState(0);
 
   // View/Edit states
@@ -1439,9 +1439,10 @@ const Inventory = () => {
             </div>
           </div>
 
+          {/* Filter Panel - In document flow with proper spacing */}
           {showFilters && (
-            <div className="p-3 mb-4 bg-white border border-gray-200 rounded-md shadow-sm">
-              <div className="grid grid-cols-3 gap-2">
+            <div className="p-3 mb-6 bg-white border border-gray-200 rounded-md shadow-sm">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {/* Barangay Filter */}
                 <div className="space-y-1">
                   <label className="block text-xs font-medium text-gray-700">

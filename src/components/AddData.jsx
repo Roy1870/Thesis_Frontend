@@ -1,42 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { farmerAPI, livestockAPI } from "./services/api";
-
-// Accordion component for collapsible sections
-const AccordionSection = ({ title, children }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <div className="mb-4 overflow-hidden border rounded-lg">
-      <button
-        className="flex items-center justify-between w-full p-3 font-medium text-left text-white bg-emerald-700"
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        {title}
-        <svg
-          className={`w-5 h-5 transition-transform ${
-            isOpen ? "rotate-180" : ""
-          }`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M19 9l-7 7-7-7"
-          ></path>
-        </svg>
-      </button>
-      <div className={`${isOpen ? "block" : "hidden"} p-4 bg-emerald-50`}>
-        {children}
-      </div>
-    </div>
-  );
-};
+import { farmerAPI, livestockAPI, operatorAPI } from "./services/api";
 
 const AddData = () => {
   const [formData, setFormData] = useState({
@@ -55,7 +20,13 @@ const AddData = () => {
   const [selectedCrop, setSelectedCrop] = useState(null);
   const [selectedVegetable, setSelectedVegetable] = useState(null);
   const [additionalRiceDetails, setAdditionalRiceDetails] = useState([
-    { area_type: "", seed_type: "", production: "" },
+    {
+      area_type: "",
+      seed_type: "",
+      area_harvested: "",
+      production: "",
+      ave_yield: "",
+    },
   ]);
   const [additionalSpiceDetails, setAdditionalSpiceDetails] = useState([
     { spices_type: "", quantity: "" },
@@ -107,7 +78,13 @@ const AddData = () => {
   const handleAddAdditionalRice = () => {
     setAdditionalRiceDetails([
       ...additionalRiceDetails,
-      { area_type: "", seed_type: "", production: "" },
+      {
+        area_type: "",
+        seed_type: "",
+        area_harvested: "",
+        production: "",
+        ave_yield: "",
+      },
     ]);
   };
 
@@ -272,6 +249,27 @@ const AddData = () => {
         // Only add livestock_records if there are valid entries
         if (livestockRecords.length > 0) {
           formattedData.livestock_records = livestockRecords;
+        }
+      }
+
+      // Handle Operator type
+      if (farmerType === "Operator") {
+        const operatorData = {
+          fishpond_location: values.fishpond_location || "",
+          cultured_species: values.cultured_species || "",
+          productive_area_sqm: values.area || "",
+          stocking_density: values.stocking_density || "",
+          date_of_stocking: values.date_of_stocking || "",
+          production_kg: values.production || "",
+          date_of_harvest: values.date_of_harvest || "",
+          operational_status: values.operational_status || "",
+          remarks: values.remarks || "",
+          geotagged_photo_url: values.geotagged_photo || "",
+        };
+
+        // Only add operators array if at least one required field is provided
+        if (operatorData.fishpond_location && operatorData.cultured_species) {
+          formattedData.operators = [operatorData];
         }
       }
 
@@ -482,11 +480,43 @@ const AddData = () => {
       let response;
 
       if (
+        farmerType === "Raiser" &&
         formattedData.livestock_records &&
         formattedData.livestock_records.length > 0
       ) {
         // If we have livestock records, use the livestock-records endpoint
         response = await livestockAPI.createLivestockRecords(formattedData);
+      } else if (
+        farmerType === "Operator" &&
+        formattedData.operators &&
+        formattedData.operators.length > 0
+      ) {
+        // If we have operator data, use the operator endpoint
+        response = await operatorAPI.addOperator(formattedData);
+      } else if (farmerType === "Grower") {
+        // Create the farmer first
+        const farmerResponse = await farmerAPI.createFarmer(formattedData);
+
+        // Get the farmer ID from the response
+        const farmerId = farmerResponse.farmer_id || farmerResponse.id;
+
+        if (farmerId) {
+          if (formattedData.rice && formattedData.rice.length > 0) {
+            // If we have rice data, use the rice endpoint
+            response = await farmerAPI.addRice(farmerId, {
+              rice: formattedData.rice,
+            });
+          } else if (formattedData.crops && formattedData.crops.length > 0) {
+            // If we have crops data, use the crops endpoint
+            response = await farmerAPI.addCrops(farmerId, {
+              crops: formattedData.crops,
+            });
+          } else {
+            response = farmerResponse;
+          }
+        } else {
+          response = farmerResponse;
+        }
       } else {
         // Otherwise use the regular farmers endpoint
         response = await farmerAPI.createFarmer(formattedData);
@@ -511,7 +541,13 @@ const AddData = () => {
         setSelectedCrop(null);
         setSelectedVegetable(null);
         setAdditionalRiceDetails([
-          { area_type: "", seed_type: "", production: "" },
+          {
+            area_type: "",
+            seed_type: "",
+            area_harvested: "",
+            production: "",
+            ave_yield: "",
+          },
         ]);
         setAdditionalSpiceDetails([{ spices_type: "", quantity: "" }]);
         setAdditionalLegumesDetails([{ legumes_type: "", quantity: "" }]);
@@ -1050,14 +1086,23 @@ const AddData = () => {
                     <label className="block mb-1 text-sm font-medium text-gray-700">
                       Cultured Species
                     </label>
-                    <input
-                      type="text"
+                    <select
                       name="cultured_species"
                       value={formData.cultured_species || ""}
                       onChange={handleInputChange}
-                      placeholder="Enter Cultured Species"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                    />
+                    >
+                      <option value="">Select Species</option>
+                      <option value="Tilapia">Tilapia</option>
+                      <option value="Bangus (Milkfish)">
+                        Bangus (Milkfish)
+                      </option>
+                      <option value="Catfish">Catfish</option>
+                      <option value="Carp">Carp</option>
+                      <option value="Shrimp">Shrimp</option>
+                      <option value="Prawn">Prawn</option>
+                      <option value="Mudcrab">Mudcrab</option>
+                    </select>
                   </div>
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
@@ -1132,9 +1177,13 @@ const AddData = () => {
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                     >
-                      <option value="">Select Operational Status</option>
+                      <option value="">Select Status</option>
                       <option value="Active">Active</option>
                       <option value="Inactive">Inactive</option>
+                      <option value="Under Maintenance">
+                        Under Maintenance
+                      </option>
+                      <option value="Abandoned">Abandoned</option>
                     </select>
                   </div>
                   <div>
@@ -1186,192 +1235,128 @@ const AddData = () => {
                     </select>
                   </div>
 
-                  {/* Common fields for Spices, Legumes, Vegetable, Banana */}
-                  {(selectedCrop === "Spices" ||
-                    selectedCrop === "Legumes" ||
-                    selectedCrop === "Vegetable" ||
-                    selectedCrop === "Banana") && (
+                  {/* Common fields for all crop types */}
+                  {selectedCrop && (
+                    <div>
+                      <label className="block mb-1 text-sm font-medium text-gray-700">
+                        Area (Hectare) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        name="area_hectare"
+                        value={formData.area_hectare || ""}
+                        onChange={handleInputChange}
+                        min="0"
+                        step="0.01"
+                        placeholder="Enter Area in Hectares"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                        required
+                      />
+                    </div>
+                  )}
+
+                  {selectedCrop && (
+                    <div>
+                      <label className="block mb-1 text-sm font-medium text-gray-700">
+                        Cropping Intensity{" "}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="cropping_intensity"
+                        value={formData.cropping_intensity || ""}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                        required
+                      >
+                        <option value="">Select Cropping Intensity</option>
+                        <option value="year_round">Year Round</option>
+                        <option value="quarterly">Quarterly</option>
+                        <option value="seasonal">Seasonal</option>
+                        <option value="annually">Annually</option>
+                        <option value="twice_a_month">Twice a Month</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Month field for all crop types except Rice */}
+                  {selectedCrop && selectedCrop !== "Rice" && (
+                    <div>
+                      <label className="block mb-1 text-sm font-medium text-gray-700">
+                        Month <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="month"
+                        value={formData.month || ""}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                        required
+                      >
+                        <option value="">Select Month</option>
+                        <option value="January">January</option>
+                        <option value="February">February</option>
+                        <option value="March">March</option>
+                        <option value="April">April</option>
+                        <option value="May">May</option>
+                        <option value="June">June</option>
+                        <option value="July">July</option>
+                        <option value="August">August</option>
+                        <option value="September">September</option>
+                        <option value="October">October</option>
+                        <option value="November">November</option>
+                        <option value="December">December</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* High Value Crops Section */}
+                  {selectedCrop === "High Value Crops" && (
                     <>
                       <div>
                         <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Area (Hectare)
+                          Crop <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          name="high_value_crop"
+                          value={formData.high_value_crop || ""}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                          required
+                        >
+                          <option value="">Select Crop</option>
+                          {highValueCropOptions.map((crop) => (
+                            <option key={crop} value={crop}>
+                              {crop}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block mb-1 text-sm font-medium text-gray-700">
+                          Variety/Clone
                         </label>
                         <input
-                          type="number"
-                          name="area_hectare"
-                          value={formData.area_hectare || ""}
+                          type="text"
+                          name="variety_clone"
+                          value={formData.variety_clone || ""}
                           onChange={handleInputChange}
-                          placeholder="Enter Area in Hectares"
+                          placeholder="Enter Variety/Clone"
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                         />
                       </div>
                       <div>
                         <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Cropping Intensity
+                          Quantity <span className="text-red-500">*</span>
                         </label>
-                        <select
-                          name="cropping_intensity"
-                          value={formData.cropping_intensity || ""}
+                        <input
+                          type="number"
+                          name="quantity"
+                          value={formData.quantity || ""}
                           onChange={handleInputChange}
+                          min="0"
+                          placeholder="Enter Quantity"
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                        >
-                          <option value="">Select Cropping Intensity</option>
-                          <option value="seasonal">Seasonal</option>
-                          <option value="year_round">Year Round</option>
-                          <option value="quarterly">Quarterly</option>
-                          <option value="annually">Annually</option>
-                          <option value="twice_a_month">Twice a Month</option>
-                        </select>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Rice Details */}
-                  {selectedCrop === "Rice" && (
-                    <>
-                      <div className="col-span-1 sm:col-span-2">
-                        <div className="max-h-[500px] overflow-auto p-1 mb-4 hide-scrollbar">
-                          {additionalRiceDetails.map((riceDetail, index) => (
-                            <div
-                              key={index}
-                              className="p-3 mb-3 bg-white border border-gray-300 border-dashed rounded-md"
-                            >
-                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
-                                <div>
-                                  <label className="block mb-1 text-sm font-medium text-gray-700">
-                                    Area Type
-                                  </label>
-                                  <select
-                                    value={riceDetail.area_type}
-                                    onChange={(e) =>
-                                      handleAdditionalRiceChange(
-                                        index,
-                                        "area_type",
-                                        e.target.value
-                                      )
-                                    }
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                                  >
-                                    <option value="">Select Area Type</option>
-                                    <option value="Irrigated">Irrigated</option>
-                                    <option value="Rainfed">Rainfed</option>
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block mb-1 text-sm font-medium text-gray-700">
-                                    Seed Type
-                                  </label>
-                                  <select
-                                    value={riceDetail.seed_type}
-                                    onChange={(e) =>
-                                      handleAdditionalRiceChange(
-                                        index,
-                                        "seed_type",
-                                        e.target.value
-                                      )
-                                    }
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                                  >
-                                    <option value="">Select Seed Type</option>
-                                    <option value="Hybrid Seeds">
-                                      Hybrid Seeds
-                                    </option>
-                                    <option value="Certified Seeds">
-                                      Certified Seeds
-                                    </option>
-                                    <option value="Good Seeds">
-                                      Good Seeds
-                                    </option>
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block mb-1 text-sm font-medium text-gray-700">
-                                    Area Harvested
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={riceDetail.area_harvested || ""}
-                                    onChange={(e) =>
-                                      handleAdditionalRiceChange(
-                                        index,
-                                        "area_harvested",
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder="Enter Area"
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block mb-1 text-sm font-medium text-gray-700">
-                                    Production
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={riceDetail.production || ""}
-                                    onChange={(e) =>
-                                      handleAdditionalRiceChange(
-                                        index,
-                                        "production",
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder="Enter Production"
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                                  />
-                                </div>
-                                <div className="flex items-end">
-                                  {additionalRiceDetails.length > 1 && (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        handleRemoveAdditionalRice(index)
-                                      }
-                                      className="flex items-center justify-center w-full px-3 py-2 text-sm text-white bg-red-600 rounded-md hover:bg-red-700"
-                                    >
-                                      <svg
-                                        className="w-4 h-4 mr-1"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth="2"
-                                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                        ></path>
-                                      </svg>
-                                      Remove
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleAddAdditionalRice}
-                          className="flex items-center justify-center w-full px-4 py-2 border border-dashed rounded-md border-emerald-700 text-emerald-700 hover:bg-emerald-50"
-                        >
-                          <svg
-                            className="w-4 h-4 mr-2"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                            ></path>
-                          </svg>
-                          Add Rice Entry
-                        </button>
+                          required
+                        />
                       </div>
                     </>
                   )}
@@ -1389,10 +1374,10 @@ const AddData = () => {
                               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                 <div>
                                   <label className="block mb-1 text-sm font-medium text-gray-700">
-                                    Spice Type
+                                    Spice Type{" "}
+                                    <span className="text-red-500">*</span>
                                   </label>
-                                  <input
-                                    type="text"
+                                  <select
                                     value={spiceDetail.spices_type}
                                     onChange={(e) =>
                                       handleAdditionalSpiceChange(
@@ -1401,16 +1386,28 @@ const AddData = () => {
                                         e.target.value
                                       )
                                     }
-                                    placeholder="Enter Spice Type"
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                                  />
+                                    required
+                                  >
+                                    <option value="">Select Spice Type</option>
+                                    <option value="Black Pepper">
+                                      Black Pepper
+                                    </option>
+                                    <option value="Ginger">Ginger</option>
+                                    <option value="Turmeric">Turmeric</option>
+                                    <option value="Lemongrass">
+                                      Lemongrass
+                                    </option>
+                                    <option value="Chili">Chili</option>
+                                  </select>
                                 </div>
                                 <div>
                                   <label className="block mb-1 text-sm font-medium text-gray-700">
-                                    Quantity
+                                    Quantity{" "}
+                                    <span className="text-red-500">*</span>
                                   </label>
                                   <input
-                                    type="text"
+                                    type="number"
                                     value={spiceDetail.quantity}
                                     onChange={(e) =>
                                       handleAdditionalSpiceChange(
@@ -1421,6 +1418,7 @@ const AddData = () => {
                                     }
                                     placeholder="Enter Quantity"
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                    required
                                   />
                                 </div>
                                 <div className="flex items-end">
@@ -1493,10 +1491,10 @@ const AddData = () => {
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                   <div>
                                     <label className="block mb-1 text-sm font-medium text-gray-700">
-                                      Legume Type
+                                      Legume Type{" "}
+                                      <span className="text-red-500">*</span>
                                     </label>
-                                    <input
-                                      type="text"
+                                    <select
                                       value={legumeDetail.legumes_type}
                                       onChange={(e) =>
                                         handleAdditionalLegumesChange(
@@ -1505,16 +1503,30 @@ const AddData = () => {
                                           e.target.value
                                         )
                                       }
-                                      placeholder="Enter Legume Type"
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                                    />
+                                      required
+                                    >
+                                      <option value="">
+                                        Select Legume Type
+                                      </option>
+                                      <option value="Mung Bean">
+                                        Mung Bean
+                                      </option>
+                                      <option value="Peanut">Peanut</option>
+                                      <option value="Soybean">Soybean</option>
+                                      <option value="Pigeon Pea">
+                                        Pigeon Pea
+                                      </option>
+                                      <option value="Cowpea">Cowpea</option>
+                                    </select>
                                   </div>
                                   <div>
                                     <label className="block mb-1 text-sm font-medium text-gray-700">
-                                      Quantity
+                                      Quantity{" "}
+                                      <span className="text-red-500">*</span>
                                     </label>
                                     <input
-                                      type="text"
+                                      type="number"
                                       value={legumeDetail.quantity}
                                       onChange={(e) =>
                                         handleAdditionalLegumesChange(
@@ -1525,6 +1537,7 @@ const AddData = () => {
                                       }
                                       placeholder="Enter Quantity"
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                      required
                                     />
                                   </div>
                                   <div className="flex items-end">
@@ -1598,10 +1611,10 @@ const AddData = () => {
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                   <div>
                                     <label className="block mb-1 text-sm font-medium text-gray-700">
-                                      Banana Type
+                                      Banana Type{" "}
+                                      <span className="text-red-500">*</span>
                                     </label>
-                                    <input
-                                      type="text"
+                                    <select
                                       value={bananaDetail.banana_type}
                                       onChange={(e) =>
                                         handleAdditionalBananaChange(
@@ -1610,16 +1623,24 @@ const AddData = () => {
                                           e.target.value
                                         )
                                       }
-                                      placeholder="Enter Banana Type"
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                                    />
+                                      required
+                                    >
+                                      <option value="">
+                                        Select Banana Type
+                                      </option>
+                                      <option value="Lakatan">Lakatan</option>
+                                      <option value="Latundan">Latundan</option>
+                                      <option value="Cardava">Cardava</option>
+                                    </select>
                                   </div>
                                   <div>
                                     <label className="block mb-1 text-sm font-medium text-gray-700">
-                                      Quantity
+                                      Quantity{" "}
+                                      <span className="text-red-500">*</span>
                                     </label>
                                     <input
-                                      type="text"
+                                      type="number"
                                       value={bananaDetail.quantity}
                                       onChange={(e) =>
                                         handleAdditionalBananaChange(
@@ -1630,6 +1651,7 @@ const AddData = () => {
                                       }
                                       placeholder="Enter Quantity"
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                      required
                                     />
                                   </div>
                                   <div className="flex items-end">
@@ -1703,7 +1725,8 @@ const AddData = () => {
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                   <div>
                                     <label className="block mb-1 text-sm font-medium text-gray-700">
-                                      Vegetable Type
+                                      Vegetable Type{" "}
+                                      <span className="text-red-500">*</span>
                                     </label>
                                     <select
                                       value={vegetableDetail.vegetable_type}
@@ -1715,6 +1738,7 @@ const AddData = () => {
                                         )
                                       }
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                      required
                                     >
                                       <option value="">
                                         Select Vegetable Type
@@ -1728,6 +1752,9 @@ const AddData = () => {
                                       <option value="Fruit Vegetables">
                                         Fruit Vegetables
                                       </option>
+                                      <option value="Tomato">Tomato</option>
+                                      <option value="Eggplant">Eggplant</option>
+                                      <option value="Okra">Okra</option>
                                       <option value="Other Crop (specify)">
                                         Other Crop (specify)
                                       </option>
@@ -1737,7 +1764,8 @@ const AddData = () => {
                                     "Other Crop (specify)" && (
                                     <div>
                                       <label className="block mb-1 text-sm font-medium text-gray-700">
-                                        Specify Vegetable
+                                        Specify Vegetable{" "}
+                                        <span className="text-red-500">*</span>
                                       </label>
                                       <input
                                         type="text"
@@ -1751,15 +1779,17 @@ const AddData = () => {
                                         }
                                         placeholder="Specify Vegetable"
                                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                        required
                                       />
                                     </div>
                                   )}
                                   <div>
                                     <label className="block mb-1 text-sm font-medium text-gray-700">
-                                      Quantity
+                                      Quantity{" "}
+                                      <span className="text-red-500">*</span>
                                     </label>
                                     <input
-                                      type="text"
+                                      type="number"
                                       value={vegetableDetail.quantity}
                                       onChange={(e) =>
                                         handleAdditionalVegetableChange(
@@ -1770,6 +1800,7 @@ const AddData = () => {
                                       }
                                       placeholder="Enter Quantity"
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                      required
                                     />
                                   </div>
                                   <div className="flex items-end">
@@ -1829,108 +1860,180 @@ const AddData = () => {
                     </>
                   )}
 
-                  {/* High Value Crops Section */}
-                  {selectedCrop === "High Value Crops" && (
+                  {/* Rice Details */}
+                  {selectedCrop === "Rice" && (
                     <>
-                      <div>
-                        <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Crop
-                        </label>
-                        <select
-                          name="high_value_crop"
-                          value={formData.high_value_crop || ""}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                        >
-                          <option value="">Select Crop</option>
-                          {highValueCropOptions.map((crop) => (
-                            <option key={crop} value={crop}>
-                              {crop}
-                            </option>
+                      <div className="col-span-1 sm:col-span-2">
+                        <div className="max-h-[500px] overflow-auto p-1 mb-4 hide-scrollbar">
+                          {additionalRiceDetails.map((riceDetail, index) => (
+                            <div
+                              key={index}
+                              className="p-3 mb-3 bg-white border border-gray-300 border-dashed rounded-md"
+                            >
+                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
+                                <div>
+                                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                                    Area Type{" "}
+                                    <span className="text-red-500">*</span>
+                                  </label>
+                                  <select
+                                    value={riceDetail.area_type}
+                                    onChange={(e) =>
+                                      handleAdditionalRiceChange(
+                                        index,
+                                        "area_type",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                    required
+                                  >
+                                    <option value="">Select Area Type</option>
+                                    <option value="Irrigated">Irrigated</option>
+                                    <option value="Rainfed">Rainfed</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                                    Seed Type{" "}
+                                    <span className="text-red-500">*</span>
+                                  </label>
+                                  <select
+                                    value={riceDetail.seed_type}
+                                    onChange={(e) =>
+                                      handleAdditionalRiceChange(
+                                        index,
+                                        "seed_type",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                    required
+                                  >
+                                    <option value="">Select Seed Type</option>
+                                    <option value="Hybrid Seeds">
+                                      Hybrid Seeds
+                                    </option>
+                                    <option value="Certified Seeds">
+                                      Certified Seeds
+                                    </option>
+                                    <option value="Good Seeds">
+                                      Good Seeds
+                                    </option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                                    Area Harvested{" "}
+                                    <span className="text-red-500">*</span>
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={riceDetail.area_harvested || ""}
+                                    onChange={(e) =>
+                                      handleAdditionalRiceChange(
+                                        index,
+                                        "area_harvested",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Enter Area"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                    required
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                                    Production{" "}
+                                    <span className="text-red-500">*</span>
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={riceDetail.production || ""}
+                                    onChange={(e) =>
+                                      handleAdditionalRiceChange(
+                                        index,
+                                        "production",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Enter Production"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                    required
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                                    Average Yield{" "}
+                                    <span className="text-red-500">*</span>
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={riceDetail.ave_yield || ""}
+                                    onChange={(e) =>
+                                      handleAdditionalRiceChange(
+                                        index,
+                                        "ave_yield",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Enter Average Yield"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                    required
+                                  />
+                                </div>
+                                <div className="flex items-end">
+                                  {additionalRiceDetails.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleRemoveAdditionalRice(index)
+                                      }
+                                      className="flex items-center justify-center w-full px-3 py-2 text-sm text-white bg-red-600 rounded-md hover:bg-red-700"
+                                    >
+                                      <svg
+                                        className="w-4 h-4 mr-1"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth="2"
+                                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                        ></path>
+                                      </svg>
+                                      Remove
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
                           ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Variety/Clone
-                        </label>
-                        <input
-                          type="text"
-                          name="variety_clone"
-                          value={formData.variety_clone || ""}
-                          onChange={handleInputChange}
-                          placeholder="Enter Variety/Clone"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Area (Hectare)
-                        </label>
-                        <input
-                          type="number"
-                          name="area_hectare"
-                          value={formData.area_hectare || ""}
-                          onChange={handleInputChange}
-                          placeholder="Enter Area in Hectares"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Month
-                        </label>
-                        <select
-                          name="month"
-                          value={formData.month || ""}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleAddAdditionalRice}
+                          className="flex items-center justify-center w-full px-4 py-2 border border-dashed rounded-md border-emerald-700 text-emerald-700 hover:bg-emerald-50"
                         >
-                          <option value="">Select Month</option>
-                          <option value="January">January</option>
-                          <option value="February">February</option>
-                          <option value="March">March</option>
-                          <option value="April">April</option>
-                          <option value="May">May</option>
-                          <option value="June">June</option>
-                          <option value="July">July</option>
-                          <option value="August">August</option>
-                          <option value="September">September</option>
-                          <option value="October">October</option>
-                          <option value="November">November</option>
-                          <option value="December">December</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Quantity
-                        </label>
-                        <input
-                          type="text"
-                          name="quantity"
-                          value={formData.quantity || ""}
-                          onChange={handleInputChange}
-                          placeholder="Enter Quantity"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Cropping Intensity
-                        </label>
-                        <select
-                          name="cropping_intensity"
-                          value={formData.cropping_intensity || ""}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                        >
-                          <option value="">Select Cropping Intensity</option>
-                          <option value="seasonal">Seasonal</option>
-                          <option value="year_round">Year Round</option>
-                          <option value="quarterly">Quarterly</option>
-                          <option value="annually">Annually</option>
-                          <option value="twice_a_month">Twice a Month</option>
-                        </select>
+                          <svg
+                            className="w-4 h-4 mr-2"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                            ></path>
+                          </svg>
+                          Add Rice Entry
+                        </button>
                       </div>
                     </>
                   )}

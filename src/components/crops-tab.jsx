@@ -225,7 +225,7 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
           "Okra",
         ];
       case "Banana":
-        return ["Lakatan", "Latundan", "Saba", "Cavendish", "Señorita"];
+        return ["Lakatan", "Latundan", "Cardava"];
       default:
         return [];
     }
