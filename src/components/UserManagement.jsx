@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import axios from "axios";
-import * as XLSX from "xlsx"; // Import xlsx for export functionality
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -245,12 +244,12 @@ const UserManagement = () => {
   );
 
   // Export function to Excel
-  const handleExport = () => {
-    const ws = XLSX.utils.json_to_sheet(filteredData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Users Data");
-    XLSX.writeFile(wb, "UsersData.xlsx");
-  };
+  // const handleExport = () => {
+  //   const ws = XLSX.utils.json_to_sheet(filteredData);
+  //   const wb = XLSX.utils.book_new();
+  //   XLSX.utils.book_append_sheet(wb, ws, "Users Data");
+  //   XLSX.writeFile(wb, "UsersData.xlsx");
+  // };
 
   // Handle modal visibility and form submission
   const showAddUserModal = () => {
@@ -440,12 +439,12 @@ const UserManagement = () => {
 
       {/* Export and Add User Buttons */}
       <div className="flex mb-6 space-x-2">
-        <button
+        {/* <button
           onClick={handleExport}
           className="px-4 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
         >
           Export to Excel
-        </button>
+        </button> */}
         <button
           onClick={showAddUserModal}
           disabled={!isCurrentUserAdmin}

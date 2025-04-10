@@ -297,18 +297,6 @@ const Sidebar = () => {
               </button>
             </li>
           )}
-
-          <li>
-            <button
-              onClick={() => handleMenuClick("/settings")}
-              className={`w-full flex items-center px-4 py-2 text-white hover:bg-[#5A8C79] ${
-                selectedKey === "/settings" ? "bg-[#5A8C79]" : ""
-              }`}
-            >
-              <SettingOutlined className="mr-3" />
-              {(!collapsed || mobile) && <span>Settings</span>}
-            </button>
-          </li>
         </ul>
       </div>
 

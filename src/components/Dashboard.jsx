@@ -30,11 +30,19 @@ import {
   Activity,
 } from "lucide-react";
 
-import { farmerAPI } from "./services/api"; // Import the API services
+import { farmerAPI, livestockAPI, operatorAPI } from "./services/api";
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [rawData, setRawData] = useState({
+    farmers: [],
+    livestock: [],
+    operators: [],
+    crops: [],
+    rice: [],
+    highValueCrops: [],
+  });
   const [dashboardData, setDashboardData] = useState({
     totalProduction: 0,
     cropProduction: [],
@@ -42,12 +50,42 @@ export default function Dashboard() {
     productionByBarangay: [],
     topPerformingCrops: [],
     recentHarvests: [],
-    productionTrend: 0, // Percentage change from previous period
+    productionTrend: 0,
     totalFarmers: 0,
     totalArea: 0,
+    categoryData: {
+      livestock: {
+        total: 0,
+        items: [],
+      },
+      rice: {
+        total: 0,
+        items: [],
+      },
+      banana: {
+        total: 0,
+        items: [],
+      },
+      legumes: {
+        total: 0,
+        items: [],
+      },
+      spices: {
+        total: 0,
+        items: [],
+      },
+      fish: {
+        total: 0,
+        items: [],
+      },
+      highValueCrops: {
+        total: 0,
+        items: [],
+      },
+    },
   });
 
-  // Theme colors - enhanced color scheme
+  // Theme colors
   const colors = {
     primary: "#6A9C89",
     primaryLight: "#8DB5A5",
@@ -88,304 +126,872 @@ export default function Dashboard() {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
-  // Fetch dashboard data
+  // Fetch all data
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    fetchAllData();
+  }, []);
+
+  // Process raw data
+  useEffect(() => {
+    if (Object.values(rawData).every((arr) => arr.length === 0)) return;
+    processData();
+  }, [rawData]);
+
+  // Fetch all data using the same approach as the analytics component
+  const fetchAllData = async () => {
+    try {
       setLoading(true);
-      try {
-        // Fetch farmers data
-        const farmersResponse = await farmerAPI.getAllFarmers(1, 1000); // Get up to 1000 farmers
-        const farmers = Array.isArray(farmersResponse)
-          ? farmersResponse
-          : farmersResponse.data || [];
 
-        // Process data for production metrics
-        let totalProduction = 0;
-        let totalArea = 0;
-        const cropProductionMap = {};
-        const barangayProductionMap = {};
-        const monthlyProductionMap = {
-          Jan: 0,
-          Feb: 0,
-          Mar: 0,
-          Apr: 0,
-          May: 0,
-          Jun: 0,
-          Jul: 0,
-          Aug: 0,
-          Sep: 0,
-          Oct: 0,
-          Nov: 0,
-          Dec: 0,
-        };
+      // Fetch all farmers
+      const farmersResponse = await farmerAPI.getAllFarmers(1, 1000);
+      const farmers = Array.isArray(farmersResponse)
+        ? farmersResponse
+        : farmersResponse.data || [];
 
-        // For production trend calculation
-        const currentYear = new Date().getFullYear();
-        const lastYear = currentYear - 1;
-        let currentYearProduction = 0;
-        let lastYearProduction = 0;
+      // Fetch all livestock records
+      const livestockResponse = await livestockAPI.getAllLivestockRecords(
+        1,
+        1000
+      );
+      const livestock = Array.isArray(livestockResponse)
+        ? livestockResponse
+        : livestockResponse.data || [];
 
-        // Recent harvests array
-        const allHarvests = [];
+      // Fetch all operators
+      const operatorsResponse = await operatorAPI.getAllOperators(1, 1000);
+      const operators = Array.isArray(operatorsResponse)
+        ? operatorsResponse
+        : operatorsResponse.data || [];
 
-        // Process farmer data to extract production information
-        farmers.forEach((farmer) => {
-          // Process crops for production data
-          if (farmer.crops && Array.isArray(farmer.crops)) {
-            farmer.crops.forEach((crop) => {
-              const cropType = crop.crop_type || crop.name || "Unknown";
-              const yield_amount = Number.parseFloat(
-                crop.yield_amount || crop.production || 0
-              );
-              const area = Number.parseFloat(
-                crop.area_hectare || crop.area || 0
-              );
-              const harvest_date =
+      // Extract crops from farmers
+      const crops = [];
+      const rice = [];
+      const highValueCrops = [];
+
+      // Process each farmer to extract crops and rice data
+      farmers.forEach((farmer) => {
+        // Extract crops
+        if (farmer.crops && Array.isArray(farmer.crops)) {
+          // Filter regular crops and high value crops
+          const regularCrops = farmer.crops.filter(
+            (crop) => crop.crop_type !== "High Value Crops"
+          );
+          const hvCrops = farmer.crops.filter(
+            (crop) => crop.crop_type === "High Value Crops"
+          );
+
+          // Add farmer info to each crop
+          const farmerCrops = regularCrops.map((crop) => {
+            // Parse production_data if it exists and is a string
+            let productionData = {};
+            if (
+              crop.production_data &&
+              typeof crop.production_data === "string"
+            ) {
+              try {
+                productionData = JSON.parse(crop.production_data);
+              } catch (e) {
+                console.error("Error parsing production data:", e);
+              }
+            }
+
+            return {
+              ...crop,
+              farmer_id: farmer.farmer_id,
+              farmer_name:
+                farmer.name ||
+                `${farmer.first_name || ""} ${farmer.last_name || ""}`.trim() ||
+                "Unknown",
+              barangay: farmer.barangay,
+              // Add parsed production data fields
+              crop_value: productionData.crop || crop.crop_value || "",
+              quantity: productionData.quantity || crop.quantity || "",
+              harvest_date:
                 crop.harvest_date ||
                 crop.created_at ||
-                new Date().toISOString();
+                new Date().toISOString(),
+            };
+          });
+          crops.push(...farmerCrops);
 
-              // Add to total production
-              totalProduction += yield_amount;
-
-              // Add to total area
-              totalArea += area;
-
-              // Add to crop production map
-              cropProductionMap[cropType] =
-                (cropProductionMap[cropType] || 0) + yield_amount;
-
-              // Add to barangay production map
-              const barangay = farmer.barangay || "Unknown";
-              barangayProductionMap[barangay] =
-                (barangayProductionMap[barangay] || 0) + yield_amount;
-
-              // Add to monthly production
-              const harvestDate = new Date(harvest_date);
-              const month = harvestDate.toLocaleString("en-US", {
-                month: "short",
-              });
-              monthlyProductionMap[month] =
-                (monthlyProductionMap[month] || 0) + yield_amount;
-
-              // For production trend
-              const harvestYear = harvestDate.getFullYear();
-              if (harvestYear === currentYear) {
-                currentYearProduction += yield_amount;
-              } else if (harvestYear === lastYear) {
-                lastYearProduction += yield_amount;
+          // Process high value crops
+          const farmerHVCs = hvCrops.map((crop) => {
+            // Parse production_data if it exists and is a string
+            let productionData = {};
+            if (
+              crop.production_data &&
+              typeof crop.production_data === "string"
+            ) {
+              try {
+                productionData = JSON.parse(crop.production_data);
+              } catch (e) {
+                console.error("Error parsing production data:", e);
               }
+            }
 
-              // Add to harvests array for recent harvests table
-              if (yield_amount > 0) {
-                allHarvests.push({
-                  id: crop.id || Math.random().toString(),
-                  farmer_id: farmer.farmer_id || farmer.id,
-                  farmer_name:
-                    farmer.name ||
-                    `${farmer.first_name || ""} ${
-                      farmer.last_name || ""
-                    }`.trim() ||
-                    "Unknown",
-                  crop_type: cropType,
-                  yield_amount: yield_amount,
-                  area: area,
-                  yield_per_hectare:
-                    area > 0 ? (yield_amount / area).toFixed(2) : "N/A",
-                  harvest_date: harvestDate,
-                  barangay: barangay,
-                });
-              }
-            });
+            return {
+              ...crop,
+              farmer_id: farmer.farmer_id,
+              farmer_name:
+                farmer.name ||
+                `${farmer.first_name || ""} ${farmer.last_name || ""}`.trim() ||
+                "Unknown",
+              barangay: farmer.barangay,
+              // Add parsed production data fields
+              month: productionData.month || "",
+              crop_value: productionData.crop || crop.crop_value || "",
+              quantity: productionData.quantity || crop.quantity || "",
+              harvest_date:
+                crop.harvest_date ||
+                crop.created_at ||
+                new Date().toISOString(),
+            };
+          });
+          highValueCrops.push(...farmerHVCs);
+        }
+
+        // Extract rice data
+        if (farmer.rice && Array.isArray(farmer.rice)) {
+          // Add farmer info to each rice entry
+          const farmerRice = farmer.rice.map((riceItem) => ({
+            ...riceItem,
+            farmer_id: farmer.farmer_id,
+            farmer_name:
+              farmer.name ||
+              `${farmer.first_name || ""} ${farmer.last_name || ""}`.trim() ||
+              "Unknown",
+            barangay: farmer.barangay,
+            harvest_date:
+              riceItem.harvest_date ||
+              riceItem.created_at ||
+              new Date().toISOString(),
+          }));
+          rice.push(...farmerRice);
+        }
+      });
+
+      // Enrich livestock records with farmer information
+      const farmersMap = {};
+      farmers.forEach((farmer) => {
+        farmersMap[farmer.farmer_id] = farmer;
+      });
+
+      const enrichedLivestock = livestock.map((record) => {
+        const farmer = farmersMap[record.farmer_id];
+        return {
+          ...record,
+          farmer_name: farmer
+            ? farmer.name ||
+              `${farmer.first_name || ""} ${farmer.last_name || ""}`.trim()
+            : "Unknown",
+          barangay: farmer ? farmer.barangay : "Unknown",
+        };
+      });
+
+      // Store all the fetched and processed data
+      setRawData({
+        farmers,
+        livestock: enrichedLivestock,
+        operators,
+        crops,
+        rice,
+        highValueCrops,
+      });
+
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      setError(error.message);
+      setLoading(false);
+    }
+  };
+
+  // Process all data for dashboard
+  const processData = () => {
+    try {
+      // Process data for each category
+      const categoryData = {
+        livestock: processLivestockData(),
+        rice: processRiceData(),
+        banana: processBananaData(),
+        legumes: processLegumesData(),
+        spices: processSpicesData(),
+        fish: processFishData(),
+        highValueCrops: processHighValueCropsData(),
+      };
+
+      // Calculate total production across all categories
+      const totalProduction = Object.values(categoryData).reduce(
+        (sum, category) => sum + category.total,
+        0
+      );
+
+      // Process data for crop production pie chart
+      const cropProduction = [];
+      Object.entries(categoryData).forEach(([category, data]) => {
+        if (data.total > 0) {
+          cropProduction.push({
+            name: getCategoryName(category),
+            value: data.total,
+          });
+        }
+      });
+
+      // Process data for monthly production
+      const monthlyProductionMap = {
+        Jan: 0,
+        Feb: 0,
+        Mar: 0,
+        Apr: 0,
+        May: 0,
+        Jun: 0,
+        Jul: 0,
+        Aug: 0,
+        Sep: 0,
+        Oct: 0,
+        Nov: 0,
+        Dec: 0,
+      };
+
+      // Add rice production to monthly data
+      rawData.rice.forEach((rice) => {
+        if (rice.harvest_date) {
+          const harvestDate = new Date(rice.harvest_date);
+          const month = harvestDate.toLocaleString("en-US", { month: "short" });
+          const production = Number.parseFloat(
+            rice.production || rice.yield_amount || 0
+          );
+          if (!isNaN(production) && production > 0) {
+            monthlyProductionMap[month] =
+              (monthlyProductionMap[month] || 0) + production;
           }
+        }
+      });
 
-          // Process rice data if available
-          if (farmer.rice && Array.isArray(farmer.rice)) {
-            farmer.rice.forEach((rice) => {
-              const variety = rice.seed_type || "Rice";
-              const yield_amount = Number.parseFloat(
-                rice.production || rice.yield_amount || 0
-              );
-              const area = Number.parseFloat(
-                rice.area_harvested || rice.area || 0
-              );
-              const harvest_date =
-                rice.harvest_date ||
-                rice.created_at ||
-                new Date().toISOString();
-
-              // Add to total production
-              totalProduction += yield_amount;
-
-              // Add to total area
-              totalArea += area;
-
-              // Add to crop production map
-              cropProductionMap[variety] =
-                (cropProductionMap[variety] || 0) + yield_amount;
-
-              // Add to barangay production map
-              const barangay = farmer.barangay || "Unknown";
-              barangayProductionMap[barangay] =
-                (barangayProductionMap[barangay] || 0) + yield_amount;
-
-              // Add to monthly production
-              const harvestDate = new Date(harvest_date);
-              const month = harvestDate.toLocaleString("en-US", {
-                month: "short",
-              });
-              monthlyProductionMap[month] =
-                (monthlyProductionMap[month] || 0) + yield_amount;
-
-              // For production trend
-              const harvestYear = harvestDate.getFullYear();
-              if (harvestYear === currentYear) {
-                currentYearProduction += yield_amount;
-              } else if (harvestYear === lastYear) {
-                lastYearProduction += yield_amount;
-              }
-
-              // Add to harvests array
-              if (yield_amount > 0) {
-                allHarvests.push({
-                  id: rice.id || Math.random().toString(),
-                  farmer_id: rice.farmer_id || rice.id,
-                  farmer_name:
-                    farmer.name ||
-                    `${farmer.first_name || ""} ${
-                      farmer.last_name || ""
-                    }`.trim() ||
-                    "Unknown",
-                  crop_type: variety,
-                  yield_amount: yield_amount,
-                  area: area,
-                  yield_per_hectare:
-                    area > 0 ? (yield_amount / area).toFixed(2) : "N/A",
-                  harvest_date: harvestDate,
-                  barangay: barangay,
-                });
-              }
-            });
+      // Add crop production to monthly data
+      rawData.crops.forEach((crop) => {
+        if (crop.harvest_date) {
+          const harvestDate = new Date(crop.harvest_date);
+          const month = harvestDate.toLocaleString("en-US", { month: "short" });
+          const production = Number.parseFloat(
+            crop.yield_amount || crop.production || crop.quantity || 0
+          );
+          if (!isNaN(production) && production > 0) {
+            monthlyProductionMap[month] =
+              (monthlyProductionMap[month] || 0) + production;
           }
+        }
+      });
+
+      // Add high value crops to monthly data
+      rawData.highValueCrops.forEach((crop) => {
+        if (crop.harvest_date) {
+          const harvestDate = new Date(crop.harvest_date);
+          const month = harvestDate.toLocaleString("en-US", { month: "short" });
+          const production = Number.parseFloat(
+            crop.yield_amount || crop.production || crop.quantity || 0
+          );
+          if (!isNaN(production) && production > 0) {
+            monthlyProductionMap[month] =
+              (monthlyProductionMap[month] || 0) + production;
+          }
+        }
+      });
+
+      // Convert monthly production to array for chart
+      const monthOrder = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+      const monthlyProduction = monthOrder.map((month) => ({
+        name: month,
+        production: monthlyProductionMap[month] || 0,
+      }));
+
+      // Process data for production by barangay
+      const barangayProductionMap = {};
+
+      // Add all sources of production to barangay map
+      const addToBarangayMap = (item, production) => {
+        if (isNaN(production) || production <= 0) return;
+
+        const barangay = item.barangay || "Unknown";
+        barangayProductionMap[barangay] =
+          (barangayProductionMap[barangay] || 0) + production;
+      };
+
+      rawData.rice.forEach((rice) => {
+        const production = Number.parseFloat(
+          rice.production || rice.yield_amount || 0
+        );
+        addToBarangayMap(rice, production);
+      });
+
+      rawData.crops.forEach((crop) => {
+        const production = Number.parseFloat(
+          crop.yield_amount || crop.production || crop.quantity || 0
+        );
+        addToBarangayMap(crop, production);
+      });
+
+      rawData.highValueCrops.forEach((crop) => {
+        const production = Number.parseFloat(
+          crop.yield_amount || crop.production || crop.quantity || 0
+        );
+        addToBarangayMap(crop, production);
+      });
+
+      rawData.livestock.forEach((livestock) => {
+        const quantity = Number.parseInt(livestock.quantity || 0);
+        addToBarangayMap(livestock, quantity);
+      });
+
+      // Convert barangay production to array for chart
+      const productionByBarangay = Object.entries(barangayProductionMap)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8); // Top 8 barangays
+
+      // Get top performing crops
+      const allCrops = [];
+
+      // Combine all items from all categories
+      Object.values(categoryData).forEach((category) => {
+        category.items.forEach((item) => {
+          allCrops.push(item);
         });
+      });
 
-        // Calculate production trend
-        const productionTrend =
-          lastYearProduction > 0
-            ? ((currentYearProduction - lastYearProduction) /
-                lastYearProduction) *
-              100
-            : 0;
+      // Sort by value and take top 5
+      const topPerformingCrops = allCrops
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5);
 
-        // Convert crop production map to array for chart
-        const cropProduction = Object.entries(cropProductionMap)
-          .map(([name, value]) => ({ name, value }))
-          .sort((a, b) => b.value - a.value);
+      // Calculate total area
+      let totalArea = 0;
 
-        // Get top performing crops (by yield)
-        const topPerformingCrops = [...cropProduction].slice(0, 5);
+      // Add rice area
+      rawData.rice.forEach((rice) => {
+        const area = Number.parseFloat(rice.area_harvested || rice.area || 0);
+        if (!isNaN(area) && area > 0) {
+          totalArea += area;
+        }
+      });
 
-        // Convert barangay production map to array for chart
-        const productionByBarangay = Object.entries(barangayProductionMap)
-          .map(([name, value]) => ({ name, value }))
-          .sort((a, b) => b.value - a.value)
-          .slice(0, 8); // Top 8 barangays by production
+      // Add crop area
+      rawData.crops.forEach((crop) => {
+        const area = Number.parseFloat(crop.area_hectare || crop.area || 0);
+        if (!isNaN(area) && area > 0) {
+          totalArea += area;
+        }
+      });
 
-        // Convert monthly production to array for chart
-        const monthOrder = [
-          "Jan",
-          "Feb",
-          "Mar",
-          "Apr",
-          "May",
-          "Jun",
-          "Jul",
-          "Aug",
-          "Sep",
-          "Oct",
-          "Nov",
-          "Dec",
-        ];
-        const monthlyProduction = monthOrder.map((month) => ({
-          name: month,
-          production: monthlyProductionMap[month] || 0,
-        }));
+      // Add high value crop area
+      rawData.highValueCrops.forEach((crop) => {
+        const area = Number.parseFloat(crop.area_hectare || crop.area || 0);
+        if (!isNaN(area) && area > 0) {
+          totalArea += area;
+        }
+      });
 
-        // Sort harvests by date (most recent first) and take top 5
-        const recentHarvests = allHarvests
-          .sort((a, b) => b.harvest_date - a.harvest_date)
-          .slice(0, 5);
+      // Calculate production trend (year over year)
+      const currentYear = new Date().getFullYear();
+      const lastYear = currentYear - 1;
+      let currentYearProduction = 0;
+      let lastYearProduction = 0;
 
-        setDashboardData({
-          totalProduction,
-          cropProduction,
-          monthlyProduction,
-          productionByBarangay,
-          topPerformingCrops,
-          recentHarvests,
-          productionTrend,
-          totalFarmers: farmers.length,
-          totalArea,
-        });
-      } catch (err) {
-        console.error("Error fetching dashboard data:", err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
+      // Function to add to yearly production
+      const addToYearlyProduction = (date, production) => {
+        if (!date || isNaN(production) || production <= 0) return;
+
+        const year = new Date(date).getFullYear();
+        if (year === currentYear) {
+          currentYearProduction += production;
+        } else if (year === lastYear) {
+          lastYearProduction += production;
+        }
+      };
+
+      // Add rice production to yearly totals
+      rawData.rice.forEach((rice) => {
+        const production = Number.parseFloat(
+          rice.production || rice.yield_amount || 0
+        );
+        addToYearlyProduction(rice.harvest_date || rice.created_at, production);
+      });
+
+      // Add crop production to yearly totals
+      rawData.crops.forEach((crop) => {
+        const production = Number.parseFloat(
+          crop.yield_amount || crop.production || crop.quantity || 0
+        );
+        addToYearlyProduction(crop.harvest_date || crop.created_at, production);
+      });
+
+      // Add high value crop production to yearly totals
+      rawData.highValueCrops.forEach((crop) => {
+        const production = Number.parseFloat(
+          crop.yield_amount || crop.production || crop.quantity || 0
+        );
+        addToYearlyProduction(crop.harvest_date || crop.created_at, production);
+      });
+
+      // Calculate production trend percentage
+      const productionTrend =
+        lastYearProduction > 0
+          ? ((currentYearProduction - lastYearProduction) /
+              lastYearProduction) *
+            100
+          : 0;
+
+      // Prepare recent harvests data
+      const allHarvests = [];
+
+      // Add rice harvests
+      rawData.rice.forEach((rice) => {
+        const production = Number.parseFloat(
+          rice.production || rice.yield_amount || 0
+        );
+        if (production > 0) {
+          allHarvests.push({
+            id: rice.id || Math.random().toString(),
+            farmer_id: rice.farmer_id,
+            farmer_name: rice.farmer_name,
+            crop_type: rice.variety || rice.seed_type || "Rice",
+            yield_amount: production,
+            area: Number.parseFloat(rice.area_harvested || rice.area || 0),
+            yield_per_hectare:
+              rice.area_harvested > 0
+                ? (
+                    production / Number.parseFloat(rice.area_harvested || 1)
+                  ).toFixed(2)
+                : "N/A",
+            harvest_date: new Date(
+              rice.harvest_date || rice.created_at || new Date()
+            ),
+            barangay: rice.barangay,
+          });
+        }
+      });
+
+      // Add crop harvests
+      rawData.crops.forEach((crop) => {
+        const yield_amount = Number.parseFloat(
+          crop.yield_amount || crop.production || crop.quantity || 0
+        );
+        if (yield_amount > 0) {
+          allHarvests.push({
+            id: crop.id || Math.random().toString(),
+            farmer_id: crop.farmer_id,
+            farmer_name: crop.farmer_name,
+            crop_type: crop.crop_type || crop.crop_value || "Crop",
+            yield_amount: yield_amount,
+            area: Number.parseFloat(crop.area_hectare || crop.area || 0),
+            yield_per_hectare:
+              crop.area_hectare > 0
+                ? (
+                    yield_amount / Number.parseFloat(crop.area_hectare || 1)
+                  ).toFixed(2)
+                : "N/A",
+            harvest_date: new Date(
+              crop.harvest_date || crop.created_at || new Date()
+            ),
+            barangay: crop.barangay,
+          });
+        }
+      });
+
+      // Add high value crop harvests
+      rawData.highValueCrops.forEach((crop) => {
+        const yield_amount = Number.parseFloat(
+          crop.yield_amount || crop.production || crop.quantity || 0
+        );
+        if (yield_amount > 0) {
+          allHarvests.push({
+            id: crop.id || Math.random().toString(),
+            farmer_id: crop.farmer_id,
+            farmer_name: crop.farmer_name,
+            crop_type: crop.crop_value || "High Value Crop",
+            yield_amount: yield_amount,
+            area: Number.parseFloat(crop.area_hectare || crop.area || 0),
+            yield_per_hectare:
+              crop.area_hectare > 0
+                ? (
+                    yield_amount / Number.parseFloat(crop.area_hectare || 1)
+                  ).toFixed(2)
+                : "N/A",
+            harvest_date: new Date(
+              crop.harvest_date || crop.created_at || new Date()
+            ),
+            barangay: crop.barangay,
+          });
+        }
+      });
+
+      // Sort harvests by date (most recent first) and take top 5
+      const recentHarvests = allHarvests
+        .sort((a, b) => b.harvest_date - a.harvest_date)
+        .slice(0, 5);
+
+      // Update dashboard data
+      setDashboardData({
+        totalProduction,
+        cropProduction,
+        monthlyProduction,
+        productionByBarangay,
+        topPerformingCrops,
+        recentHarvests,
+        productionTrend,
+        totalFarmers: rawData.farmers.length,
+        totalArea,
+        categoryData,
+      });
+    } catch (error) {
+      console.error("Error processing data:", error);
+      setError("Error processing data: " + error.message);
+    }
+  };
+
+  // Process livestock data
+  const processLivestockData = () => {
+    const livestock = rawData.livestock || [];
+    const animalTypeMap = {};
+
+    livestock.forEach((record) => {
+      const animalType = record.animal_type || "Unknown";
+      const quantity = Number.parseInt(record.quantity) || 0;
+
+      animalTypeMap[animalType] = (animalTypeMap[animalType] || 0) + quantity;
+    });
+
+    const items = Object.entries(animalTypeMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    const total = items.reduce((sum, item) => sum + item.value, 0);
+
+    return {
+      total,
+      items,
+    };
+  };
+
+  // Process rice data
+  const processRiceData = () => {
+    const riceData = rawData.rice || [];
+    const varietyMap = {};
+
+    riceData.forEach((rice) => {
+      // Use variety if available, otherwise use seed_type
+      const variety = rice.variety || rice.seed_type || "Unknown Rice";
+
+      // Try to get production from different possible fields
+      let production = 0;
+      if (rice.production && !isNaN(Number.parseFloat(rice.production))) {
+        production = Number.parseFloat(rice.production);
+      } else if (
+        rice.yield_amount &&
+        !isNaN(Number.parseFloat(rice.yield_amount))
+      ) {
+        production = Number.parseFloat(rice.yield_amount);
+      } else if (rice.yield && !isNaN(Number.parseFloat(rice.yield))) {
+        production = Number.parseFloat(rice.yield);
       }
+
+      varietyMap[variety] = (varietyMap[variety] || 0) + production;
+    });
+
+    const items = Object.entries(varietyMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    const total = items.reduce((sum, item) => sum + item.value, 0);
+
+    return {
+      total,
+      items,
+    };
+  };
+
+  // Process banana data
+  const processBananaData = () => {
+    const crops = rawData.crops || [];
+    const bananaVarietyMap = {};
+
+    // Filter banana crops
+    const bananaCrops = crops.filter(
+      (crop) =>
+        (crop.crop_type && crop.crop_type.toLowerCase().includes("banana")) ||
+        (crop.crop_value && crop.crop_value.toLowerCase().includes("banana")) ||
+        isBananaVariety(crop.crop_type) ||
+        isBananaVariety(crop.crop_value)
+    );
+
+    bananaCrops.forEach((crop) => {
+      const variety = crop.crop_value || crop.variety_clone || "Unknown Banana";
+      const production = Number.parseFloat(
+        crop.yield_amount || crop.production || crop.quantity || 0
+      );
+
+      bananaVarietyMap[variety] = (bananaVarietyMap[variety] || 0) + production;
+    });
+
+    const items = Object.entries(bananaVarietyMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    const total = items.reduce((sum, item) => sum + item.value, 0);
+
+    return {
+      total,
+      items,
+    };
+  };
+
+  // Process legumes data
+  const processLegumesData = () => {
+    const crops = rawData.crops || [];
+    const legumesTypeMap = {};
+
+    // Filter legume crops
+    const legumeCrops = crops.filter(
+      (crop) =>
+        (crop.crop_type && isLegume(crop.crop_type.toLowerCase())) ||
+        (crop.crop_value && isLegume(crop.crop_value.toLowerCase()))
+    );
+
+    legumeCrops.forEach((crop) => {
+      const type = crop.crop_value || crop.crop_type || "Unknown Legume";
+      const production = Number.parseFloat(
+        crop.yield_amount || crop.production || crop.quantity || 0
+      );
+
+      legumesTypeMap[type] = (legumesTypeMap[type] || 0) + production;
+    });
+
+    const items = Object.entries(legumesTypeMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    const total = items.reduce((sum, item) => sum + item.value, 0);
+
+    return {
+      total,
+      items,
+    };
+  };
+
+  // Process spices data
+  const processSpicesData = () => {
+    const crops = rawData.crops || [];
+    const spicesTypeMap = {};
+
+    // Filter spice crops
+    const spiceCrops = crops.filter(
+      (crop) =>
+        (crop.crop_type && isSpice(crop.crop_type.toLowerCase())) ||
+        (crop.crop_value && isSpice(crop.crop_value.toLowerCase()))
+    );
+
+    spiceCrops.forEach((crop) => {
+      const type = crop.crop_value || crop.crop_type || "Unknown Spice";
+      const production = Number.parseFloat(
+        crop.yield_amount || crop.production || crop.quantity || 0
+      );
+
+      spicesTypeMap[type] = (spicesTypeMap[type] || 0) + production;
+    });
+
+    const items = Object.entries(spicesTypeMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    const total = items.reduce((sum, item) => sum + item.value, 0);
+
+    return {
+      total,
+      items,
+    };
+  };
+
+  // Process fish data
+  const processFishData = () => {
+    // Combine data from crops and operators (for fish)
+    const crops = rawData.crops || [];
+    const operators = rawData.operators || [];
+    const fishTypeMap = {};
+
+    // Filter fish crops
+    const fishCrops = crops.filter(
+      (crop) =>
+        (crop.crop_type && isFish(crop.crop_type.toLowerCase())) ||
+        (crop.crop_value && isFish(crop.crop_value.toLowerCase()))
+    );
+
+    fishCrops.forEach((crop) => {
+      const type = crop.crop_value || crop.crop_type || "Unknown Fish";
+      const production = Number.parseFloat(
+        crop.yield_amount || crop.production || crop.quantity || 0
+      );
+
+      fishTypeMap[type] = (fishTypeMap[type] || 0) + production;
+    });
+
+    // Add fish data from operators
+    operators.forEach((operator) => {
+      if (operator.cultured_species) {
+        const species = operator.cultured_species;
+        const production = Number.parseFloat(operator.production_kg || 0);
+
+        fishTypeMap[species] = (fishTypeMap[species] || 0) + production;
+      }
+    });
+
+    const items = Object.entries(fishTypeMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    const total = items.reduce((sum, item) => sum + item.value, 0);
+
+    return {
+      total,
+      items,
+    };
+  };
+
+  // Process high value crops data
+  const processHighValueCropsData = () => {
+    const highValueCrops = rawData.highValueCrops || [];
+    const cropTypeMap = {};
+
+    highValueCrops.forEach((crop) => {
+      const cropType = crop.crop_value || "Unknown HVC";
+
+      // Try to get quantity from different possible fields
+      let quantity = 0;
+      if (crop.quantity && !isNaN(Number.parseFloat(crop.quantity))) {
+        quantity = Number.parseFloat(crop.quantity);
+      } else if (
+        crop.yield_amount &&
+        !isNaN(Number.parseFloat(crop.yield_amount))
+      ) {
+        quantity = Number.parseFloat(crop.yield_amount);
+      } else if (
+        crop.production &&
+        !isNaN(Number.parseFloat(crop.production))
+      ) {
+        quantity = Number.parseFloat(crop.production);
+      }
+
+      cropTypeMap[cropType] = (cropTypeMap[cropType] || 0) + quantity;
+    });
+
+    const items = Object.entries(cropTypeMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    const total = items.reduce((sum, item) => sum + item.value, 0);
+
+    return {
+      total,
+      items,
+    };
+  };
+
+  // Helper functions to categorize crops
+  const isBananaVariety = (cropType) => {
+    if (!cropType) return false;
+    const bananaVarieties = [
+      "lakatan",
+      "latundan",
+      "saba",
+      "cavendish",
+      "señorita",
+    ];
+    return bananaVarieties.some((variety) =>
+      cropType.toLowerCase().includes(variety)
+    );
+  };
+
+  const isLegume = (cropType) => {
+    if (!cropType) return false;
+    const legumes = [
+      "mung bean",
+      "peanut",
+      "soybean",
+      "cowpea",
+      "pigeon pea",
+      "beans",
+      "legume",
+    ];
+    return legumes.some((legume) => cropType.includes(legume));
+  };
+
+  const isSpice = (cropType) => {
+    if (!cropType) return false;
+    const spices = [
+      "ginger",
+      "turmeric",
+      "pepper",
+      "chili",
+      "lemongrass",
+      "spice",
+    ];
+    return spices.some((spice) => cropType.includes(spice));
+  };
+
+  const isFish = (cropType) => {
+    if (!cropType) return false;
+    const fishTypes = [
+      "tilapia",
+      "milkfish",
+      "catfish",
+      "carp",
+      "shrimp",
+      "fish",
+    ];
+    return fishTypes.some((fish) => cropType.includes(fish));
+  };
+
+  // Get category name for display
+  const getCategoryName = (category) => {
+    const categoryNames = {
+      livestock: "Livestock & Poultry",
+      rice: "Rice",
+      banana: "Banana",
+      legumes: "Legumes",
+      spices: "Spices",
+      fish: "Fish",
+      highValueCrops: "High Value Crops",
     };
 
-    fetchDashboardData();
-  }, []);
+    return categoryNames[category] || category;
+  };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#F5F7F9]">
-        <div className="flex flex-col items-center p-8 bg-white rounded-lg shadow-lg">
-          <Loader2 className="w-12 h-12 animate-spin text-[#6A9C89] mb-4" />
-          <p className="text-lg font-medium text-gray-700">
-            Loading agricultural production data...
-          </p>
-          <p className="mt-2 text-sm text-gray-500">
-            Please wait while we gather the latest information
-          </p>
-        </div>
+      <div className="flex h-[400px] w-full items-center justify-center">
+        <Loader2 className="w-8 h-8 mr-2 text-green-500 animate-spin" />
+        <span className="ml-2">Loading production data...</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-2xl p-8 mx-auto mt-20 bg-white rounded-lg shadow-lg">
-        <div className="flex items-center justify-center mb-4">
-          <div className="flex items-center justify-center w-12 h-12 text-red-600 bg-red-100 rounded-full">
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              ></path>
-            </svg>
-          </div>
-        </div>
-        <h4 className="text-xl font-semibold text-center text-[#D32F2F] mb-2">
-          Error Loading Dashboard
-        </h4>
-        <p className="text-center text-gray-700">{error}</p>
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-[#6A9C89] text-white rounded-md hover:bg-[#4A7C69] transition-colors"
-          >
-            Try Again
-          </button>
+      <div className="flex items-center justify-center h-screen bg-[#F5F7F9]">
+        <div className="flex flex-col items-center p-8 bg-white rounded-lg shadow-lg">
+          <p className="text-lg font-medium text-red-700">Error: {error}</p>
         </div>
       </div>
     );
