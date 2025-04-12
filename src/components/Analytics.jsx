@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { farmerAPI, livestockAPI, operatorAPI } from "./services/api";
-import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, ChevronDown } from "lucide-react";
 
 function Analytics() {
   const [loading, setLoading] = useState(true);
   const [currentCategory, setCurrentCategory] = useState(0);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [rawData, setRawData] = useState({
     farmers: [],
     livestock: [],
@@ -651,14 +652,15 @@ function Analytics() {
     return fishTypes.some((fish) => cropType.toLowerCase().includes(fish));
   };
 
-  const handlePrevious = () => {
-    setCurrentCategory((prev) => (prev > 0 ? prev - 1 : prev));
+  // Toggle dropdown
+  const toggleDropdown = () => {
+    setDropdownOpen(!dropdownOpen);
   };
 
-  const handleNext = () => {
-    setCurrentCategory((prev) =>
-      prev < categories.length - 1 ? prev + 1 : prev
-    );
+  // Handle category selection
+  const handleCategorySelect = (index) => {
+    setCurrentCategory(index);
+    setDropdownOpen(false);
   };
 
   // Update the renderCategoryContent function to fix percentage display
@@ -787,55 +789,46 @@ function Analytics() {
         </p>
       </div>
 
-      {/* Category Navigation */}
-      <div className="flex items-center justify-between">
+      {/* Category Dropdown */}
+      <div className="relative">
         <button
-          onClick={handlePrevious}
-          disabled={currentCategory === 0}
-          className={`flex items-center gap-1 px-3 py-2 rounded-md ${
-            currentCategory === 0
-              ? "text-gray-300 cursor-not-allowed"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
+          onClick={toggleDropdown}
+          className="flex items-center justify-between w-full px-4 py-3 text-left bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500"
         >
-          <ChevronLeft className="w-5 h-5" />
-          <span className="hidden sm:inline">Previous</span>
-        </button>
-
-        <div className="flex items-center">
-          <span className="text-sm text-gray-500">
-            {currentCategory + 1} of {categories.length}
-          </span>
-        </div>
-
-        <button
-          onClick={handleNext}
-          disabled={currentCategory === categories.length - 1}
-          className={`flex items-center gap-1 px-3 py-2 rounded-md ${
-            currentCategory === categories.length - 1
-              ? "text-gray-300 cursor-not-allowed"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          <span className="hidden sm:inline">Next</span>
-          <ChevronRight className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Category Dots Navigation */}
-      <div className="flex justify-center gap-2">
-        {categories.map((category, index) => (
-          <button
-            key={category.id}
-            onClick={() => setCurrentCategory(index)}
-            className={`w-2 h-2 rounded-full ${
-              currentCategory === index
-                ? "bg-green-600"
-                : "bg-gray-300 hover:bg-gray-400"
+          <div className="flex items-center">
+            <span className="mr-2">{categories[currentCategory].icon}</span>
+            <span className="font-medium">
+              {categories[currentCategory].name}
+            </span>
+          </div>
+          <ChevronDown
+            className={`w-5 h-5 transition-transform duration-200 ${
+              dropdownOpen ? "rotate-180" : ""
             }`}
-            aria-label={`Go to ${category.name}`}
           />
-        ))}
+        </button>
+
+        {dropdownOpen && (
+          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+            <ul className="py-1 overflow-auto max-h-60">
+              {categories.map((category, index) => (
+                <li key={category.id}>
+                  <button
+                    onClick={() => handleCategorySelect(index)}
+                    className={`flex items-center w-full px-4 py-2 text-left hover:bg-gray-100 ${
+                      currentCategory === index
+                        ? "bg-green-50 text-green-700"
+                        : ""
+                    }`}
+                  >
+                    <span className="mr-2">{category.icon}</span>
+                    <span>{category.name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* Category Content */}

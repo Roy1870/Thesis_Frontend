@@ -48,7 +48,7 @@ export default function Dashboard() {
     cropProduction: [],
     monthlyProduction: [],
     productionByBarangay: [],
-    topPerformingCrops: [],
+    topPerformingItems: [],
     recentHarvests: [],
     productionTrend: 0,
     totalFarmers: 0,
@@ -463,17 +463,21 @@ export default function Dashboard() {
         .slice(0, 8); // Top 8 barangays
 
       // Get top performing crops
-      const allCrops = [];
+      const allItems = [];
 
       // Combine all items from all categories
-      Object.values(categoryData).forEach((category) => {
-        category.items.forEach((item) => {
-          allCrops.push(item);
+      Object.entries(categoryData).forEach(([category, data]) => {
+        data.items.forEach((item) => {
+          // Add category information to each item
+          allItems.push({
+            ...item,
+            category: category, // Add category field to track the source
+          });
         });
       });
 
       // Sort by value and take top 5
-      const topPerformingCrops = allCrops
+      const topPerformingItems = allItems
         .sort((a, b) => b.value - a.value)
         .slice(0, 5);
 
@@ -649,7 +653,7 @@ export default function Dashboard() {
         cropProduction,
         monthlyProduction,
         productionByBarangay,
-        topPerformingCrops,
+        topPerformingItems,
         recentHarvests,
         productionTrend,
         totalFarmers: rawData.farmers.length,
@@ -1123,21 +1127,39 @@ export default function Dashboard() {
               <Award className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-white opacity-80">
-                Top Crop
-              </p>
-              <p className="text-2xl font-bold">
-                {dashboardData.topPerformingCrops.length > 0
-                  ? dashboardData.topPerformingCrops[0].name
-                  : "None"}
-              </p>
+              {dashboardData.topPerformingItems &&
+              dashboardData.topPerformingItems.length > 0 ? (
+                <>
+                  <p className="text-sm font-medium text-white opacity-80">
+                    Top{" "}
+                    {getCategoryName(
+                      dashboardData.topPerformingItems[0].category
+                    ).replace(" & Poultry", "")}
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {dashboardData.topPerformingItems[0].name}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium text-white opacity-80">
+                    Top Producer
+                  </p>
+                  <p className="text-2xl font-bold">None</p>
+                </>
+              )}
             </div>
           </div>
           <p className="mt-2 text-sm text-white opacity-80">
-            {dashboardData.topPerformingCrops.length > 0
+            {dashboardData.topPerformingItems &&
+            dashboardData.topPerformingItems.length > 0
               ? `${formatNumber(
-                  dashboardData.topPerformingCrops[0].value.toFixed(2)
-                )} tons produced`
+                  dashboardData.topPerformingItems[0].value.toFixed(2)
+                )} ${
+                  dashboardData.topPerformingItems[0].category === "livestock"
+                    ? "heads"
+                    : "tons"
+                }`
               : "No production data available"}
           </p>
         </div>
@@ -1455,20 +1477,20 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Top Performing Crops */}
+      {/* Top Performing Items */}
       <div className="p-6 mb-8 bg-white border border-gray-100 shadow-md rounded-xl">
         <div className="flex items-center justify-between mb-6">
           <h4 className="text-lg font-semibold text-gray-800">
-            Top Performing Crops
+            Top Performing Items
           </h4>
           <span className="px-3 py-1 text-xs font-medium text-green-800 bg-green-100 rounded-full">
             By Production Volume
           </span>
         </div>
 
-        {dashboardData.topPerformingCrops.length > 0 ? (
+        {dashboardData.topPerformingItems.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-            {dashboardData.topPerformingCrops.map((crop, index) => (
+            {dashboardData.topPerformingItems.map((item, index) => (
               <div
                 key={index}
                 className="p-4 transition-all border border-gray-100 rounded-lg bg-gray-50 hover:shadow-md"
@@ -1489,24 +1511,26 @@ export default function Dashboard() {
                   </div>
                   <h5
                     className="font-medium text-gray-800 truncate"
-                    title={crop.name}
+                    title={item.name}
                   >
-                    {crop.name}
+                    {item.name}
                   </h5>
                 </div>
                 <div className="mt-2">
                   <div className="text-lg font-bold text-gray-900">
-                    {formatNumber(crop.value.toFixed(2))}
+                    {formatNumber(item.value.toFixed(2))}
                   </div>
-                  <div className="text-xs text-gray-500">metric tons</div>
+                  <div className="text-xs text-gray-500">
+                    {item.category === "livestock" ? "heads" : "metric tons"}
+                  </div>
                 </div>
                 <div className="w-full h-2 mt-3 bg-gray-200 rounded-full">
                   <div
                     className="h-2 bg-green-600 rounded-full"
                     style={{
                       width: `${
-                        (crop.value /
-                          dashboardData.topPerformingCrops[0].value) *
+                        (item.value /
+                          dashboardData.topPerformingItems[0].value) *
                         100
                       }%`,
                     }}

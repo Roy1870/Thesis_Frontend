@@ -1332,7 +1332,7 @@ const Inventory = () => {
   };
 
   return (
-    <div className="p-2 sm:p-3 bg-[#F5F7F9] min-h-screen max-w-full overflow-hidden">
+    <div className="p-2 sm:p-3 bg-[#F5F7F9] min-h-screen max-w-full overflow-hidden flex flex-col">
       <div className="mb-4 bg-white rounded-lg shadow-md">
         <div className="flex flex-col items-start justify-between p-3 border-b sm:flex-row sm:items-center sm:p-4">
           <h4 className="m-0 mb-2 text-base font-semibold sm:text-lg sm:mb-0">
@@ -1441,8 +1441,8 @@ const Inventory = () => {
 
           {/* Filter Panel - In document flow with proper spacing */}
           {showFilters && (
-            <div className="p-3 mb-6 bg-white border border-gray-200 rounded-md shadow-sm">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="p-2 mb-3 bg-white border border-gray-200 rounded-md shadow-sm">
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-3">
                 {/* Barangay Filter */}
                 <div className="space-y-1">
                   <label className="block text-xs font-medium text-gray-700">
@@ -1576,7 +1576,7 @@ const Inventory = () => {
               </div>
             )}
 
-            <div className="-mx-3 overflow-x-auto sm:mx-0">
+            <div className="-mx-3 overflow-x-auto sm:mx-0 overflow-y-auto max-h-[calc(100vh-300px)]">
               <table className="min-w-full text-xs border divide-y divide-gray-200 sm:text-sm">
                 <thead className="bg-gray-50">{renderTableColumns()}</thead>
                 <tbody className="bg-white divide-y divide-gray-200">
