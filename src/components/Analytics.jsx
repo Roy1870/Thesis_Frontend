@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { farmerAPI, livestockAPI, operatorAPI } from "./services/api";
 import { Loader2, ChevronDown } from "lucide-react";
 
@@ -8,6 +8,13 @@ function Analytics() {
   const [loading, setLoading] = useState(true);
   const [currentCategory, setCurrentCategory] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+  });
+  const buttonRef = useRef(null);
+  const dropdownRef = useRef(null);
   const [rawData, setRawData] = useState({
     farmers: [],
     livestock: [],
@@ -67,6 +74,38 @@ function Analytics() {
     fetchAllData();
   }, []);
 
+  // Update dropdown position when it opens
+  useEffect(() => {
+    if (dropdownOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + window.scrollY,
+        left: rect.left + window.scrollX,
+        width: rect.width,
+      });
+    }
+  }, [dropdownOpen]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target) &&
+        dropdownOpen
+      ) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [dropdownOpen]);
+
   // Process raw data into analytics data
   useEffect(() => {
     if (Object.values(rawData).every((arr) => arr.length === 0)) return;
@@ -116,6 +155,8 @@ function Analytics() {
       const rice = [];
       const highValueCrops = [];
 
+      console.log("Farmers data:", farmers);
+
       // Process each farmer to extract crops and rice data
       farmers.forEach((farmer) => {
         // Extract crops
@@ -141,6 +182,11 @@ function Analytics() {
               } catch (e) {
                 console.error("Error parsing production data:", e);
               }
+            } else if (
+              crop.production_data &&
+              typeof crop.production_data === "object"
+            ) {
+              productionData = crop.production_data;
             }
 
             return {
@@ -154,6 +200,8 @@ function Analytics() {
               // Add parsed production data fields
               crop_value: productionData.crop || crop.crop_value || "",
               quantity: productionData.quantity || crop.quantity || "",
+              // Keep the original production_data for reference
+              production_data: crop.production_data,
             };
           });
           crops.push(...farmerCrops);
@@ -171,6 +219,11 @@ function Analytics() {
               } catch (e) {
                 console.error("Error parsing production data:", e);
               }
+            } else if (
+              crop.production_data &&
+              typeof crop.production_data === "object"
+            ) {
+              productionData = crop.production_data;
             }
 
             return {
@@ -185,6 +238,8 @@ function Analytics() {
               month: productionData.month || "",
               crop_value: productionData.crop || crop.crop_value || "",
               quantity: productionData.quantity || crop.quantity || "",
+              // Keep the original production_data for reference
+              production_data: crop.production_data,
             };
           });
           highValueCrops.push(...farmerHVCs);
@@ -205,6 +260,9 @@ function Analytics() {
           rice.push(...farmerRice);
         }
       });
+
+      console.log("Processed crops:", crops);
+      console.log("Processed high value crops:", highValueCrops);
 
       // Enrich livestock records with farmer information
       const farmersMap = {};
@@ -346,13 +404,63 @@ function Analytics() {
         isBananaVariety(crop.crop_value)
     );
 
-    bananaCrops.forEach((crop) => {
-      const variety = crop.crop_value || crop.variety_clone || "Unknown Banana";
-      const production = Number.parseFloat(
-        crop.yield_amount || crop.production || crop.quantity || 0
-      );
+    console.log("Banana crops:", bananaCrops);
 
-      bananaVarietyMap[variety] = (bananaVarietyMap[variety] || 0) + production;
+    bananaCrops.forEach((crop) => {
+      // Get variety from crop_value, variety_clone, or from parsed production_data
+      let variety = crop.crop_value || crop.variety_clone || "Unknown Banana";
+
+      // Try to parse production_data if it's a string
+      let productionData = {};
+      if (crop.production_data && typeof crop.production_data === "string") {
+        try {
+          productionData = JSON.parse(crop.production_data);
+          // If crop value is in production_data, use it
+          if (productionData.crop) {
+            variety = productionData.crop;
+          }
+        } catch (e) {
+          console.error("Error parsing production data:", e);
+        }
+      } else if (
+        crop.production_data &&
+        typeof crop.production_data === "object"
+      ) {
+        productionData = crop.production_data;
+        if (productionData.crop) {
+          variety = productionData.crop;
+        }
+      }
+
+      // Try to get production from different possible fields
+      let production = 0;
+
+      // First check if quantity is in production_data
+      if (
+        productionData.quantity &&
+        !isNaN(Number.parseFloat(productionData.quantity))
+      ) {
+        production = Number.parseFloat(productionData.quantity);
+      }
+      // Then check other possible fields
+      else if (crop.quantity && !isNaN(Number.parseFloat(crop.quantity))) {
+        production = Number.parseFloat(crop.quantity);
+      } else if (
+        crop.yield_amount &&
+        !isNaN(Number.parseFloat(crop.yield_amount))
+      ) {
+        production = Number.parseFloat(crop.yield_amount);
+      } else if (
+        crop.production &&
+        !isNaN(Number.parseFloat(crop.production))
+      ) {
+        production = Number.parseFloat(crop.production);
+      }
+
+      if (variety && production > 0) {
+        bananaVarietyMap[variety] =
+          (bananaVarietyMap[variety] || 0) + production;
+      }
     });
 
     const items = Object.entries(bananaVarietyMap)
@@ -379,13 +487,62 @@ function Analytics() {
         (crop.crop_value && isLegume(crop.crop_value.toLowerCase()))
     );
 
-    legumeCrops.forEach((crop) => {
-      const type = crop.crop_value || crop.crop_type || "Unknown Legume";
-      const production = Number.parseFloat(
-        crop.yield_amount || crop.production || crop.quantity || 0
-      );
+    console.log("Legume crops:", legumeCrops);
 
-      legumesTypeMap[type] = (legumesTypeMap[type] || 0) + production;
+    legumeCrops.forEach((crop) => {
+      // Get crop type from crop_value, crop_type, or from parsed production_data
+      let type = crop.crop_value || crop.crop_type || "Unknown Legume";
+
+      // Try to parse production_data if it's a string
+      let productionData = {};
+      if (crop.production_data && typeof crop.production_data === "string") {
+        try {
+          productionData = JSON.parse(crop.production_data);
+          // If crop value is in production_data, use it
+          if (productionData.crop) {
+            type = productionData.crop;
+          }
+        } catch (e) {
+          console.error("Error parsing production data:", e);
+        }
+      } else if (
+        crop.production_data &&
+        typeof crop.production_data === "object"
+      ) {
+        productionData = crop.production_data;
+        if (productionData.crop) {
+          type = productionData.crop;
+        }
+      }
+
+      // Try to get quantity from different possible fields
+      let production = 0;
+
+      // First check if quantity is in production_data
+      if (
+        productionData.quantity &&
+        !isNaN(Number.parseFloat(productionData.quantity))
+      ) {
+        production = Number.parseFloat(productionData.quantity);
+      }
+      // Then check other possible fields
+      else if (crop.quantity && !isNaN(Number.parseFloat(crop.quantity))) {
+        production = Number.parseFloat(crop.quantity);
+      } else if (
+        crop.yield_amount &&
+        !isNaN(Number.parseFloat(crop.yield_amount))
+      ) {
+        production = Number.parseFloat(crop.yield_amount);
+      } else if (
+        crop.production &&
+        !isNaN(Number.parseFloat(crop.production))
+      ) {
+        production = Number.parseFloat(crop.production);
+      }
+
+      if (type && production > 0) {
+        legumesTypeMap[type] = (legumesTypeMap[type] || 0) + production;
+      }
     });
 
     const items = Object.entries(legumesTypeMap)
@@ -412,13 +569,62 @@ function Analytics() {
         (crop.crop_value && isSpice(crop.crop_value.toLowerCase()))
     );
 
-    spiceCrops.forEach((crop) => {
-      const type = crop.crop_value || crop.crop_type || "Unknown Spice";
-      const production = Number.parseFloat(
-        crop.yield_amount || crop.production || crop.quantity || 0
-      );
+    console.log("Spice crops:", spiceCrops);
 
-      spicesTypeMap[type] = (spicesTypeMap[type] || 0) + production;
+    spiceCrops.forEach((crop) => {
+      // Get crop type from crop_value, crop_type, or from parsed production_data
+      let type = crop.crop_value || crop.crop_type || "Unknown Spice";
+
+      // Try to parse production_data if it's a string
+      let productionData = {};
+      if (crop.production_data && typeof crop.production_data === "string") {
+        try {
+          productionData = JSON.parse(crop.production_data);
+          // If crop value is in production_data, use it
+          if (productionData.crop) {
+            type = productionData.crop;
+          }
+        } catch (e) {
+          console.error("Error parsing production data:", e);
+        }
+      } else if (
+        crop.production_data &&
+        typeof crop.production_data === "object"
+      ) {
+        productionData = crop.production_data;
+        if (productionData.crop) {
+          type = productionData.crop;
+        }
+      }
+
+      // Try to get quantity from different possible fields
+      let production = 0;
+
+      // First check if quantity is in production_data
+      if (
+        productionData.quantity &&
+        !isNaN(Number.parseFloat(productionData.quantity))
+      ) {
+        production = Number.parseFloat(productionData.quantity);
+      }
+      // Then check other possible fields
+      else if (crop.quantity && !isNaN(Number.parseFloat(crop.quantity))) {
+        production = Number.parseFloat(crop.quantity);
+      } else if (
+        crop.yield_amount &&
+        !isNaN(Number.parseFloat(crop.yield_amount))
+      ) {
+        production = Number.parseFloat(crop.yield_amount);
+      } else if (
+        crop.production &&
+        !isNaN(Number.parseFloat(crop.production))
+      ) {
+        production = Number.parseFloat(crop.production);
+      }
+
+      if (type && production > 0) {
+        spicesTypeMap[type] = (spicesTypeMap[type] || 0) + production;
+      }
     });
 
     const items = Object.entries(spicesTypeMap)
@@ -556,12 +762,46 @@ function Analytics() {
     const highValueCrops = rawData.highValueCrops || [];
     const cropTypeMap = {};
 
+    console.log("High Value Crops data:", highValueCrops);
+
     highValueCrops.forEach((crop) => {
-      const cropType = crop.crop_value || "Unknown HVC";
+      // Get crop type from crop_value or from parsed production_data
+      let cropType = crop.crop_value || "Unknown HVC";
+
+      // Try to parse production_data if it's a string
+      let productionData = {};
+      if (crop.production_data && typeof crop.production_data === "string") {
+        try {
+          productionData = JSON.parse(crop.production_data);
+          // If crop value is in production_data, use it
+          if (productionData.crop) {
+            cropType = productionData.crop;
+          }
+        } catch (e) {
+          console.error("Error parsing production data:", e);
+        }
+      } else if (
+        crop.production_data &&
+        typeof crop.production_data === "object"
+      ) {
+        productionData = crop.production_data;
+        if (productionData.crop) {
+          cropType = productionData.crop;
+        }
+      }
 
       // Try to get quantity from different possible fields
       let quantity = 0;
-      if (crop.quantity && !isNaN(Number.parseFloat(crop.quantity))) {
+
+      // First check if quantity is in production_data
+      if (
+        productionData.quantity &&
+        !isNaN(Number.parseFloat(productionData.quantity))
+      ) {
+        quantity = Number.parseFloat(productionData.quantity);
+      }
+      // Then check other possible fields
+      else if (crop.quantity && !isNaN(Number.parseFloat(crop.quantity))) {
         quantity = Number.parseFloat(crop.quantity);
       } else if (
         crop.yield_amount &&
@@ -575,7 +815,9 @@ function Analytics() {
         quantity = Number.parseFloat(crop.production);
       }
 
-      cropTypeMap[cropType] = (cropTypeMap[cropType] || 0) + quantity;
+      if (cropType && quantity > 0) {
+        cropTypeMap[cropType] = (cropTypeMap[cropType] || 0) + quantity;
+      }
     });
 
     const items = Object.entries(cropTypeMap)
@@ -615,8 +857,12 @@ function Analytics() {
       "pigeon pea",
       "beans",
       "legume",
+      "legumes",
     ];
-    return legumes.some((legume) => cropType.includes(legume));
+    return (
+      cropType.toLowerCase() === "legumes" ||
+      legumes.some((legume) => cropType.toLowerCase().includes(legume))
+    );
   };
 
   const isSpice = (cropType) => {
@@ -628,8 +874,12 @@ function Analytics() {
       "chili",
       "lemongrass",
       "spice",
+      "spices",
     ];
-    return spices.some((spice) => cropType.includes(spice));
+    return (
+      cropType.toLowerCase() === "spices" ||
+      spices.some((spice) => cropType.toLowerCase().includes(spice))
+    );
   };
 
   // Update the isFish function to be more comprehensive
@@ -659,6 +909,7 @@ function Analytics() {
 
   // Handle category selection
   const handleCategorySelect = (index) => {
+    console.log("Category selected:", index);
     setCurrentCategory(index);
     setDropdownOpen(false);
   };
@@ -781,17 +1032,18 @@ function Analytics() {
   }
 
   return (
-    <div className="container max-h-screen p-4 mx-auto space-y-6 overflow-auto">
-      <div className="flex flex-col space-y-2">
+    <div className="container p-4 mx-auto overflow-auto">
+      <div className="flex flex-col mb-4 space-y-2">
         <h1 className="text-3xl font-bold">Agricultural Production Data</h1>
         <p className="text-gray-600">
           Total production and breakdown by category
         </p>
       </div>
 
-      {/* Category Dropdown */}
-      <div className="relative">
+      {/* Dropdown section with fixed position */}
+      <div className="relative w-full">
         <button
+          ref={buttonRef}
           onClick={toggleDropdown}
           className="flex items-center justify-between w-full px-4 py-3 text-left bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500"
         >
@@ -808,12 +1060,23 @@ function Analytics() {
           />
         </button>
 
+        {/* Fixed position dropdown that breaks out of any container constraints */}
         {dropdownOpen && (
-          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
-            <ul className="py-1 overflow-auto max-h-60">
+          <div
+            ref={dropdownRef}
+            className="fixed bg-white border border-gray-300 rounded-md shadow-lg"
+            style={{
+              zIndex: 9999,
+              top: `${dropdownPosition.top}px`,
+              left: `${dropdownPosition.left}px`,
+              width: `${dropdownPosition.width}px`,
+            }}
+          >
+            <ul>
               {categories.map((category, index) => (
                 <li key={category.id}>
                   <button
+                    type="button"
                     onClick={() => handleCategorySelect(index)}
                     className={`flex items-center w-full px-4 py-2 text-left hover:bg-gray-100 ${
                       currentCategory === index
@@ -831,8 +1094,8 @@ function Analytics() {
         )}
       </div>
 
-      {/* Category Content */}
-      {renderCategoryContent()}
+      {/* Content section with scrollable overflow */}
+      <div className="mt-4 overflow-auto">{renderCategoryContent()}</div>
     </div>
   );
 }

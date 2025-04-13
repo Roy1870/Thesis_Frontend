@@ -249,7 +249,7 @@ const AddData = () => {
           formattedData.association_organization =
             values.association_organization;
       }
-
+      const currentUser = localStorage.getItem("userName") || "System";
       // Handle livestock records for Raiser type
       if (farmerType === "Raiser") {
         const livestockRecords = [];
@@ -265,7 +265,7 @@ const AddData = () => {
               animal_type: animalType,
               subcategory: subcategory,
               quantity: Number.parseInt(quantity, 10),
-              updated_by: "User", // You can replace this with the actual user name or ID
+              updated_by: currentUser, // You can replace this with the actual user name or ID
             });
           }
         }

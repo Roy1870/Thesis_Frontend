@@ -58,7 +58,7 @@ const Inventory = () => {
   const [loading, setLoading] = useState(true); // Start with loading true
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(9);
+  const [pageSize, setPageSize] = useState(8);
   const [totalRecords, setTotalRecords] = useState(0);
 
   // View/Edit states
@@ -180,6 +180,24 @@ const Inventory = () => {
     setTotalRecords(allData.length);
   };
 
+  // Helper function to parse production_data
+  const parseProductionData = (crop) => {
+    let productionData = {};
+    if (crop.production_data && typeof crop.production_data === "string") {
+      try {
+        productionData = JSON.parse(crop.production_data);
+      } catch (e) {
+        console.error("Error parsing production data:", e);
+      }
+    } else if (
+      crop.production_data &&
+      typeof crop.production_data === "object"
+    ) {
+      productionData = crop.production_data;
+    }
+    return productionData;
+  };
+
   // Fetch all data for client-side filtering
   const fetchAllData = async () => {
     try {
@@ -218,18 +236,8 @@ const Inventory = () => {
 
               // Add farmer info to each crop
               const farmerCrops = regularCrops.map((crop) => {
-                // Parse production_data if it exists and is a string
-                let productionData = {};
-                if (
-                  crop.production_data &&
-                  typeof crop.production_data === "string"
-                ) {
-                  try {
-                    productionData = JSON.parse(crop.production_data);
-                  } catch (e) {
-                    console.error("Error parsing production data:", e);
-                  }
-                }
+                // Parse production_data
+                const productionData = parseProductionData(crop);
 
                 return {
                   ...crop,
@@ -244,6 +252,8 @@ const Inventory = () => {
                   // Add parsed production data fields
                   crop_value: productionData.crop || crop.crop_value || "",
                   quantity: productionData.quantity || crop.quantity || "",
+                  // Keep original production_data for reference
+                  production_data: crop.production_data,
                 };
               });
               allCrops.push(...farmerCrops);
@@ -271,18 +281,8 @@ const Inventory = () => {
 
               // Add farmer info to each crop
               const farmerHVCs = highValueCrops.map((crop) => {
-                // Parse production_data if it exists and is a string
-                let productionData = {};
-                if (
-                  crop.production_data &&
-                  typeof crop.production_data === "string"
-                ) {
-                  try {
-                    productionData = JSON.parse(crop.production_data);
-                  } catch (e) {
-                    console.error("Error parsing production data:", e);
-                  }
-                }
+                // Parse production_data
+                const productionData = parseProductionData(crop);
 
                 return {
                   ...crop,
@@ -296,8 +296,10 @@ const Inventory = () => {
                   barangay: farmer.barangay,
                   // Add parsed production data fields
                   month: productionData.month || "",
-                  crop_value: productionData.crop || "",
-                  quantity: productionData.quantity || "",
+                  crop_value: productionData.crop || crop.crop_value || "",
+                  quantity: productionData.quantity || crop.quantity || "",
+                  // Keep original production_data for reference
+                  production_data: crop.production_data,
                 };
               });
               allHighValueCrops.push(...farmerHVCs);
@@ -503,36 +505,72 @@ const Inventory = () => {
           break;
 
         case "crops":
-          filtered = filtered.filter(
-            (crop) =>
+          filtered = filtered.filter((crop) => {
+            // Get crop value from production_data if available
+            let cropValue = crop.crop_value || "";
+            let quantity = crop.quantity || "";
+
+            // Try to parse production_data if it's a string
+            if (crop.production_data) {
+              const productionData = parseProductionData(crop);
+              if (productionData.crop) {
+                cropValue = productionData.crop;
+              }
+              if (productionData.quantity) {
+                quantity = productionData.quantity;
+              }
+            }
+
+            return (
               (crop.crop_type &&
                 crop.crop_type.toLowerCase().includes(searchLower)) ||
-              (crop.crop_value &&
-                crop.crop_value.toLowerCase().includes(searchLower)) ||
+              (cropValue && cropValue.toLowerCase().includes(searchLower)) ||
               (crop.area_hectare &&
                 crop.area_hectare.toString().includes(searchLower)) ||
+              (quantity && quantity.toString().includes(searchLower)) ||
               (crop.farmer_name &&
                 crop.farmer_name.toLowerCase().includes(searchLower)) ||
               (crop.barangay &&
                 crop.barangay.toLowerCase().includes(searchLower))
-          );
+            );
+          });
           break;
 
         case "highValueCrops":
-          filtered = filtered.filter(
-            (crop) =>
-              (crop.crop_value &&
-                crop.crop_value.toLowerCase().includes(searchLower)) ||
-              (crop.month && crop.month.toLowerCase().includes(searchLower)) ||
+          filtered = filtered.filter((crop) => {
+            // Get crop value and month from production_data if available
+            let cropValue = crop.crop_value || "";
+            let month = crop.month || "";
+            let quantity = crop.quantity || "";
+
+            // Try to parse production_data if it's a string
+            if (crop.production_data) {
+              const productionData = parseProductionData(crop);
+              if (productionData.crop) {
+                cropValue = productionData.crop;
+              }
+              if (productionData.month) {
+                month = productionData.month;
+              }
+              if (productionData.quantity) {
+                quantity = productionData.quantity;
+              }
+            }
+
+            return (
+              (cropValue && cropValue.toLowerCase().includes(searchLower)) ||
+              (month && month.toLowerCase().includes(searchLower)) ||
               (crop.variety_clone &&
                 crop.variety_clone.toLowerCase().includes(searchLower)) ||
               (crop.area_hectare &&
                 crop.area_hectare.toString().includes(searchLower)) ||
+              (quantity && quantity.toString().includes(searchLower)) ||
               (crop.farmer_name &&
                 crop.farmer_name.toLowerCase().includes(searchLower)) ||
               (crop.barangay &&
                 crop.barangay.toLowerCase().includes(searchLower))
-          );
+            );
+          });
           break;
 
         case "rice":
@@ -968,7 +1006,7 @@ const Inventory = () => {
         <tr>
           <td
             colSpan={selectedDataType === "farmers" ? 6 : 6}
-            className="px-2 py-2 text-xs text-center text-gray-500 sm:px-6 sm:py-4 sm:text-sm"
+            className="px-2 py-2 text-xs text-center text-gray-500 sm:px-6 sm:py-3 sm:text-sm"
           >
             No data found
           </td>
@@ -983,9 +1021,9 @@ const Inventory = () => {
             key={farmer.farmer_id || Math.random().toString()}
             className="hover:bg-gray-50"
           >
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <div className="flex items-center">
-                <UserIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-[#6A9C89]" />
+                <UserIcon className="w-4 h-4 mr-1 sm:mr-2 text-[#6A9C89]" />
                 <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[100px] sm:max-w-none">
                   {searchedColumn === "name" ? (
                     <Highlighter
@@ -1005,57 +1043,57 @@ const Inventory = () => {
                 </span>
               </div>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <div className="flex items-center">
-                <PhoneIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-[#4F6F7D]" />
+                <PhoneIcon className="w-4 h-4 mr-1 sm:mr-2 text-[#4F6F7D]" />
                 <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[80px] sm:max-w-none">
                   {farmer.contact_number || "N/A"}
                 </span>
               </div>
             </td>
-            <td className="hidden px-2 py-2 md:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="hidden px-2 py-2 md:table-cell sm:px-6 sm:py-3 whitespace-nowrap">
               <div className="flex items-center">
-                <MailIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-[#4F6F7D]" />
+                <MailIcon className="w-4 h-4 mr-1 sm:mr-2 text-[#4F6F7D]" />
                 <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
                   {farmer.facebook_email || "N/A"}
                 </span>
               </div>
             </td>
-            <td className="hidden px-2 py-2 lg:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="hidden px-2 py-2 lg:table-cell sm:px-6 sm:py-3 whitespace-nowrap">
               <div className="flex items-center">
-                <HomeIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-[#4F6F7D]" />
+                <HomeIcon className="w-4 h-4 mr-1 sm:mr-2 text-[#4F6F7D]" />
                 <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
                   {farmer.home_address || "N/A"}
                 </span>
               </div>
             </td>
-            <td className="hidden px-2 py-2 md:table-cell sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="hidden px-2 py-2 md:table-cell sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-md bg-[#E6F5E4] text-[#6A9C89]">
                 {farmer.barangay || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 text-xs font-medium sm:px-6 sm:py-4 whitespace-nowrap sm:text-sm">
+            <td className="px-2 py-2 text-xs font-medium sm:px-6 sm:py-3 whitespace-nowrap sm:text-sm">
               <div className="flex space-x-1 sm:space-x-2">
                 <button
                   onClick={() => handleView(farmer)}
                   className="text-[#6A9C89] hover:text-opacity-70"
                   title="View Details"
                 >
-                  <EyeIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <EyeIcon className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
                 </button>
                 <button
                   onClick={() => handleEdit(farmer)}
                   className="text-[#FFA000] hover:text-opacity-70"
                   title="Edit"
                 >
-                  <PencilIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <PencilIcon className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
                 </button>
                 <button
                   onClick={() => setShowDeleteConfirm(farmer.farmer_id)}
                   className="text-[#D32F2F] hover:text-opacity-70"
                   title="Delete"
                 >
-                  <TrashIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <TrashIcon className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
                 </button>
               </div>
             </td>
@@ -1063,111 +1101,126 @@ const Inventory = () => {
         ));
 
       case "crops":
-        return data.map((crop) => (
-          <tr
-            key={crop.id || Math.random().toString()}
-            className="hover:bg-gray-50"
-          >
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-              <div className="flex items-center">
-                <Wheat className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-[#6A9C89]" />
-                <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[100px] sm:max-w-none">
-                  {crop.crop_type || "Unknown"}
+        return data.map((crop) => {
+          // Parse production_data if needed
+          const productionData = parseProductionData(crop);
+          const cropValue = productionData.crop || crop.crop_value || "Unknown";
+          const quantity = productionData.quantity || crop.quantity || "N/A";
+
+          return (
+            <tr
+              key={crop.id || Math.random().toString()}
+              className="hover:bg-gray-50"
+            >
+              <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
+                <div className="flex items-center">
+                  <Wheat className="w-4 h-4 mr-1 sm:mr-2 text-[#6A9C89]" />
+                  <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[100px] sm:max-w-none">
+                    {crop.crop_type || "Unknown"}
+                  </span>
+                </div>
+              </td>
+              <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
+                <span className="text-xs text-gray-900 sm:text-sm">
+                  {cropValue}
                 </span>
-              </div>
-            </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-              <span className="text-xs text-gray-900 sm:text-sm">
-                {crop.crop_value || "N/A"}
-              </span>
-            </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-              <span className="text-xs text-gray-900 sm:text-sm">
-                {crop.area_hectare
-                  ? Number.parseFloat(crop.area_hectare).toFixed(2)
-                  : "N/A"}
-              </span>
-            </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-              <span className="text-xs text-gray-900 sm:text-sm">
-                {crop.quantity || "N/A"}
-              </span>
-            </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-              <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
-                {crop.farmer_name || "N/A"}
-              </span>
-            </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-md bg-[#E6F5E4] text-[#6A9C89]">
-                {crop.barangay || "N/A"}
-              </span>
-            </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-              <span className="text-xs text-gray-500 sm:text-sm">
-                {crop.created_at
-                  ? new Date(crop.created_at).toLocaleDateString()
-                  : "N/A"}
-              </span>
-            </td>
-          </tr>
-        ));
+              </td>
+              <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
+                <span className="text-xs text-gray-900 sm:text-sm">
+                  {crop.area_hectare
+                    ? Number.parseFloat(crop.area_hectare).toFixed(2)
+                    : "N/A"}
+                </span>
+              </td>
+              <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
+                <span className="text-xs text-gray-900 sm:text-sm">
+                  {quantity}
+                </span>
+              </td>
+              <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
+                <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
+                  {crop.farmer_name || "N/A"}
+                </span>
+              </td>
+              <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
+                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-md bg-[#E6F5E4] text-[#6A9C89]">
+                  {crop.barangay || "N/A"}
+                </span>
+              </td>
+              <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
+                <span className="text-xs text-gray-500 sm:text-sm">
+                  {crop.created_at
+                    ? new Date(crop.created_at).toLocaleDateString()
+                    : "N/A"}
+                </span>
+              </td>
+            </tr>
+          );
+        });
 
       case "highValueCrops":
-        return data.map((crop) => (
-          <tr
-            key={crop.id || Math.random().toString()}
-            className="hover:bg-gray-50"
-          >
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-              <div className="flex items-center">
-                <Coffee className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-[#6A9C89]" />
-                <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[100px] sm:max-w-none">
-                  {crop.crop_value || "Unknown"}
+        return data.map((crop) => {
+          // Parse production_data if needed
+          const productionData = parseProductionData(crop);
+          const cropValue = productionData.crop || crop.crop_value || "Unknown";
+          const month = productionData.month || crop.month || "N/A";
+          const quantity = productionData.quantity || crop.quantity || "N/A";
+
+          return (
+            <tr
+              key={crop.id || Math.random().toString()}
+              className="hover:bg-gray-50"
+            >
+              <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
+                <div className="flex items-center">
+                  <Coffee className="w-4 h-4 mr-1 sm:mr-2 text-[#6A9C89]" />
+                  <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[100px] sm:max-w-none">
+                    {cropValue}
+                  </span>
+                </div>
+              </td>
+              <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
+                <span className="text-xs text-gray-900 sm:text-sm">
+                  {crop.variety_clone || "N/A"}
                 </span>
-              </div>
-            </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-              <span className="text-xs text-gray-900 sm:text-sm">
-                {crop.variety_clone || "N/A"}
-              </span>
-            </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-              <span className="text-xs text-gray-900 sm:text-sm">
-                {crop.month || "N/A"}
-              </span>
-            </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-              <span className="text-xs text-gray-900 sm:text-sm">
-                {crop.area_hectare
-                  ? Number.parseFloat(crop.area_hectare).toFixed(2)
-                  : "N/A"}
-              </span>
-            </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-              <span className="text-xs text-gray-900 sm:text-sm">
-                {crop.quantity || "N/A"}
-              </span>
-            </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-              <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
-                {crop.farmer_name || "N/A"}
-              </span>
-            </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-md bg-[#E6F5E4] text-[#6A9C89]">
-                {crop.barangay || "N/A"}
-              </span>
-            </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-              <span className="text-xs text-gray-500 sm:text-sm">
-                {crop.created_at
-                  ? new Date(crop.created_at).toLocaleDateString()
-                  : "N/A"}
-              </span>
-            </td>
-          </tr>
-        ));
+              </td>
+              <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
+                <span className="text-xs text-gray-900 sm:text-sm">
+                  {month}
+                </span>
+              </td>
+              <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
+                <span className="text-xs text-gray-900 sm:text-sm">
+                  {crop.area_hectare
+                    ? Number.parseFloat(crop.area_hectare).toFixed(2)
+                    : "N/A"}
+                </span>
+              </td>
+              <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
+                <span className="text-xs text-gray-900 sm:text-sm">
+                  {quantity}
+                </span>
+              </td>
+              <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
+                <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
+                  {crop.farmer_name || "N/A"}
+                </span>
+              </td>
+              <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
+                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-md bg-[#E6F5E4] text-[#6A9C89]">
+                  {crop.barangay || "N/A"}
+                </span>
+              </td>
+              <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
+                <span className="text-xs text-gray-500 sm:text-sm">
+                  {crop.created_at
+                    ? new Date(crop.created_at).toLocaleDateString()
+                    : "N/A"}
+                </span>
+              </td>
+            </tr>
+          );
+        });
 
       case "rice":
         return data.map((rice) => (
@@ -1175,44 +1228,44 @@ const Inventory = () => {
             key={rice.id || Math.random().toString()}
             className="hover:bg-gray-50"
           >
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <div className="flex items-center">
-                <Sprout className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-[#6A9C89]" />
+                <Sprout className="w-4 h-4 mr-1 sm:mr-2 text-[#6A9C89]" />
                 <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[100px] sm:max-w-none">
                   {rice.area_type || "Unknown"}
                 </span>
               </div>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="text-xs text-gray-900 sm:text-sm">
                 {rice.seed_type || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="text-xs text-gray-900 sm:text-sm">
                 {rice.area_harvested
                   ? Number.parseFloat(rice.area_harvested).toFixed(2)
                   : "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="text-xs text-gray-900 sm:text-sm">
                 {rice.production
                   ? Number.parseFloat(rice.production).toFixed(2)
                   : "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
                 {rice.farmer_name || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-md bg-[#E6F5E4] text-[#6A9C89]">
                 {rice.barangay || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="text-xs text-gray-500 sm:text-sm">
                 {rice.created_at
                   ? new Date(rice.created_at).toLocaleDateString()
@@ -1228,35 +1281,35 @@ const Inventory = () => {
             key={livestock.id || Math.random().toString()}
             className="hover:bg-gray-50"
           >
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <div className="flex items-center">
-                <MilkIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-[#6A9C89]" />
+                <MilkIcon className="w-4 h-4 mr-1 sm:mr-2 text-[#6A9C89]" />
                 <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[100px] sm:max-w-none">
                   {livestock.animal_type || "Unknown"}
                 </span>
               </div>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="text-xs text-gray-900 sm:text-sm">
                 {livestock.subcategory || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="text-xs text-gray-900 sm:text-sm">
                 {livestock.quantity || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
                 {livestock.farmer_name || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-md bg-[#E6F5E4] text-[#6A9C89]">
                 {livestock.barangay || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="text-xs text-gray-500 sm:text-sm">
                 {livestock.created_at
                   ? new Date(livestock.created_at).toLocaleDateString()
@@ -1272,30 +1325,30 @@ const Inventory = () => {
             key={operator.id || Math.random().toString()}
             className="hover:bg-gray-50"
           >
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <div className="flex items-center">
-                <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-[#6A9C89]" />
+                <Users className="w-4 h-4 mr-1 sm:mr-2 text-[#6A9C89]" />
                 <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[100px] sm:max-w-none">
                   {operator.fishpond_location || "N/A"}
                 </span>
               </div>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="text-xs text-gray-900 sm:text-sm">
                 {operator.cultured_species || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="text-xs text-gray-900 sm:text-sm">
                 {operator.productive_area_sqm || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
                 {operator.production_kg || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span
                 className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-md ${
                   operator.operational_status === "Active"
@@ -1306,17 +1359,17 @@ const Inventory = () => {
                 {operator.operational_status || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
                 {operator.farmer_name || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-md bg-[#E6F5E4] text-[#6A9C89]">
                 {operator.barangay || "N/A"}
               </span>
             </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="text-xs text-gray-500 sm:text-sm">
                 {operator.created_at
                   ? new Date(operator.created_at).toLocaleDateString()
@@ -1343,7 +1396,7 @@ const Inventory = () => {
           <div className="relative">
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center justify-between w-full px-3 py-2 text-xs sm:text-sm font-medium text-white bg-[#5A8C79] rounded-md sm:w-[180px] hover:bg-opacity-90"
+              className="flex items-center justify-between w-full px-2.5 py-1.5 text-xs sm:text-sm font-medium text-white bg-[#5A8C79] rounded-md sm:w-[180px] hover:bg-opacity-90"
             >
               <div className="flex items-center">
                 {dataTypes.find((type) => type.id === selectedDataType)?.icon}
@@ -1353,7 +1406,7 @@ const Inventory = () => {
                 </span>
               </div>
               <ChevronDownIcon
-                className={`w-4 h-4 transition-transform ${
+                className={`w-3.5 h-3.5 transition-transform ${
                   dropdownOpen ? "rotate-180" : ""
                 }`}
               />
@@ -1368,7 +1421,7 @@ const Inventory = () => {
                       setSelectedDataType(type.id);
                       setDropdownOpen(false);
                     }}
-                    className={`flex items-center w-full px-3 py-2 text-xs sm:text-sm text-left hover:bg-gray-100 ${
+                    className={`flex items-center w-full px-2.5 py-1.5 text-xs sm:text-sm text-left hover:bg-gray-100 ${
                       selectedDataType === type.id
                         ? "bg-gray-100 font-medium"
                         : ""
@@ -1388,7 +1441,7 @@ const Inventory = () => {
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <SearchIcon className="w-4 h-4 text-[#6A9C89]" />
+                  <SearchIcon className="w-3.5 h-3.5 text-[#6A9C89]" />
                 </div>
                 <input
                   type="text"
@@ -1398,7 +1451,7 @@ const Inventory = () => {
                   }`}
                   value={searchText}
                   onChange={handleSearchInputChange}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-md w-full sm:w-[250px] focus:outline-none focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm"
+                  className="pl-10 pr-4 py-1.5 border border-gray-300 rounded-md w-full sm:w-[250px] focus:outline-none focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm"
                 />
                 {searchText && (
                   <button
@@ -1412,11 +1465,11 @@ const Inventory = () => {
 
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center px-3 py-2 text-xs font-medium text-white bg-[#6A9C89] rounded-md sm:text-sm hover:bg-opacity-90 transition-colors"
+                className="flex items-center px-2.5 py-1.5 text-xs font-medium text-white bg-[#6A9C89] rounded-md sm:text-sm hover:bg-opacity-90 transition-colors"
               >
                 <span>Filters</span>
                 <ChevronDownIcon
-                  className={`w-4 h-4 ml-2 transition-transform ${
+                  className={`w-3.5 h-3.5 ml-2 transition-transform ${
                     showFilters ? "rotate-180" : ""
                   }`}
                 />
@@ -1425,7 +1478,7 @@ const Inventory = () => {
               {(barangayFilter || monthFilter || yearFilter) && (
                 <button
                   onClick={clearAllFilters}
-                  className="px-3 py-2 text-xs font-medium text-gray-700 transition-colors border border-gray-300 rounded-md sm:text-sm hover:bg-gray-50"
+                  className="px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors border border-gray-300 rounded-md sm:text-sm hover:bg-gray-50"
                 >
                   Clear
                 </button>
@@ -1464,7 +1517,7 @@ const Inventory = () => {
                       ))}
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-1 pointer-events-none">
-                      <ChevronDownIcon className="w-3 h-3 text-gray-500" />
+                      <ChevronDownIcon className="w-3.5 h-3.5 text-gray-500" />
                     </div>
                   </div>
                 </div>
@@ -1490,7 +1543,7 @@ const Inventory = () => {
                       ))}
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-1 pointer-events-none">
-                      <ChevronDownIcon className="w-3 h-3 text-gray-500" />
+                      <ChevronDownIcon className="w-3.5 h-3.5 text-gray-500" />
                     </div>
                   </div>
                 </div>
@@ -1516,7 +1569,7 @@ const Inventory = () => {
                       ))}
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-1 pointer-events-none">
-                      <ChevronDownIcon className="w-3 h-3 text-gray-500" />
+                      <ChevronDownIcon className="w-3.5 h-3.5 text-gray-500" />
                     </div>
                   </div>
                 </div>
@@ -1572,11 +1625,11 @@ const Inventory = () => {
           <div className="relative">
             {loading && (
               <div className="absolute inset-0 z-10 flex items-center justify-center bg-white bg-opacity-70">
-                <Loader2 className="w-8 h-8 sm:w-12 sm:h-12 animate-spin text-[#6A9C89]" />
+                <Loader2 className="w-3.5 h-3.5 sm:w-12 sm:h-12 animate-spin text-[#6A9C89]" />
               </div>
             )}
 
-            <div className="-mx-3 overflow-x-auto sm:mx-0 overflow-y-auto max-h-[calc(100vh-300px)]">
+            <div className="-mx-3 overflow-x-auto sm:mx-0">
               <table className="min-w-full text-xs border divide-y divide-gray-200 sm:text-sm">
                 <thead className="bg-gray-50">{renderTableColumns()}</thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -1585,42 +1638,90 @@ const Inventory = () => {
               </table>
             </div>
 
-            <div className="flex justify-center mt-4">
-              <nav className="flex items-center">
+            <div className="flex justify-center mt-3">
+              <nav
+                className="inline-flex items-center rounded-md shadow-sm"
+                aria-label="Pagination"
+              >
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium rounded-l-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="sr-only">First</span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-4 h-4"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M15.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 010 1.414zm-6 0a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L5.414 10l4.293 4.293a1 1 0 010 1.414z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </button>
                 <button
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="px-1 py-1 mr-1 border border-gray-300 rounded-md sm:px-2 sm:py-1 sm:mr-2 disabled:opacity-50"
+                  className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium border-t border-b border-l border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <ChevronLeftIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="sr-only">Previous</span>
+                  <ChevronLeftIcon className="w-4 h-4" aria-hidden="true" />
                 </button>
 
-                <div className="flex space-x-1">
-                  {[
-                    ...Array(Math.min(3, Math.ceil(totalRecords / pageSize))),
-                  ].map((_, i) => {
-                    const pageNum = i + 1;
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center rounded-md text-xs sm:text-sm ${
-                          currentPage === pageNum
-                            ? "bg-[#6A9C89] text-white"
-                            : "border border-gray-300 hover:bg-gray-50"
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
+                <div className="hidden sm:flex">
+                  {(() => {
+                    const totalPages = Math.ceil(totalRecords / pageSize);
+                    const pageNumbers = [];
 
-                  {Math.ceil(totalRecords / pageSize) > 3 && (
-                    <span className="flex items-center px-1 text-xs sm:px-2 sm:text-sm">
-                      ...
-                    </span>
-                  )}
+                    // Logic to show current page, first, last, and pages around current
+                    for (let i = 1; i <= totalPages; i++) {
+                      if (
+                        i === 1 || // First page
+                        i === totalPages || // Last page
+                        (i >= currentPage - 1 && i <= currentPage + 1) // Pages around current
+                      ) {
+                        pageNumbers.push(
+                          <button
+                            key={i}
+                            onClick={() => setCurrentPage(i)}
+                            aria-current={
+                              currentPage === i ? "page" : undefined
+                            }
+                            className={`relative inline-flex items-center px-3 py-1.5 text-xs font-medium border ${
+                              currentPage === i
+                                ? "z-10 bg-[#6A9C89] text-white border-[#6A9C89]"
+                                : "bg-white text-gray-500 border-gray-300 hover:bg-gray-50"
+                            }`}
+                          >
+                            {i}
+                          </button>
+                        );
+                      } else if (
+                        (i === 2 && currentPage > 3) || // Show ellipsis after first page
+                        (i === totalPages - 1 && currentPage < totalPages - 2) // Show ellipsis before last page
+                      ) {
+                        pageNumbers.push(
+                          <span
+                            key={`ellipsis-${i}`}
+                            className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300"
+                          >
+                            ...
+                          </span>
+                        );
+                      }
+                    }
+
+                    return pageNumbers;
+                  })()}
                 </div>
+
+                {/* Mobile page indicator */}
+                <span className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 sm:hidden">
+                  {currentPage} / {Math.ceil(totalRecords / pageSize)}
+                </span>
 
                 <button
                   onClick={() =>
@@ -1632,9 +1733,36 @@ const Inventory = () => {
                     )
                   }
                   disabled={currentPage >= Math.ceil(totalRecords / pageSize)}
-                  className="px-1 py-1 ml-1 border border-gray-300 rounded-md sm:px-2 sm:py-1 sm:ml-2 disabled:opacity-50"
+                  className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium border-t border-b border-r border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <ChevronRightIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="sr-only">Next</span>
+                  <ChevronRightIcon className="w-4 h-4" aria-hidden="true" />
+                </button>
+                <button
+                  onClick={() =>
+                    setCurrentPage(Math.ceil(totalRecords / pageSize))
+                  }
+                  disabled={currentPage >= Math.ceil(totalRecords / pageSize)}
+                  className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium rounded-r-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="sr-only">Last</span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-4 h-4"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10.293 15.707a1 1 0 010-1.414L14.586 10l-4.293-4.293a1 1 0 111.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z"
+                      clipRule="evenodd"
+                    />
+                    <path
+                      fillRule="evenodd"
+                      d="M4.293 15.707a1 1 0 010-1.414L8.586 10 4.293 5.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
                 </button>
               </nav>
             </div>
@@ -1646,7 +1774,7 @@ const Inventory = () => {
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-30">
           <div className="w-full max-w-sm p-4 bg-white rounded-lg shadow-xl sm:p-6">
-            <h3 className="mb-2 text-base font-medium sm:text-lg">
+            <h3 className="mb-2 text-sm font-medium sm:text-lg">
               Delete this {selectedDataType.slice(0, -1)}?
             </h3>
             <p className="mb-4 text-xs text-gray-500 sm:text-sm">
@@ -1655,13 +1783,13 @@ const Inventory = () => {
             <div className="flex justify-end space-x-2">
               <button
                 onClick={() => setShowDeleteConfirm(null)}
-                className="px-3 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-md sm:px-4 sm:py-2 sm:text-sm hover:bg-gray-50"
+                className="px-2.5 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded-md sm:px-4 sm:py-2 sm:text-sm hover:bg-gray-50"
               >
                 No
               </button>
               <button
                 onClick={() => handleDelete(showDeleteConfirm)}
-                className="px-3 py-1 sm:px-4 sm:py-2 bg-[#D32F2F] text-white rounded-md text-xs sm:text-sm font-medium hover:bg-opacity-90"
+                className="px-2.5 py-1.5 sm:px-4 sm:py-2 bg-[#D32F2F] text-white rounded-md text-xs sm:text-sm font-medium hover:bg-opacity-90"
               >
                 Yes
               </button>

@@ -20,14 +20,14 @@ import {
   BarChart2,
   TrendingUp,
   Sprout,
-  Wheat,
   Loader2,
   Calendar,
-  Map,
   Award,
   ArrowUp,
   ArrowDown,
   Activity,
+  Fish,
+  MilkIcon as Cow,
 } from "lucide-react";
 
 import { farmerAPI, livestockAPI, operatorAPI } from "./services/api";
@@ -53,6 +53,7 @@ export default function Dashboard() {
     productionTrend: 0,
     totalFarmers: 0,
     totalArea: 0,
+    farmerTypeDistribution: [],
     categoryData: {
       livestock: {
         total: 0,
@@ -102,6 +103,9 @@ export default function Dashboard() {
     border: "#E0E0E0",
     background: "#F5F7F9",
     cardBg: "#FFFFFF",
+    raiser: "#8884d8",
+    operator: "#82ca9d",
+    grower: "#ffc658",
   };
 
   // Colors for pie chart
@@ -193,6 +197,11 @@ export default function Dashboard() {
               } catch (e) {
                 console.error("Error parsing production data:", e);
               }
+            } else if (
+              crop.production_data &&
+              typeof crop.production_data === "object"
+            ) {
+              productionData = crop.production_data;
             }
 
             return {
@@ -227,6 +236,11 @@ export default function Dashboard() {
               } catch (e) {
                 console.error("Error parsing production data:", e);
               }
+            } else if (
+              crop.production_data &&
+              typeof crop.production_data === "object"
+            ) {
+              productionData = crop.production_data;
             }
 
             return {
@@ -288,15 +302,31 @@ export default function Dashboard() {
         };
       });
 
+      // Enrich operators with farmer information
+      const enrichedOperators = operators.map((record) => {
+        const farmer = farmersMap[record.farmer_id];
+        return {
+          ...record,
+          farmer_name: farmer
+            ? farmer.name ||
+              `${farmer.first_name || ""} ${farmer.last_name || ""}`.trim()
+            : "Unknown",
+          barangay: farmer ? farmer.barangay : "Unknown",
+        };
+      });
+
       // Store all the fetched and processed data
       setRawData({
         farmers,
         livestock: enrichedLivestock,
-        operators,
+        operators: enrichedOperators,
         crops,
         rice,
         highValueCrops,
       });
+
+      console.log("Processed crops:", crops);
+      console.log("Processed high value crops:", highValueCrops);
 
       setLoading(false);
     } catch (error) {
@@ -398,6 +428,19 @@ export default function Dashboard() {
         }
       });
 
+      // Add fish production to monthly data
+      rawData.operators.forEach((operator) => {
+        if (operator.date_of_harvest) {
+          const harvestDate = new Date(operator.date_of_harvest);
+          const month = harvestDate.toLocaleString("en-US", { month: "short" });
+          const production = Number.parseFloat(operator.production_kg || 0);
+          if (!isNaN(production) && production > 0) {
+            monthlyProductionMap[month] =
+              (monthlyProductionMap[month] || 0) + production;
+          }
+        }
+      });
+
       // Convert monthly production to array for chart
       const monthOrder = [
         "Jan",
@@ -456,6 +499,11 @@ export default function Dashboard() {
         addToBarangayMap(livestock, quantity);
       });
 
+      rawData.operators.forEach((operator) => {
+        const production = Number.parseFloat(operator.production_kg || 0);
+        addToBarangayMap(operator, production);
+      });
+
       // Convert barangay production to array for chart
       const productionByBarangay = Object.entries(barangayProductionMap)
         .map(([name, value]) => ({ name, value }))
@@ -508,6 +556,15 @@ export default function Dashboard() {
         }
       });
 
+      // Add operator area
+      rawData.operators.forEach((operator) => {
+        const area =
+          Number.parseFloat(operator.productive_area_sqm || 0) / 10000; // Convert sqm to hectares
+        if (!isNaN(area) && area > 0) {
+          totalArea += area;
+        }
+      });
+
       // Calculate production trend (year over year)
       const currentYear = new Date().getFullYear();
       const lastYear = currentYear - 1;
@@ -550,6 +607,15 @@ export default function Dashboard() {
         addToYearlyProduction(crop.harvest_date || crop.created_at, production);
       });
 
+      // Add operator production to yearly totals
+      rawData.operators.forEach((operator) => {
+        const production = Number.parseFloat(operator.production_kg || 0);
+        addToYearlyProduction(
+          operator.date_of_harvest || operator.created_at,
+          production
+        );
+      });
+
       // Calculate production trend percentage
       const productionTrend =
         lastYearProduction > 0
@@ -571,6 +637,7 @@ export default function Dashboard() {
             id: rice.id || Math.random().toString(),
             farmer_id: rice.farmer_id,
             farmer_name: rice.farmer_name,
+            type: "Grower",
             crop_type: rice.variety || rice.seed_type || "Rice",
             yield_amount: production,
             area: Number.parseFloat(rice.area_harvested || rice.area || 0),
@@ -598,6 +665,7 @@ export default function Dashboard() {
             id: crop.id || Math.random().toString(),
             farmer_id: crop.farmer_id,
             farmer_name: crop.farmer_name,
+            type: "Grower",
             crop_type: crop.crop_type || crop.crop_value || "Crop",
             yield_amount: yield_amount,
             area: Number.parseFloat(crop.area_hectare || crop.area || 0),
@@ -625,6 +693,7 @@ export default function Dashboard() {
             id: crop.id || Math.random().toString(),
             farmer_id: crop.farmer_id,
             farmer_name: crop.farmer_name,
+            type: "Grower",
             crop_type: crop.crop_value || "High Value Crop",
             yield_amount: yield_amount,
             area: Number.parseFloat(crop.area_hectare || crop.area || 0),
@@ -642,10 +711,74 @@ export default function Dashboard() {
         }
       });
 
+      // Add operator harvests
+      rawData.operators.forEach((operator) => {
+        const production = Number.parseFloat(operator.production_kg || 0);
+        if (production > 0) {
+          allHarvests.push({
+            id: operator.id || Math.random().toString(),
+            farmer_id: operator.farmer_id,
+            farmer_name: operator.farmer_name,
+            type: "Operator",
+            crop_type: operator.cultured_species || "Fish",
+            yield_amount: production,
+            area: Number.parseFloat(operator.productive_area_sqm || 0) / 10000, // Convert sqm to hectares
+            yield_per_hectare:
+              operator.productive_area_sqm > 0
+                ? (
+                    (production * 10000) /
+                    Number.parseFloat(operator.productive_area_sqm || 1)
+                  ).toFixed(2)
+                : "N/A",
+            harvest_date: new Date(
+              operator.date_of_harvest || operator.created_at || new Date()
+            ),
+            barangay: operator.barangay,
+          });
+        }
+      });
+
       // Sort harvests by date (most recent first) and take top 5
       const recentHarvests = allHarvests
         .sort((a, b) => b.harvest_date - a.harvest_date)
         .slice(0, 5);
+
+      // Process farmer type distribution
+      const farmerTypeCount = {
+        Raiser: 0,
+        Operator: 0,
+        Grower: 0,
+      };
+
+      // Count farmers by type
+      rawData.farmers.forEach((farmer) => {
+        // Determine farmer type based on associated records
+        const hasLivestock = rawData.livestock.some(
+          (record) => record.farmer_id === farmer.farmer_id
+        );
+        const hasOperator = rawData.operators.some(
+          (record) => record.farmer_id === farmer.farmer_id
+        );
+        const hasCrops =
+          rawData.crops.some(
+            (record) => record.farmer_id === farmer.farmer_id
+          ) ||
+          rawData.rice.some(
+            (record) => record.farmer_id === farmer.farmer_id
+          ) ||
+          rawData.highValueCrops.some(
+            (record) => record.farmer_id === farmer.farmer_id
+          );
+
+        if (hasLivestock) farmerTypeCount.Raiser++;
+        if (hasOperator) farmerTypeCount.Operator++;
+        if (hasCrops) farmerTypeCount.Grower++;
+      });
+
+      // Convert to array for chart
+      const farmerTypeDistribution = Object.entries(farmerTypeCount)
+        .map(([name, value]) => ({ name, value }))
+        .filter((item) => item.value > 0);
 
       // Update dashboard data
       setDashboardData({
@@ -658,6 +791,7 @@ export default function Dashboard() {
         productionTrend,
         totalFarmers: rawData.farmers.length,
         totalArea,
+        farmerTypeDistribution,
         categoryData,
       });
     } catch (error) {
@@ -741,13 +875,63 @@ export default function Dashboard() {
         isBananaVariety(crop.crop_value)
     );
 
-    bananaCrops.forEach((crop) => {
-      const variety = crop.crop_value || crop.variety_clone || "Unknown Banana";
-      const production = Number.parseFloat(
-        crop.yield_amount || crop.production || crop.quantity || 0
-      );
+    console.log("Banana crops:", bananaCrops);
 
-      bananaVarietyMap[variety] = (bananaVarietyMap[variety] || 0) + production;
+    bananaCrops.forEach((crop) => {
+      // Get variety from crop_value, variety_clone, or from parsed production_data
+      let variety = crop.crop_value || crop.variety_clone || "Unknown Banana";
+
+      // Try to parse production_data if it's a string
+      let productionData = {};
+      if (crop.production_data && typeof crop.production_data === "string") {
+        try {
+          productionData = JSON.parse(crop.production_data);
+          // If crop value is in production_data, use it
+          if (productionData.crop) {
+            variety = productionData.crop;
+          }
+        } catch (e) {
+          console.error("Error parsing production data:", e);
+        }
+      } else if (
+        crop.production_data &&
+        typeof crop.production_data === "object"
+      ) {
+        productionData = crop.production_data;
+        if (productionData.crop) {
+          variety = productionData.crop;
+        }
+      }
+
+      // Try to get quantity from different possible fields
+      let production = 0;
+
+      // First check if quantity is in production_data
+      if (
+        productionData.quantity &&
+        !isNaN(Number.parseFloat(productionData.quantity))
+      ) {
+        production = Number.parseFloat(productionData.quantity);
+      }
+      // Then check other possible fields
+      else if (crop.quantity && !isNaN(Number.parseFloat(crop.quantity))) {
+        production = Number.parseFloat(crop.quantity);
+      } else if (
+        crop.yield_amount &&
+        !isNaN(Number.parseFloat(crop.yield_amount))
+      ) {
+        production = Number.parseFloat(crop.yield_amount);
+      } else if (
+        crop.production &&
+        !isNaN(Number.parseFloat(crop.production))
+      ) {
+        production = Number.parseFloat(crop.production);
+      }
+
+      if (variety && production > 0) {
+        bananaVarietyMap[variety] =
+          (bananaVarietyMap[variety] || 0) + production;
+      }
     });
 
     const items = Object.entries(bananaVarietyMap)
@@ -774,13 +958,62 @@ export default function Dashboard() {
         (crop.crop_value && isLegume(crop.crop_value.toLowerCase()))
     );
 
-    legumeCrops.forEach((crop) => {
-      const type = crop.crop_value || crop.crop_type || "Unknown Legume";
-      const production = Number.parseFloat(
-        crop.yield_amount || crop.production || crop.quantity || 0
-      );
+    console.log("Legume crops:", legumeCrops);
 
-      legumesTypeMap[type] = (legumesTypeMap[type] || 0) + production;
+    legumeCrops.forEach((crop) => {
+      // Get crop type from crop_value, crop_type, or from parsed production_data
+      let type = crop.crop_value || crop.crop_type || "Unknown Legume";
+
+      // Try to parse production_data if it's a string
+      let productionData = {};
+      if (crop.production_data && typeof crop.production_data === "string") {
+        try {
+          productionData = JSON.parse(crop.production_data);
+          // If crop value is in production_data, use it
+          if (productionData.crop) {
+            type = productionData.crop;
+          }
+        } catch (e) {
+          console.error("Error parsing production data:", e);
+        }
+      } else if (
+        crop.production_data &&
+        typeof crop.production_data === "object"
+      ) {
+        productionData = crop.production_data;
+        if (productionData.crop) {
+          type = productionData.crop;
+        }
+      }
+
+      // Try to get quantity from different possible fields
+      let production = 0;
+
+      // First check if quantity is in production_data
+      if (
+        productionData.quantity &&
+        !isNaN(Number.parseFloat(productionData.quantity))
+      ) {
+        production = Number.parseFloat(productionData.quantity);
+      }
+      // Then check other possible fields
+      else if (crop.quantity && !isNaN(Number.parseFloat(crop.quantity))) {
+        production = Number.parseFloat(crop.quantity);
+      } else if (
+        crop.yield_amount &&
+        !isNaN(Number.parseFloat(crop.yield_amount))
+      ) {
+        production = Number.parseFloat(crop.yield_amount);
+      } else if (
+        crop.production &&
+        !isNaN(Number.parseFloat(crop.production))
+      ) {
+        production = Number.parseFloat(crop.production);
+      }
+
+      if (type && production > 0) {
+        legumesTypeMap[type] = (legumesTypeMap[type] || 0) + production;
+      }
     });
 
     const items = Object.entries(legumesTypeMap)
@@ -807,13 +1040,62 @@ export default function Dashboard() {
         (crop.crop_value && isSpice(crop.crop_value.toLowerCase()))
     );
 
-    spiceCrops.forEach((crop) => {
-      const type = crop.crop_value || crop.crop_type || "Unknown Spice";
-      const production = Number.parseFloat(
-        crop.yield_amount || crop.production || crop.quantity || 0
-      );
+    console.log("Spice crops:", spiceCrops);
 
-      spicesTypeMap[type] = (spicesTypeMap[type] || 0) + production;
+    spiceCrops.forEach((crop) => {
+      // Get crop type from crop_value, crop_type, or from parsed production_data
+      let type = crop.crop_value || crop.crop_type || "Unknown Spice";
+
+      // Try to parse production_data if it's a string
+      let productionData = {};
+      if (crop.production_data && typeof crop.production_data === "string") {
+        try {
+          productionData = JSON.parse(crop.production_data);
+          // If crop value is in production_data, use it
+          if (productionData.crop) {
+            type = productionData.crop;
+          }
+        } catch (e) {
+          console.error("Error parsing production data:", e);
+        }
+      } else if (
+        crop.production_data &&
+        typeof crop.production_data === "object"
+      ) {
+        productionData = crop.production_data;
+        if (productionData.crop) {
+          type = productionData.crop;
+        }
+      }
+
+      // Try to get quantity from different possible fields
+      let production = 0;
+
+      // First check if quantity is in production_data
+      if (
+        productionData.quantity &&
+        !isNaN(Number.parseFloat(productionData.quantity))
+      ) {
+        production = Number.parseFloat(productionData.quantity);
+      }
+      // Then check other possible fields
+      else if (crop.quantity && !isNaN(Number.parseFloat(crop.quantity))) {
+        production = Number.parseFloat(crop.quantity);
+      } else if (
+        crop.yield_amount &&
+        !isNaN(Number.parseFloat(crop.yield_amount))
+      ) {
+        production = Number.parseFloat(crop.yield_amount);
+      } else if (
+        crop.production &&
+        !isNaN(Number.parseFloat(crop.production))
+      ) {
+        production = Number.parseFloat(crop.production);
+      }
+
+      if (type && production > 0) {
+        spicesTypeMap[type] = (spicesTypeMap[type] || 0) + production;
+      }
     });
 
     const items = Object.entries(spicesTypeMap)
@@ -878,12 +1160,46 @@ export default function Dashboard() {
     const highValueCrops = rawData.highValueCrops || [];
     const cropTypeMap = {};
 
+    console.log("High Value Crops data:", highValueCrops);
+
     highValueCrops.forEach((crop) => {
-      const cropType = crop.crop_value || "Unknown HVC";
+      // Get crop type from crop_value or from parsed production_data
+      let cropType = crop.crop_value || "Unknown HVC";
+
+      // Try to parse production_data if it's a string
+      let productionData = {};
+      if (crop.production_data && typeof crop.production_data === "string") {
+        try {
+          productionData = JSON.parse(crop.production_data);
+          // If crop value is in production_data, use it
+          if (productionData.crop) {
+            cropType = productionData.crop;
+          }
+        } catch (e) {
+          console.error("Error parsing production data:", e);
+        }
+      } else if (
+        crop.production_data &&
+        typeof crop.production_data === "object"
+      ) {
+        productionData = crop.production_data;
+        if (productionData.crop) {
+          cropType = productionData.crop;
+        }
+      }
 
       // Try to get quantity from different possible fields
       let quantity = 0;
-      if (crop.quantity && !isNaN(Number.parseFloat(crop.quantity))) {
+
+      // First check if quantity is in production_data
+      if (
+        productionData.quantity &&
+        !isNaN(Number.parseFloat(productionData.quantity))
+      ) {
+        quantity = Number.parseFloat(productionData.quantity);
+      }
+      // Then check other possible fields
+      else if (crop.quantity && !isNaN(Number.parseFloat(crop.quantity))) {
         quantity = Number.parseFloat(crop.quantity);
       } else if (
         crop.yield_amount &&
@@ -897,7 +1213,9 @@ export default function Dashboard() {
         quantity = Number.parseFloat(crop.production);
       }
 
-      cropTypeMap[cropType] = (cropTypeMap[cropType] || 0) + quantity;
+      if (cropType && quantity > 0) {
+        cropTypeMap[cropType] = (cropTypeMap[cropType] || 0) + quantity;
+      }
     });
 
     const items = Object.entries(cropTypeMap)
@@ -937,8 +1255,12 @@ export default function Dashboard() {
       "pigeon pea",
       "beans",
       "legume",
+      "legumes",
     ];
-    return legumes.some((legume) => cropType.includes(legume));
+    return (
+      cropType.toLowerCase() === "legumes" ||
+      legumes.some((legume) => cropType.toLowerCase().includes(legume))
+    );
   };
 
   const isSpice = (cropType) => {
@@ -950,8 +1272,12 @@ export default function Dashboard() {
       "chili",
       "lemongrass",
       "spice",
+      "spices",
     ];
-    return spices.some((spice) => cropType.includes(spice));
+    return (
+      cropType.toLowerCase() === "spices" ||
+      spices.some((spice) => cropType.toLowerCase().includes(spice))
+    );
   };
 
   const isFish = (cropType) => {
@@ -1011,7 +1337,7 @@ export default function Dashboard() {
               Agricultural Production Dashboard
             </h2>
             <p className="text-[#666666] mt-1">
-              Overview of crop production and yields as of {formattedDate}
+              Overview of all farmer types and production as of {formattedDate}
             </p>
           </div>
           <div className="mt-4 md:mt-0">
@@ -1065,7 +1391,7 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="mt-2 text-sm text-white opacity-80">
-            Metric tons of produce across all crops
+            Metric tons of produce across all categories
           </p>
         </div>
 
@@ -1117,7 +1443,7 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="mt-2 text-sm text-white opacity-80">
-            Hectares of cultivated farmland
+            Hectares of cultivated land and water
           </p>
         </div>
 
@@ -1165,6 +1491,85 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Farmer Type Distribution */}
+      <div className="p-6 mb-8 bg-white border border-gray-100 shadow-md rounded-xl">
+        <h4 className="mb-6 text-lg font-semibold text-gray-800">
+          Farmer Type Distribution
+        </h4>
+        {dashboardData.farmerTypeDistribution &&
+        dashboardData.farmerTypeDistribution.length > 0 ? (
+          <div className="h-[320px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={dashboardData.farmerTypeDistribution}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={true}
+                  label={({ name, percent }) =>
+                    `${name}: ${(percent * 100).toFixed(0)}%`
+                  }
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {dashboardData.farmerTypeDistribution.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={
+                        entry.name === "Raiser"
+                          ? colors.raiser
+                          : entry.name === "Operator"
+                          ? colors.operator
+                          : colors.grower
+                      }
+                    />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(value, name) => [
+                    `${formatNumber(value)} farmers`,
+                    name,
+                  ]}
+                  contentStyle={{
+                    backgroundColor: "rgba(255, 255, 255, 0.9)",
+                    borderRadius: "8px",
+                    border: "1px solid #E0E0E0",
+                    boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+                  }}
+                />
+                <Legend
+                  layout="horizontal"
+                  verticalAlign="bottom"
+                  align="center"
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-[320px] text-gray-400">
+            <svg
+              className="w-16 h-16 mb-4 text-gray-300"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              ></path>
+            </svg>
+            <p className="text-lg font-medium">No farmer type data available</p>
+            <p className="mt-2 text-sm text-gray-400">
+              Add farmer data to see distribution
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Secondary Stats Row */}
       <div className="grid grid-cols-1 gap-6 mb-8 sm:grid-cols-3">
         <div className="p-6 bg-white border border-gray-100 shadow-md rounded-xl">
@@ -1187,32 +1592,34 @@ export default function Dashboard() {
         <div className="p-6 bg-white border border-gray-100 shadow-md rounded-xl">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-800">
-              Crop Varieties
+              Livestock Count
             </h3>
-            <div className="p-2 rounded-lg bg-green-50">
-              <Wheat className="w-5 h-5 text-green-600" />
+            <div className="p-2 rounded-lg bg-purple-50">
+              <Cow className="w-5 h-5 text-purple-600" />
             </div>
           </div>
           <p className="text-3xl font-bold text-gray-900">
-            {dashboardData.cropProduction.length}
+            {formatNumber(dashboardData.categoryData.livestock.total)}
           </p>
           <p className="mt-2 text-sm text-gray-500">
-            Different crops being cultivated
+            Total heads of livestock and poultry
           </p>
         </div>
 
         <div className="p-6 bg-white border border-gray-100 shadow-md rounded-xl">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">Barangays</h3>
-            <div className="p-2 rounded-lg bg-amber-50">
-              <Map className="w-5 h-5 text-amber-600" />
+            <h3 className="text-lg font-semibold text-gray-800">
+              Aquaculture Production
+            </h3>
+            <div className="p-2 rounded-lg bg-cyan-50">
+              <Fish className="w-5 h-5 text-cyan-600" />
             </div>
           </div>
           <p className="text-3xl font-bold text-gray-900">
-            {dashboardData.productionByBarangay.length}
+            {formatNumber(dashboardData.categoryData.fish.total.toFixed(2))}
           </p>
           <p className="mt-2 text-sm text-gray-500">
-            Areas with agricultural activity
+            Metric tons of fish and seafood
           </p>
         </div>
       </div>
@@ -1221,7 +1628,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 gap-6 mb-8 lg:grid-cols-2">
         <div className="p-6 bg-white border border-gray-100 shadow-md rounded-xl">
           <h4 className="mb-6 text-lg font-semibold text-gray-800">
-            Crop Production Distribution
+            Production Distribution
           </h4>
           {dashboardData.cropProduction.length > 0 ? (
             <div className="h-[320px]">
@@ -1248,7 +1655,9 @@ export default function Dashboard() {
                   </Pie>
                   <Tooltip
                     formatter={(value, name) => [
-                      `${formatNumber(value.toFixed(2))} tons`,
+                      name === "Livestock & Poultry"
+                        ? `${formatNumber(value)} heads`
+                        : `${formatNumber(value.toFixed(2))} tons`,
                       name,
                     ]}
                     contentStyle={{
@@ -1286,7 +1695,7 @@ export default function Dashboard() {
                 No production data available
               </p>
               <p className="mt-2 text-sm text-gray-400">
-                Add crop data to see distribution
+                Add production data to see distribution
               </p>
             </div>
           )}
@@ -1422,7 +1831,7 @@ export default function Dashboard() {
                 />
                 <Tooltip
                   formatter={(value) => [
-                    `${formatNumber(value.toFixed(2))} tons`,
+                    `${formatNumber(value.toFixed(2))} units`,
                     "Production",
                   ]}
                   contentStyle={{
@@ -1435,7 +1844,7 @@ export default function Dashboard() {
                 <Legend />
                 <Bar
                   dataKey="value"
-                  name="Production (tons)"
+                  name="Production (units)"
                   fill={colors.primary}
                   radius={[4, 4, 0, 0]}
                 >
@@ -1555,7 +1964,7 @@ export default function Dashboard() {
                 d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               ></path>
             </svg>
-            <p>No crop production data available</p>
+            <p>No production data available</p>
           </div>
         )}
       </div>
@@ -1589,13 +1998,19 @@ export default function Dashboard() {
                     scope="col"
                     className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase bg-gray-50"
                   >
-                    Crop
+                    Type
                   </th>
                   <th
                     scope="col"
                     className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase bg-gray-50"
                   >
-                    Yield (tons)
+                    Product
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase bg-gray-50"
+                  >
+                    Yield
                   </th>
                   <th
                     scope="col"
@@ -1639,12 +2054,26 @@ export default function Dashboard() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full ${
+                          harvest.type === "Raiser"
+                            ? "bg-purple-100 text-purple-700"
+                            : harvest.type === "Operator"
+                            ? "bg-cyan-100 text-cyan-700"
+                            : "bg-[#E6F5E4] text-[#6A9C89]"
+                        } font-medium`}
+                      >
+                        {harvest.type}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <span className="px-2 py-1 text-xs rounded-full bg-[#E6F5E4] text-[#6A9C89] font-medium">
                         {harvest.crop_type}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
                       {harvest.yield_amount.toFixed(2)}
+                      {harvest.type === "Raiser" ? " heads" : " tons"}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
                       {harvest.area.toFixed(2)}
