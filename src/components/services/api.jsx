@@ -2,7 +2,7 @@
 import axios from "axios";
 
 // Base API URL
-const API_BASE_URL = "thesis-backend-tau.vercel.app/api";
+const API_BASE_URL = "thesis-backend-tau.vercel.app/api/api";
 
 // Helper to get auth token
 const getAuthToken = () => {
