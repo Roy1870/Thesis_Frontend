@@ -4,13 +4,46 @@ import axios from "axios";
 // Base API URL
 const API_BASE_URL = "https://thesis-backend-tau.vercel.app/api/api";
 
+// Simple lightweight cache implementation
+const cache = {
+  data: new Map(),
+  get: (key) => {
+    const item = cache.data.get(key);
+    if (!item) return null;
+    if (Date.now() > item.expiry) {
+      cache.data.delete(key);
+      return null;
+    }
+    return item.value;
+  },
+  set: (key, value, ttl = 60000) => {
+    cache.data.set(key, {
+      value,
+      expiry: Date.now() + ttl,
+    });
+  },
+  invalidate: (prefix) => {
+    for (const key of cache.data.keys()) {
+      if (key.startsWith(prefix)) {
+        cache.data.delete(key);
+      }
+    }
+  },
+};
+
 // Helper to get auth token
 const getAuthToken = () => {
-  const token = localStorage.getItem("authToken");
-  if (!token) {
-    throw new Error("Authorization token not found");
+  if (typeof window === "undefined") return null;
+  try {
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      throw new Error("Authorization token not found");
+    }
+    return token;
+  } catch (error) {
+    console.error("Error getting auth token:", error);
+    return null;
   }
-  return token;
 };
 
 // Create axios instance with default config
@@ -18,7 +51,9 @@ const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
+    Connection: "keep-alive", // Enable connection reuse
   },
+  timeout: 10000, // Add timeout to prevent hanging requests
 });
 
 // Add auth token to requests
@@ -39,6 +74,11 @@ apiClient.interceptors.request.use(
 export const farmerAPI = {
   // Get all farmers with pagination and search
   getAllFarmers: async (page = 1, perPage = 10, search = "") => {
+    const cacheKey = `farmers|${page}|${perPage}|${search}`;
+    const cachedData = cache.get(cacheKey);
+
+    if (cachedData) return cachedData;
+
     const params = new URLSearchParams({
       page,
       per_page: perPage,
@@ -50,6 +90,7 @@ export const farmerAPI = {
 
     try {
       const response = await apiClient.get(`/farmers?${params.toString()}`);
+      cache.set(cacheKey, response.data);
       return response.data;
     } catch (error) {
       throw new Error(`Failed to fetch farmers: ${error.message}`);
@@ -58,11 +99,16 @@ export const farmerAPI = {
 
   // Get a single farmer by ID
   getFarmerById: async (farmerId) => {
+    const cacheKey = `farmer|${farmerId}`;
+    const cachedData = cache.get(cacheKey);
+
+    if (cachedData) return cachedData;
+
     try {
       // Try to directly get the farmer by ID first
       try {
-        // This might not work if the endpoint doesn't exist
         const response = await apiClient.get(`/farmers/${farmerId}`);
+        cache.set(cacheKey, response.data);
         return response.data;
       } catch (directError) {
         // If direct access fails, try to get all farmers and filter
@@ -89,6 +135,7 @@ export const farmerAPI = {
           throw new Error(`Farmer with ID ${farmerId} not found`);
         }
 
+        cache.set(cacheKey, farmer);
         return farmer;
       }
     } catch (error) {
@@ -100,6 +147,7 @@ export const farmerAPI = {
   createFarmer: async (farmerData) => {
     try {
       const response = await apiClient.post("/farmers", farmerData);
+      cache.invalidate("farmers|");
       return response.data;
     } catch (error) {
       throw new Error(`Failed to create farmer: ${error.message}`);
@@ -110,6 +158,8 @@ export const farmerAPI = {
   updateFarmer: async (farmerId, farmerData) => {
     try {
       const response = await apiClient.put(`/farmers/${farmerId}`, farmerData);
+      cache.invalidate(`farmer|${farmerId}`);
+      cache.invalidate("farmers|");
       return response.data;
     } catch (error) {
       throw new Error(`Failed to update farmer: ${error.message}`);
@@ -120,6 +170,8 @@ export const farmerAPI = {
   deleteFarmer: async (farmerId) => {
     try {
       const response = await apiClient.delete(`/farmers/${farmerId}`);
+      cache.invalidate(`farmer|${farmerId}`);
+      cache.invalidate("farmers|");
       return response.data;
     } catch (error) {
       throw new Error(`Failed to delete farmer: ${error.message}`);
@@ -133,6 +185,7 @@ export const farmerAPI = {
         `/farmers/${farmerId}/crops`,
         cropsData
       );
+      cache.invalidate(`farmer|${farmerId}`);
       return response.data;
     } catch (error) {
       throw new Error(`Failed to add crops: ${error.message}`);
@@ -146,6 +199,7 @@ export const farmerAPI = {
         `/farmers/${farmerId}/rice`,
         riceData
       );
+      cache.invalidate(`farmer|${farmerId}`);
       return response.data;
     } catch (error) {
       throw new Error(`Failed to add rice data: ${error.message}`);
@@ -158,6 +212,7 @@ export const farmerAPI = {
       const response = await apiClient.delete(
         `/farmers/${farmerId}/crops/${cropId}`
       );
+      cache.invalidate(`farmer|${farmerId}`);
       return response.data;
     } catch (error) {
       throw new Error(`Failed to delete crop: ${error.message}`);
@@ -170,6 +225,7 @@ export const farmerAPI = {
       const response = await apiClient.delete(
         `/farmers/${farmerId}/rice/${riceId}`
       );
+      cache.invalidate(`farmer|${farmerId}`);
       return response.data;
     } catch (error) {
       throw new Error(`Failed to delete rice data: ${error.message}`);
@@ -178,11 +234,11 @@ export const farmerAPI = {
 
   updateCrop: async (farmerId, cropId, cropData) => {
     try {
-      // cropData should already be in the correct format
       const response = await apiClient.put(
         `/farmers/${farmerId}/crops/${cropId}`,
         cropData
       );
+      cache.invalidate(`farmer|${farmerId}`);
       return response.data;
     } catch (error) {
       throw new Error(`Failed to update crop: ${error.message}`);
@@ -191,11 +247,11 @@ export const farmerAPI = {
 
   updateRice: async (farmerId, riceId, riceData) => {
     try {
-      // riceData should already be in the correct format
       const response = await apiClient.put(
         `/farmers/${farmerId}/rice/${riceId}`,
         riceData
       );
+      cache.invalidate(`farmer|${farmerId}`);
       return response.data;
     } catch (error) {
       throw new Error(`Failed to update rice data: ${error.message}`);
@@ -207,6 +263,11 @@ export const farmerAPI = {
 export const livestockAPI = {
   // Get all livestock records with pagination and search
   getAllLivestockRecords: async (page = 1, perPage = 10, search = "") => {
+    const cacheKey = `livestock|${page}|${perPage}|${search}`;
+    const cachedData = cache.get(cacheKey);
+
+    if (cachedData) return cachedData;
+
     const params = new URLSearchParams({
       page,
       per_page: perPage,
@@ -220,6 +281,7 @@ export const livestockAPI = {
       const response = await apiClient.get(
         `/livestock-records?${params.toString()}`
       );
+      cache.set(cacheKey, response.data);
       return response.data;
     } catch (error) {
       throw new Error(`Failed to fetch livestock records: ${error.message}`);
@@ -228,8 +290,14 @@ export const livestockAPI = {
 
   // Get a single livestock record by ID
   getLivestockRecordById: async (recordId) => {
+    const cacheKey = `livestock-record|${recordId}`;
+    const cachedData = cache.get(cacheKey);
+
+    if (cachedData) return cachedData;
+
     try {
       const response = await apiClient.get(`/livestock-records/${recordId}`);
+      cache.set(cacheKey, response.data);
       return response.data;
     } catch (error) {
       throw new Error(
@@ -242,6 +310,7 @@ export const livestockAPI = {
   createLivestockRecords: async (data) => {
     try {
       const response = await apiClient.post("/livestock-records", data);
+      cache.invalidate("livestock|");
       return response.data;
     } catch (error) {
       throw new Error(`Failed to create livestock records: ${error.message}`);
@@ -255,6 +324,8 @@ export const livestockAPI = {
         `/farmers/${farmerId}/livestock-records`,
         livestockData
       );
+      cache.invalidate(`farmer|${farmerId}`);
+      cache.invalidate("livestock|");
       return response.data;
     } catch (error) {
       throw new Error(`Failed to add livestock records: ${error.message}`);
@@ -268,6 +339,8 @@ export const livestockAPI = {
         `/livestock-records/${recordId}`,
         livestockData
       );
+      cache.invalidate(`livestock-record|${recordId}`);
+      cache.invalidate("livestock|");
       return response.data;
     } catch (error) {
       throw new Error(`Failed to update livestock record: ${error.message}`);
@@ -283,6 +356,8 @@ export const livestockAPI = {
       }
 
       const response = await apiClient.delete(`/livestock-records/${recordId}`);
+      cache.invalidate(`livestock-record|${recordId}`);
+      cache.invalidate("livestock|");
       return response.data;
     } catch (error) {
       console.error("API Service - Error deleting livestock record:", error);
@@ -295,6 +370,11 @@ export const livestockAPI = {
 export const operatorAPI = {
   // Get all operators with pagination and search
   getAllOperators: async (page = 1, perPage = 10, search = "") => {
+    const cacheKey = `operators|${page}|${perPage}|${search}`;
+    const cachedData = cache.get(cacheKey);
+
+    if (cachedData) return cachedData;
+
     const params = new URLSearchParams({
       page,
       per_page: perPage,
@@ -306,6 +386,7 @@ export const operatorAPI = {
 
     try {
       const response = await apiClient.get(`/operators?${params.toString()}`);
+      cache.set(cacheKey, response.data);
       return response.data;
     } catch (error) {
       throw new Error(`Failed to fetch operators: ${error.message}`);
@@ -314,9 +395,14 @@ export const operatorAPI = {
 
   // Get a single operator by ID
   getOperatorById: async (operatorId) => {
+    const cacheKey = `operator|${operatorId}`;
+    const cachedData = cache.get(cacheKey);
+
+    if (cachedData) return cachedData;
+
     try {
       const response = await apiClient.get(`/operators/${operatorId}`);
-      console.log("API Response for operator by ID:", response.data);
+      cache.set(cacheKey, response.data);
       return response.data;
     } catch (error) {
       throw new Error(`Failed to fetch operator details: ${error.message}`);
@@ -327,6 +413,7 @@ export const operatorAPI = {
   addOperator: async (data) => {
     try {
       const response = await apiClient.post(`/operators`, data);
+      cache.invalidate("operators|");
       return response.data;
     } catch (error) {
       throw new Error(`Failed to add operator: ${error.message}`);
@@ -340,6 +427,8 @@ export const operatorAPI = {
         `/operators/${farmerId}`,
         operatorData
       );
+      cache.invalidate(`operator|${farmerId}`);
+      cache.invalidate("operators|");
       return response.data;
     } catch (error) {
       throw new Error(`Failed to update operator: ${error.message}`);
@@ -353,11 +442,21 @@ export const operatorAPI = {
         throw new Error("Operator ID is required for deletion");
       }
       const response = await apiClient.delete(`/operators/${operatorId}`);
+      cache.invalidate(`operator|${operatorId}`);
+      cache.invalidate("operators|");
       return response.data;
     } catch (error) {
       throw new Error(`Failed to delete operator: ${error.message}`);
     }
   },
+};
+
+// Prefetch common data function
+export const prefetchCommonData = () => {
+  // Prefetch data that's commonly needed
+  farmerAPI.getAllFarmers(1, 10);
+  livestockAPI.getAllLivestockRecords(1, 10);
+  operatorAPI.getAllOperators(1, 10);
 };
 
 // Export a default object with all APIs
