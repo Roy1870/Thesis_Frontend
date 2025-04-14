@@ -7,10 +7,13 @@ import backgroundImage from "../images/logo4.png"; // Import the background imag
 const Login = () => {
   const onFinish = async (values) => {
     try {
-      const response = await axios.post("http://localhost:8000/api/login", {
-        email: values.email,
-        password: values.password,
-      });
+      const response = await axios.post(
+        "thesis-backend-tau.vercel.app/api/login",
+        {
+          email: values.email,
+          password: values.password,
+        }
+      );
 
       if (response.data.token) {
         const token = response.data.token;
