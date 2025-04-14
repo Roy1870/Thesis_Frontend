@@ -8,7 +8,7 @@ const Login = () => {
   const onFinish = async (values) => {
     try {
       const response = await axios.post(
-        "https://thesis-backend-tau.vercel.app/api/login",
+        "https://thesis-backend-tau.vercel.app/api/api/login",
         {
           email: values.email,
           password: values.password,
