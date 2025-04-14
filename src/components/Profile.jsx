@@ -96,7 +96,7 @@ const Profile = () => {
     try {
       const token = getAuthToken();
       const response = await axios.post(
-        "http://localhost:8000/api/user/profile",
+        "https://thesis-backend-tau.vercel.app/api/api/user/profile",
         formData,
         {
           headers: {

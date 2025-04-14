@@ -38,7 +38,7 @@ const UserManagement = () => {
         try {
           // Try to get current user info from a user profile endpoint
           const userResponse = await axios.get(
-            "http://localhost:8000/api/user", // Adjust this endpoint to match your API
+            "https://thesis-backend-tau.vercel.app/api/api/user", // Adjust this endpoint to match your API
             {
               headers: {
                 Authorization: `Bearer ${authToken}`,
