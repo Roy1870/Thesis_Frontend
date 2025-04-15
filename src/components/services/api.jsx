@@ -8,9 +8,6 @@ const API_BASE_URL = "https://thesis-backend-tau.vercel.app/api/api";
 const CACHE_TTL = 300000; // 5 minutes in milliseconds
 const CACHE_TTL_CRITICAL = 600000; // 10 minutes for critical data
 
-// Reduced timeout for faster error detection
-const CONNECTION_TIMEOUT = 5000; // 5 seconds max for requests
-
 // Persistent cache implementation with localStorage backup
 class PersistentCache {
   constructor(maxSize = 100) {
@@ -220,8 +217,11 @@ const apiClient = axios.create({
     "Content-Type": "application/json",
     Connection: "keep-alive",
   },
-  timeout: CONNECTION_TIMEOUT, // Reduced timeout for faster error detection
+  timeout: 15000, // Increased timeout for slower connections
 });
+
+// Track in-flight requests to prevent duplicates
+const pendingRequests = new Map();
 
 // Add auth token to requests
 apiClient.interceptors.request.use(
@@ -255,19 +255,31 @@ apiClient.interceptors.request.use(
     // Don't cache if specifically requested
     if (config.headers?.["Cache-Control"] === "no-cache") return config;
 
-    const cacheKey = `${config.url}|${JSON.stringify(config.params)}`;
+    const cacheKey = `${config.url}|${JSON.stringify(config.params || {})}`;
+
+    // Check if this exact request is already in flight
+    if (pendingRequests.has(cacheKey)) {
+      // Return the existing promise to avoid duplicate requests
+      return pendingRequests.get(cacheKey);
+    }
+
     const cachedResponse = cache.get(cacheKey);
 
     if (cachedResponse) {
       // Return cached data in a format axios expects
-      return Promise.resolve({
-        data: cachedResponse.data,
-        status: 200,
-        statusText: "OK",
-        headers: cachedResponse.headers || {},
-        config,
-        cached: true,
-      });
+      return {
+        ...config,
+        adapter: () => {
+          return Promise.resolve({
+            data: cachedResponse.data,
+            status: 200,
+            statusText: "OK",
+            headers: cachedResponse.headers || {},
+            config,
+            cached: true,
+          });
+        },
+      };
     }
 
     return config;
@@ -284,7 +296,7 @@ apiClient.interceptors.response.use(
     // Only cache GET requests
     if (response.config.method?.toLowerCase() === "get") {
       const cacheKey = `${response.config.url}|${JSON.stringify(
-        response.config.params
+        response.config.params || {}
       )}`;
 
       // Store in cache with headers for ETag support
@@ -296,11 +308,22 @@ apiClient.interceptors.response.use(
         },
         timestamp: Date.now(),
       });
+
+      // Remove from pending requests
+      pendingRequests.delete(cacheKey);
     }
 
     return response;
   },
   (error) => {
+    // Clean up pending requests on error
+    if (error.config) {
+      const cacheKey = `${error.config.url}|${JSON.stringify(
+        error.config.params || {}
+      )}`;
+      pendingRequests.delete(cacheKey);
+    }
+
     // Implement faster retry logic for network errors
     const config = error.config;
 
@@ -340,7 +363,7 @@ apiClient.interceptors.response.use(
 
     // For failed requests, try to return stale cache data if available
     if (config && config.method?.toLowerCase() === "get") {
-      const cacheKey = `${config.url}|${JSON.stringify(config.params)}`;
+      const cacheKey = `${config.url}|${JSON.stringify(config.params || {})}`;
       const cachedData = cache.get(cacheKey);
 
       if (cachedData) {
@@ -361,106 +384,71 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Implement faster SWR pattern with timeout
-const fetchWithSWR = async (key, fetcher, options = {}) => {
-  const { ttl = CACHE_TTL, revalidateOnMount = true, timeout = 5000 } = options;
+// Implement faster data fetching without timeouts
+const fetchWithFastLoading = async (key, fetcher, options = {}) => {
+  const { ttl = CACHE_TTL, revalidateOnMount = true } = options;
 
   // Check cache first
   const cachedData = cache.get(key);
 
-  // If we have cached data, return it immediately
+  // Start fetching immediately
+  const fetchPromise = fetcher()
+    .then((freshData) => {
+      // Update cache with fresh data
+      cache.set(
+        key,
+        {
+          data: freshData,
+          timestamp: Date.now(),
+        },
+        ttl
+      );
+      return freshData;
+    })
+    .catch((error) => {
+      console.error(`Error fetching data: ${error.message}`);
+      // If we have cached data, return it on error
+      if (cachedData) {
+        return cachedData.data;
+      }
+      throw error;
+    });
+
+  // If we have cached data, return it immediately while fetching in background
   if (cachedData) {
-    // If revalidateOnMount is true, revalidate in background with timeout
     if (revalidateOnMount) {
-      const revalidationPromise = new Promise(async (resolve) => {
-        try {
-          const freshData = await fetcher();
-          cache.set(
-            key,
-            {
-              data: freshData,
-              timestamp: Date.now(),
-            },
-            ttl
-          );
-          resolve();
-        } catch (error) {
-          console.error("Background revalidation failed:", error);
-          resolve();
-        }
+      // Let the fetch continue in background
+      fetchPromise.catch((err) => {
+        // Silently handle background fetch errors
+        console.error("Background fetch error:", err);
       });
-
-      // Set timeout for background revalidation
-      setTimeout(() => {
-        // This will just abandon the revalidation if it takes too long
-      }, timeout);
     }
-
     return cachedData.data;
   }
 
-  // If no cache, fetch fresh data with timeout
-  try {
-    // Create a promise that rejects after timeout
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Request timeout")), timeout);
-    });
-
-    // Race between the actual fetch and the timeout
-    const freshData = await Promise.race([fetcher(), timeoutPromise]);
-
-    cache.set(
-      key,
-      {
-        data: freshData,
-        timestamp: Date.now(),
-      },
-      ttl
-    );
-
-    return freshData;
-  } catch (error) {
-    console.error(`Error fetching data: ${error.message}`);
-
-    // If we timeout or have an error, check if we have any cached data at all
-    // even if it's expired
-    if (typeof window !== "undefined") {
-      try {
-        const savedCache = localStorage.getItem("api_cache");
-        if (savedCache) {
-          const parsed = JSON.parse(savedCache);
-          if (parsed[key] && parsed[key].data) {
-            console.log("Returning expired data after fetch failure");
-            return parsed[key].data;
-          }
-        }
-      } catch (e) {
-        // Ignore storage errors
-      }
-    }
-
-    throw error;
-  }
+  // If no cache, wait for the fetch to complete
+  return fetchPromise;
 };
 
 // Optimized batch requests helper with faster parallel execution
 export const batchRequests = async (requests) => {
   try {
-    // Process all requests in parallel with timeout
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Batch requests timeout")), 5000);
-    });
-
-    const results = await Promise.race([
-      Promise.all(
-        requests.map((req) => {
-          // Add a short timeout to each individual request
-          req.timeout = 4000; // 4 seconds per request
-          return apiClient(req).then((res) => res.data);
-        })
-      ),
-      timeoutPromise,
-    ]);
+    // Process all requests in parallel
+    const results = await Promise.all(
+      requests.map((req) => {
+        return apiClient(req)
+          .then((res) => res.data)
+          .catch((err) => {
+            // Try to get from cache on error
+            const cacheKey = `${req.url}|${JSON.stringify(req.params || {})}`;
+            const cachedData = cache.get(cacheKey);
+            if (cachedData) {
+              return cachedData.data;
+            }
+            throw err;
+          });
+      })
+    );
 
     return results;
   } catch (error) {
@@ -495,7 +483,7 @@ export const batchRequests = async (requests) => {
 export const prefetchCriticalData = () => {
   if (typeof window === "undefined") return;
 
-  // Execute immediately without waiting
+  // Execute with a small delay to not block initial render
   setTimeout(() => {
     try {
       // Prefetch minimal data with small page sizes
@@ -505,7 +493,7 @@ export const prefetchCriticalData = () => {
     } catch (err) {
       console.error("Prefetch error:", err);
     }
-  }, 0);
+  }, 100);
 };
 
 // Call prefetch immediately
@@ -527,7 +515,7 @@ export const farmerAPI = {
   getAllFarmers: async (page = 1, perPage = 10, search = "", fields = []) => {
     const cacheKey = `farmers|${page}|${perPage}|${search}|${fields.join(",")}`;
 
-    return fetchWithSWR(
+    return fetchWithFastLoading(
       cacheKey,
       async () => {
         const params = new URLSearchParams({
@@ -551,7 +539,7 @@ export const farmerAPI = {
           throw new Error(`Failed to fetch farmers: ${error.message}`);
         }
       },
-      { ttl: CACHE_TTL_CRITICAL, timeout: 4000 }
+      { ttl: CACHE_TTL_CRITICAL }
     );
   },
 
@@ -559,7 +547,7 @@ export const farmerAPI = {
   getFarmerById: async (farmerId) => {
     const cacheKey = `farmer|${farmerId}`;
 
-    return fetchWithSWR(
+    return fetchWithFastLoading(
       cacheKey,
       async () => {
         try {
@@ -579,7 +567,6 @@ export const farmerAPI = {
                 fields: "farmer_id,name,first_name,last_name,barangay",
                 page: -1, // Signal to backend to return all records without pagination
               },
-              timeout: 3000, // Shorter timeout for fallback
             });
 
             // Check if response.data is an array
@@ -606,7 +593,7 @@ export const farmerAPI = {
           throw new Error(`Failed to fetch farmer details: ${error.message}`);
         }
       },
-      { ttl: CACHE_TTL_CRITICAL, timeout: 4000 }
+      { ttl: CACHE_TTL_CRITICAL }
     );
   },
 
@@ -743,7 +730,7 @@ export const livestockAPI = {
   getAllLivestockRecords: async (page = 1, perPage = 10, search = "") => {
     const cacheKey = `livestock|${page}|${perPage}|${search}`;
 
-    return fetchWithSWR(
+    return fetchWithFastLoading(
       cacheKey,
       async () => {
         const params = new URLSearchParams({
@@ -766,7 +753,7 @@ export const livestockAPI = {
           );
         }
       },
-      { ttl: CACHE_TTL_CRITICAL, timeout: 4000 }
+      { ttl: CACHE_TTL_CRITICAL }
     );
   },
 
@@ -774,7 +761,7 @@ export const livestockAPI = {
   getLivestockRecordById: async (recordId) => {
     const cacheKey = `livestock-record|${recordId}`;
 
-    return fetchWithSWR(
+    return fetchWithFastLoading(
       cacheKey,
       async () => {
         try {
@@ -788,7 +775,7 @@ export const livestockAPI = {
           );
         }
       },
-      { ttl: CACHE_TTL_CRITICAL, timeout: 4000 }
+      { ttl: CACHE_TTL_CRITICAL }
     );
   },
 
@@ -862,7 +849,7 @@ export const operatorAPI = {
   getAllOperators: async (page = 1, perPage = 10, search = "") => {
     const cacheKey = `operators|${page}|${perPage}|${search}`;
 
-    return fetchWithSWR(
+    return fetchWithFastLoading(
       cacheKey,
       async () => {
         const params = new URLSearchParams({
@@ -883,7 +870,7 @@ export const operatorAPI = {
           throw new Error(`Failed to fetch operators: ${error.message}`);
         }
       },
-      { ttl: CACHE_TTL_CRITICAL, timeout: 4000 }
+      { ttl: CACHE_TTL_CRITICAL }
     );
   },
 
@@ -891,7 +878,7 @@ export const operatorAPI = {
   getOperatorById: async (operatorId) => {
     const cacheKey = `operator|${operatorId}`;
 
-    return fetchWithSWR(
+    return fetchWithFastLoading(
       cacheKey,
       async () => {
         try {
@@ -901,7 +888,7 @@ export const operatorAPI = {
           throw new Error(`Failed to fetch operator details: ${error.message}`);
         }
       },
-      { ttl: CACHE_TTL_CRITICAL, timeout: 4000 }
+      { ttl: CACHE_TTL_CRITICAL }
     );
   },
 
