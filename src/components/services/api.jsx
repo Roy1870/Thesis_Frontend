@@ -4,19 +4,68 @@ import axios from "axios";
 // Base API URL
 const API_BASE_URL = "https://thesis-backend-tau.vercel.app/api/api";
 
-// Increase cache TTL for better performance
+// Reduced cache TTL for faster updates
 const CACHE_TTL = 300000; // 5 minutes in milliseconds
+const CACHE_TTL_CRITICAL = 600000; // 10 minutes for critical data
 
-// Connection pool settings for Neon Tech
-const CONNECTION_POOL_SIZE = 10; // Adjust based on your Neon plan
-const CONNECTION_TIMEOUT = 20000; // 20 seconds for serverless cold starts
+// Reduced timeout for faster error detection
+const CONNECTION_TIMEOUT = 5000; // 5 seconds max for requests
 
-// LRU Cache implementation with TTL for better memory management
-class LRUCache {
+// Persistent cache implementation with localStorage backup
+class PersistentCache {
   constructor(maxSize = 100) {
     this.cache = new Map();
     this.maxSize = maxSize;
-    this.ttls = new Map(); // Store TTLs separately
+    this.ttls = new Map();
+    this.loadFromStorage();
+  }
+
+  loadFromStorage() {
+    if (typeof window === "undefined") return;
+
+    try {
+      const savedCache = localStorage.getItem("api_cache");
+      if (savedCache) {
+        const parsed = JSON.parse(savedCache);
+        const now = Date.now();
+
+        // Only load non-expired items
+        Object.entries(parsed).forEach(([key, item]) => {
+          if (item.expiry > now) {
+            this.cache.set(key, item.data);
+            this.ttls.set(key, item.expiry);
+          }
+        });
+
+        console.log(`Loaded ${this.cache.size} items from persistent cache`);
+      }
+    } catch (e) {
+      console.error("Failed to load cache from storage:", e);
+    }
+  }
+
+  saveToStorage() {
+    if (typeof window === "undefined") return;
+
+    try {
+      const cacheObj = {};
+      const now = Date.now();
+
+      // Only save non-expired items
+      for (const [key, value] of this.cache.entries()) {
+        const expiry = this.ttls.get(key);
+        if (expiry && expiry > now) {
+          cacheObj[key] = {
+            data: value,
+            expiry,
+          };
+        }
+      }
+
+      localStorage.setItem("api_cache", JSON.stringify(cacheObj));
+    } catch (e) {
+      console.error("Failed to save cache to storage:", e);
+    }
   }
 
   get(key) {
@@ -53,6 +102,11 @@ class LRUCache {
     if (ttl > 0) {
       this.ttls.set(key, Date.now() + ttl);
     }
+
+    // Save to localStorage every 10 operations
+    if (Math.random() < 0.1) {
+      this.saveToStorage();
+    }
   }
 
   delete(key) {
@@ -63,6 +117,9 @@ class LRUCache {
   clear() {
     this.cache.clear();
     this.ttls.clear();
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("api_cache");
+    }
   }
 
   has(key) {
@@ -94,27 +151,37 @@ class LRUCache {
 
   // Cleanup expired entries periodically
   startCleanupInterval(interval = 60000) {
-    this.cleanupInterval = setInterval(() => {
-      const now = Date.now();
-      for (const [key, expiry] of this.ttls.entries()) {
-        if (now > expiry) {
-          this.delete(key);
+    if (typeof window !== "undefined") {
+      this.cleanupInterval = setInterval(() => {
+        const now = Date.now();
+        let deleted = 0;
+        for (const [key, expiry] of this.ttls.entries()) {
+          if (now > expiry) {
+            this.delete(key);
+            deleted++;
+          }
         }
-      }
-    }, interval);
+        if (deleted > 0) {
+          this.saveToStorage();
+        }
+      }, interval);
+    }
   }
 
   stopCleanupInterval() {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
+      this.saveToStorage();
     }
   }
 }
 
-// Create cache instance with larger size for Neon
-const cache = new LRUCache(300);
+// Create cache instance with larger size
+const cache = new PersistentCache(500);
 // Start cleanup interval
-cache.startCleanupInterval();
+if (typeof window !== "undefined") {
+  cache.startCleanupInterval();
+}
 
 // Helper to get auth token with memoization
 let cachedToken = null;
@@ -146,27 +213,14 @@ const getAuthToken = () => {
   }
 };
 
-// Create axios instance with optimized config for Neon Tech
+// Create axios instance with optimized config
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
     Connection: "keep-alive",
   },
-  timeout: CONNECTION_TIMEOUT, // Increased timeout for Neon cold starts
-  // Enable HTTP keep-alive with optimized settings
-  httpAgent: new (require("http").Agent)({
-    keepAlive: true,
-    maxSockets: CONNECTION_POOL_SIZE,
-    maxFreeSockets: Math.ceil(CONNECTION_POOL_SIZE / 2),
-    timeout: 60000, // Socket timeout
-  }),
-  httpsAgent: new (require("https").Agent)({
-    keepAlive: true,
-    maxSockets: CONNECTION_POOL_SIZE,
-    maxFreeSockets: Math.ceil(CONNECTION_POOL_SIZE / 2),
-    timeout: 60000, // Socket timeout
-  }),
+  timeout: CONNECTION_TIMEOUT, // Reduced timeout for faster error detection
 });
 
 // Add auth token to requests
@@ -233,12 +287,12 @@ apiClient.interceptors.response.use(
         response.config.params
       )}`;
 
-      // Store in LRU cache with headers for ETag support
+      // Store in cache with headers for ETag support
       cache.set(cacheKey, {
         data: response.data,
         headers: {
-          etag: response.headers.etag,
-          "last-modified": response.headers["last-modified"],
+          etag: response.headers?.etag,
+          "last-modified": response.headers?.["last-modified"],
         },
         timestamp: Date.now(),
       });
@@ -247,7 +301,7 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
-    // Implement advanced retry logic for network errors and Neon cold starts
+    // Implement faster retry logic for network errors
     const config = error.config;
 
     // Only retry certain requests and limit retries
@@ -262,20 +316,20 @@ apiClient.interceptors.response.use(
         // Retry on 429 (rate limit)
         (error.response && error.response.status === 429))
     ) {
-      // Exponential backoff with jitter
+      // Use faster retry with minimal delay
       const retryCount = config._retryCount || 0;
       config._retryCount = retryCount + 1;
 
-      if (config._retryCount <= 3) {
-        // Maximum 3 retries
-        // Calculate delay with exponential backoff and jitter
+      if (config._retryCount <= 2) {
+        // Maximum 2 retries for faster response
+        // Calculate delay with minimal backoff
         const delay = Math.min(
-          1000 * Math.pow(2, retryCount) + Math.random() * 1000,
-          10000 // Max 10 seconds
+          200 * (retryCount + 1), // Start with 200ms, then 400ms
+          1000 // Max 1 second
         );
 
         console.log(
-          `Retrying request (${config._retryCount}/3) after ${delay}ms`
+          `Retrying request (${config._retryCount}/2) after ${delay}ms`
         );
 
         return new Promise((resolve) => {
@@ -284,22 +338,41 @@ apiClient.interceptors.response.use(
       }
     }
 
+    // For failed requests, try to return stale cache data if available
+    if (config && config.method?.toLowerCase() === "get") {
+      const cacheKey = `${config.url}|${JSON.stringify(config.params)}`;
+      const cachedData = cache.get(cacheKey);
+
+      if (cachedData) {
+        console.log("Returning stale cache data after request failure");
+        return Promise.resolve({
+          data: cachedData.data,
+          status: 200,
+          statusText: "OK (from stale cache)",
+          headers: cachedData.headers || {},
+          config,
+          cached: true,
+          stale: true,
+        });
+      }
+    }
+
     return Promise.reject(error);
   }
 );
 
-// Implement SWR (Stale-While-Revalidate) pattern with optimized implementation for Neon
+// Implement faster SWR pattern with timeout
 const fetchWithSWR = async (key, fetcher, options = {}) => {
-  const { ttl = CACHE_TTL, revalidateOnMount = true } = options;
+  const { ttl = CACHE_TTL, revalidateOnMount = true, timeout = 5000 } = options;
 
   // Check cache first
   const cachedData = cache.get(key);
 
   // If we have cached data, return it immediately
   if (cachedData) {
-    // If revalidateOnMount is true, revalidate in background
+    // If revalidateOnMount is true, revalidate in background with timeout
     if (revalidateOnMount) {
-      setTimeout(async () => {
+      const revalidationPromise = new Promise(async (resolve) => {
         try {
           const freshData = await fetcher();
           cache.set(
@@ -310,83 +383,133 @@ const fetchWithSWR = async (key, fetcher, options = {}) => {
             },
             ttl
           );
+          resolve();
         } catch (error) {
           console.error("Background revalidation failed:", error);
+          resolve();
         }
-      }, 0);
+      });
+
+      // Set timeout for background revalidation
+      setTimeout(() => {
+        // This will just abandon the revalidation if it takes too long
+      }, timeout);
     }
 
     return cachedData.data;
   }
 
-  // If no cache, fetch fresh data
-  const freshData = await fetcher();
-  cache.set(
-    key,
-    {
-      data: freshData,
-      timestamp: Date.now(),
-    },
-    ttl
-  );
-
-  return freshData;
-};
-
-// Optimized batch requests helper with connection pooling for Neon
-export const batchRequests = async (requests) => {
+  // If no cache, fetch fresh data with timeout
   try {
-    // Group requests by endpoint to reduce connection overhead
-    const groupedRequests = requests.reduce((acc, req) => {
-      const endpoint = req.url.split("?")[0];
-      if (!acc[endpoint]) acc[endpoint] = [];
-      acc[endpoint].push(req);
-      return acc;
-    }, {});
+    // Create a promise that rejects after timeout
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Request timeout")), timeout);
+    });
 
-    // Process each group sequentially to avoid overwhelming Neon
-    let results = [];
-    for (const endpoint of Object.keys(groupedRequests)) {
-      const endpointRequests = groupedRequests[endpoint];
+    // Race between the actual fetch and the timeout
+    const freshData = await Promise.race([fetcher(), timeoutPromise]);
 
-      // Process requests in batches of 5 to avoid connection limits
-      const batchSize = 5;
-      for (let i = 0; i < endpointRequests.length; i += batchSize) {
-        const batch = endpointRequests.slice(i, i + batchSize);
-        const batchResponses = await Promise.all(
-          batch.map((req) => apiClient(req))
-        );
-        results = results.concat(batchResponses.map((res) => res.data));
+    cache.set(
+      key,
+      {
+        data: freshData,
+        timestamp: Date.now(),
+      },
+      ttl
+    );
+
+    return freshData;
+  } catch (error) {
+    console.error(`Error fetching data: ${error.message}`);
+
+    // If we timeout or have an error, check if we have any cached data at all
+    // even if it's expired
+    if (typeof window !== "undefined") {
+      try {
+        const savedCache = localStorage.getItem("api_cache");
+        if (savedCache) {
+          const parsed = JSON.parse(savedCache);
+          if (parsed[key] && parsed[key].data) {
+            console.log("Returning expired data after fetch failure");
+            return parsed[key].data;
+          }
+        }
+      } catch (e) {
+        // Ignore storage errors
       }
     }
 
+    throw error;
+  }
+};
+
+// Optimized batch requests helper with faster parallel execution
+export const batchRequests = async (requests) => {
+  try {
+    // Process all requests in parallel with timeout
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Batch requests timeout")), 5000);
+    });
+
+    const results = await Promise.race([
+      Promise.all(
+        requests.map((req) => {
+          // Add a short timeout to each individual request
+          req.timeout = 4000; // 4 seconds per request
+          return apiClient(req).then((res) => res.data);
+        })
+      ),
+      timeoutPromise,
+    ]);
+
     return results;
   } catch (error) {
+    console.error(`Batch request failed: ${error.message}`);
+
+    // Return partial results if available
+    const partialResults = [];
+    for (const req of requests) {
+      try {
+        const cacheKey = `${req.url}|${JSON.stringify(req.params || {})}`;
+        const cachedData = cache.get(cacheKey);
+        if (cachedData) {
+          partialResults.push(cachedData.data);
+        }
+      } catch (e) {
+        // Skip this item if there's an error
+      }
+    }
+
+    if (partialResults.length > 0) {
+      console.log(
+        `Returning ${partialResults.length} cached results after batch failure`
+      );
+      return partialResults;
+    }
+
     throw new Error(`Batch request failed: ${error.message}`);
   }
 };
 
-// Prefetch common data with priority and connection management for Neon
-export const prefetchCommonData = () => {
-  // Use sequential fetching to avoid overwhelming Neon connections
-  const prefetchSequentially = async () => {
+// Prefetch critical data immediately on load
+export const prefetchCriticalData = () => {
+  if (typeof window === "undefined") return;
+
+  // Execute immediately without waiting
+  setTimeout(() => {
     try {
-      // Fetch farmers first (most important)
-      await farmerAPI.getAllFarmers(1, 10);
-
-      // Then fetch livestock
-      await livestockAPI.getAllLivestockRecords(1, 10);
-
-      // Finally fetch operators
-      await operatorAPI.getAllOperators(1, 10);
+      // Prefetch minimal data with small page sizes
+      farmerAPI.getAllFarmers(1, 5, "", ["farmer_id", "name"]);
+      livestockAPI.getAllLivestockRecords(1, 5);
+      operatorAPI.getAllOperators(1, 5);
     } catch (err) {
       console.error("Prefetch error:", err);
     }
-  };
-
-  // Start prefetching
-  prefetchSequentially();
+  }, 0);
 };
+
+// Call prefetch immediately
+prefetchCriticalData();
 
 // Optimized cache invalidation helper
 const invalidateCache = (pattern) => {
@@ -416,7 +539,7 @@ export const farmerAPI = {
           params.append("search", search);
         }
 
-        // Only request the fields you need (crucial for Neon performance)
+        // Only request the fields you need (crucial for performance)
         if (fields.length > 0) {
           params.append("fields", fields.join(","));
         }
@@ -428,11 +551,11 @@ export const farmerAPI = {
           throw new Error(`Failed to fetch farmers: ${error.message}`);
         }
       },
-      { ttl: 180000 }
-    ); // 3 minutes TTL for farmers list
+      { ttl: CACHE_TTL_CRITICAL, timeout: 4000 }
+    );
   },
 
-  // Get a single farmer by ID with optimized fallback for Neon
+  // Get a single farmer by ID with optimized fallback
   getFarmerById: async (farmerId) => {
     const cacheKey = `farmer|${farmerId}`;
 
@@ -451,12 +574,12 @@ export const farmerAPI = {
             );
 
             // Get all farmers without pagination but with minimal fields
-            // This is crucial for Neon performance
             const response = await apiClient.get(`/farmers`, {
               params: {
                 fields: "farmer_id,name,first_name,last_name,barangay",
                 page: -1, // Signal to backend to return all records without pagination
               },
+              timeout: 3000, // Shorter timeout for fallback
             });
 
             // Check if response.data is an array
@@ -483,8 +606,8 @@ export const farmerAPI = {
           throw new Error(`Failed to fetch farmer details: ${error.message}`);
         }
       },
-      { ttl: 300000 }
-    ); // 5 minutes TTL for single farmer
+      { ttl: CACHE_TTL_CRITICAL, timeout: 4000 }
+    );
   },
 
   // Create a new farmer with optimized cache invalidation
@@ -643,8 +766,8 @@ export const livestockAPI = {
           );
         }
       },
-      { ttl: 180000 }
-    ); // 3 minutes TTL
+      { ttl: CACHE_TTL_CRITICAL, timeout: 4000 }
+    );
   },
 
   // Get a single livestock record by ID
@@ -665,8 +788,8 @@ export const livestockAPI = {
           );
         }
       },
-      { ttl: 300000 }
-    ); // 5 minutes TTL
+      { ttl: CACHE_TTL_CRITICAL, timeout: 4000 }
+    );
   },
 
   // Create livestock records with optimized cache invalidation
@@ -760,8 +883,8 @@ export const operatorAPI = {
           throw new Error(`Failed to fetch operators: ${error.message}`);
         }
       },
-      { ttl: 180000 }
-    ); // 3 minutes TTL
+      { ttl: CACHE_TTL_CRITICAL, timeout: 4000 }
+    );
   },
 
   // Get a single operator by ID
@@ -778,8 +901,8 @@ export const operatorAPI = {
           throw new Error(`Failed to fetch operator details: ${error.message}`);
         }
       },
-      { ttl: 300000 }
-    ); // 5 minutes TTL
+      { ttl: CACHE_TTL_CRITICAL, timeout: 4000 }
+    );
   },
 
   // Add operator to a farmer with optimized cache invalidation
@@ -831,6 +954,7 @@ export const operatorAPI = {
 if (typeof window !== "undefined") {
   window.addEventListener("beforeunload", () => {
     cache.stopCleanupInterval();
+    cache.saveToStorage();
   });
 }
 
