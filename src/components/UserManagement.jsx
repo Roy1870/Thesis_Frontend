@@ -59,7 +59,7 @@ const UserManagement = () => {
 
         // Fetch users data from the API
         const response = await axios.get(
-          "http://localhost:8000/api/usermanagement/data",
+          "https://thesis-backend-tau.vercel.app/api/api/usermanagement/data",
           {
             headers: {
               Authorization: `Bearer ${authToken}`,
@@ -170,7 +170,7 @@ const UserManagement = () => {
       }
 
       await axios.delete(
-        `http://localhost:8000/api/usermanagement/delete/${userId}`,
+        `https://thesis-backend-tau.vercel.app/api/api/usermanagement/delete/${userId}`,
         {
           headers: {
             Authorization: `Bearer ${authToken}`,
@@ -206,7 +206,7 @@ const UserManagement = () => {
 
       // Send the update to the correct endpoint with the proper field name
       const response = await axios.put(
-        `http://localhost:8000/api/usermanagement/change-type/${userId}`,
+        `https://thesis-backend-tau.vercel.app/api/api/usermanagement/change-type/${userId}`,
         {
           role: newRole, // Use 'role' as the field name for the backend
         },
@@ -332,7 +332,7 @@ const UserManagement = () => {
       };
 
       const response = await axios.post(
-        "http://localhost:8000/api/register",
+        "https://thesis-backend-tau.vercel.app/api/api/register",
         userData,
         {
           headers: {
@@ -353,7 +353,7 @@ const UserManagement = () => {
 
       // Refresh the user list
       const usersResponse = await axios.get(
-        "http://localhost:8000/api/usermanagement/data",
+        "https://thesis-backend-tau.vercel.app/api/usermanagement/data",
         {
           headers: {
             Authorization: `Bearer ${authToken}`,

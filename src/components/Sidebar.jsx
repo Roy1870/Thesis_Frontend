@@ -56,11 +56,14 @@ const Sidebar = () => {
         }
 
         // Get current user info from API
-        const userResponse = await axios.get("http://localhost:8000/api/user", {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        });
+        const userResponse = await axios.get(
+          "https://thesis-backend-tau.vercel.app/api/api/user",
+          {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          }
+        );
 
         console.log("User API response:", userResponse.data);
 
@@ -73,14 +76,7 @@ const Sidebar = () => {
 
           // Check if user is admin
           const adminStatus = userData.role === "admin";
-          console.log(
-            "Is admin check:",
-            userData.role,
-            "===",
-            "admin",
-            "Result:",
-            adminStatus
-          );
+
           setIsAdmin(adminStatus);
 
           // Store in localStorage for other components
