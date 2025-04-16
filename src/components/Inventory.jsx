@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { farmerAPI, livestockAPI, operatorAPI } from "./services/api";
 import {
   UserIcon,
@@ -88,31 +88,37 @@ const Inventory = () => {
   const [yearOptions, setYearOptions] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Data type options
-  const dataTypes = [
-    {
-      id: "farmers",
-      label: "Farmers",
-      icon: <UserIcon className="w-4 h-4 mr-2" />,
-    },
-    { id: "crops", label: "Crops", icon: <Wheat className="w-4 h-4 mr-2" /> },
-    { id: "rice", label: "Rice", icon: <Sprout className="w-4 h-4 mr-2" /> },
-    {
-      id: "livestock",
-      label: "Livestock",
-      icon: <MilkIcon className="w-4 h-4 mr-2" />,
-    },
-    {
-      id: "operators",
-      label: "Operators",
-      icon: <Users className="w-4 h-4 mr-2" />,
-    },
-    {
-      id: "highValueCrops",
-      label: "High Value Crops",
-      icon: <Coffee className="w-4 h-4 mr-2" />,
-    },
-  ];
+  // Refs for cleanup
+  const abortControllerRef = useRef(null);
+
+  // Data type options - memoized to prevent recreating on each render
+  const dataTypes = useMemo(
+    () => [
+      {
+        id: "farmers",
+        label: "Farmers",
+        icon: <UserIcon className="w-4 h-4 mr-2" />,
+      },
+      { id: "crops", label: "Crops", icon: <Wheat className="w-4 h-4 mr-2" /> },
+      { id: "rice", label: "Rice", icon: <Sprout className="w-4 h-4 mr-2" /> },
+      {
+        id: "livestock",
+        label: "Livestock",
+        icon: <MilkIcon className="w-4 h-4 mr-2" />,
+      },
+      {
+        id: "operators",
+        label: "Operators",
+        icon: <Users className="w-4 h-4 mr-2" />,
+      },
+      {
+        id: "highValueCrops",
+        label: "High Value Crops",
+        icon: <Coffee className="w-4 h-4 mr-2" />,
+      },
+    ],
+    []
+  );
 
   // Debounce search text to prevent too many API calls
   useEffect(() => {
@@ -123,9 +129,20 @@ const Inventory = () => {
     return () => clearTimeout(timer);
   }, [searchText]);
 
-  // Initial data fetch
+  // Initial data fetch with AbortController for cleanup
   useEffect(() => {
-    fetchAllData();
+    // Create a new AbortController for this effect
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
+    fetchAllData(signal);
+
+    return () => {
+      // Abort any in-flight requests when component unmounts or effect re-runs
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, []); // Empty dependency array for initial load only
 
   // Reset page when data type changes
@@ -141,8 +158,22 @@ const Inventory = () => {
     setAllData([]); // Clear all data immediately
     setTotalRecords(0); // Reset total records
 
-    // Then fetch new data
-    fetchAllData();
+    // Create a new AbortController for this effect
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
+    // Then fetch new data with AbortController
+    fetchAllData(signal);
+
+    return () => {
+      // Abort any in-flight requests when component unmounts or effect re-runs
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [selectedDataType]);
 
   // Handle pagination, debounced search, and filters
@@ -171,23 +202,23 @@ const Inventory = () => {
     loading,
   ]);
 
-  // Paginate data function
-  const paginateData = () => {
+  // Paginate data function - memoized with useCallback
+  const paginateData = useCallback(() => {
     const startIndex = (currentPage - 1) * pageSize;
     const paginatedResults = allData.slice(startIndex, startIndex + pageSize);
 
     setData(paginatedResults);
     setTotalRecords(allData.length);
-  };
+  }, [allData, currentPage, pageSize]);
 
-  // Helper function to parse production_data
-  const parseProductionData = (crop) => {
+  // Helper function to parse production_data - memoized with useCallback
+  const parseProductionData = useCallback((crop) => {
     let productionData = {};
     if (crop.production_data && typeof crop.production_data === "string") {
       try {
         productionData = JSON.parse(crop.production_data);
       } catch (e) {
-        console.error("Error parsing production data:", e);
+        // Silent error - continue with empty production data
       }
     } else if (
       crop.production_data &&
@@ -196,254 +227,10 @@ const Inventory = () => {
       productionData = crop.production_data;
     }
     return productionData;
-  };
+  }, []);
 
-  // Fetch all data for client-side filtering
-  const fetchAllData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Clear existing data to prevent mixing
-      setData([]);
-
-      let response;
-      let processedData = [];
-
-      switch (selectedDataType) {
-        case "farmers":
-          response = await farmerAPI.getAllFarmers(1, 1000);
-          processedData = Array.isArray(response)
-            ? response
-            : response.data || [];
-          break;
-
-        case "crops":
-          // First get all farmers
-          const farmersResponse = await farmerAPI.getAllFarmers(1, 1000);
-          const farmers = Array.isArray(farmersResponse)
-            ? farmersResponse
-            : farmersResponse.data || [];
-
-          // Extract all crops from farmers
-          const allCrops = [];
-          for (const farmer of farmers) {
-            if (farmer.crops && Array.isArray(farmer.crops)) {
-              // Filter out high value crops (they'll be in their own section)
-              const regularCrops = farmer.crops.filter(
-                (crop) => crop.crop_type !== "High Value Crops"
-              );
-
-              // Add farmer info to each crop
-              const farmerCrops = regularCrops.map((crop) => {
-                // Parse production_data
-                const productionData = parseProductionData(crop);
-
-                return {
-                  ...crop,
-                  farmer_id: farmer.farmer_id,
-                  farmer_name:
-                    farmer.name ||
-                    `${farmer.first_name || ""} ${
-                      farmer.last_name || ""
-                    }`.trim() ||
-                    "Unknown",
-                  barangay: farmer.barangay,
-                  // Add parsed production data fields
-                  crop_value: productionData.crop || crop.crop_value || "",
-                  quantity: productionData.quantity || crop.quantity || "",
-                  // Keep original production_data for reference
-                  production_data: crop.production_data,
-                };
-              });
-              allCrops.push(...farmerCrops);
-            }
-          }
-
-          processedData = allCrops;
-          break;
-
-        case "highValueCrops":
-          // First get all farmers
-          const farmersForHVC = await farmerAPI.getAllFarmers(1, 1000);
-          const farmersDataForHVC = Array.isArray(farmersForHVC)
-            ? farmersForHVC
-            : farmersForHVC.data || [];
-
-          // Extract all high value crops from farmers
-          const allHighValueCrops = [];
-          for (const farmer of farmersDataForHVC) {
-            if (farmer.crops && Array.isArray(farmer.crops)) {
-              // Filter only high value crops
-              const highValueCrops = farmer.crops.filter(
-                (crop) => crop.crop_type === "High Value Crops"
-              );
-
-              // Add farmer info to each crop
-              const farmerHVCs = highValueCrops.map((crop) => {
-                // Parse production_data
-                const productionData = parseProductionData(crop);
-
-                return {
-                  ...crop,
-                  farmer_id: farmer.farmer_id,
-                  farmer_name:
-                    farmer.name ||
-                    `${farmer.first_name || ""} ${
-                      farmer.last_name || ""
-                    }`.trim() ||
-                    "Unknown",
-                  barangay: farmer.barangay,
-                  // Add parsed production data fields
-                  month: productionData.month || "",
-                  crop_value: productionData.crop || crop.crop_value || "",
-                  quantity: productionData.quantity || crop.quantity || "",
-                  // Keep original production_data for reference
-                  production_data: crop.production_data,
-                };
-              });
-              allHighValueCrops.push(...farmerHVCs);
-            }
-          }
-
-          processedData = allHighValueCrops;
-          break;
-
-        case "rice":
-          // First get all farmers
-          const farmersForRice = await farmerAPI.getAllFarmers(1, 1000);
-          const farmersDataForRice = Array.isArray(farmersForRice)
-            ? farmersForRice
-            : farmersForRice.data || [];
-
-          // Extract all rice data from farmers
-          const allRice = [];
-          for (const farmer of farmersDataForRice) {
-            if (farmer.rice && Array.isArray(farmer.rice)) {
-              // Add farmer info to each rice entry
-              const farmerRice = farmer.rice.map((rice) => ({
-                ...rice,
-                farmer_id: farmer.farmer_id,
-                farmer_name:
-                  farmer.name ||
-                  `${farmer.first_name || ""} ${
-                    farmer.last_name || ""
-                  }`.trim() ||
-                  "Unknown",
-                barangay: farmer.barangay,
-              }));
-              allRice.push(...farmerRice);
-            }
-          }
-
-          processedData = allRice;
-          break;
-
-        case "livestock":
-          // Get all livestock records
-          const livestockResponse = await livestockAPI.getAllLivestockRecords(
-            1,
-            1000
-          );
-          const livestockRecords = Array.isArray(livestockResponse)
-            ? livestockResponse
-            : livestockResponse.data || [];
-
-          // Get all farmers to add farmer information to livestock records
-          const farmersForLivestock = await farmerAPI.getAllFarmers(1, 1000);
-          const farmersMap = {};
-
-          // Create a map of farmer_id to farmer data for quick lookup
-          const farmersForLivestockData = Array.isArray(farmersForLivestock)
-            ? farmersForLivestock
-            : farmersForLivestock.data || [];
-          farmersForLivestockData.forEach((farmer) => {
-            farmersMap[farmer.farmer_id] = farmer;
-          });
-
-          // Enrich livestock records with farmer information
-          const enrichedLivestockRecords = livestockRecords.map((record) => {
-            const farmer = farmersMap[record.farmer_id];
-            return {
-              ...record,
-              farmer_name: farmer
-                ? farmer.name ||
-                  `${farmer.first_name || ""} ${farmer.last_name || ""}`.trim()
-                : "Unknown",
-              barangay: farmer ? farmer.barangay : "Unknown",
-            };
-          });
-
-          processedData = enrichedLivestockRecords;
-          break;
-
-        case "operators":
-          // Get all operators
-          const operatorsResponse = await operatorAPI.getAllOperators(1, 1000);
-          const operators = Array.isArray(operatorsResponse)
-            ? operatorsResponse
-            : operatorsResponse.data || [];
-
-          // Get all farmers to add farmer information to operators
-          const farmersForOperators = await farmerAPI.getAllFarmers(1, 1000);
-          const farmerOperatorMap = {};
-
-          // Create a map of farmer_id to farmer data for quick lookup
-          const farmersForOperatorsData = Array.isArray(farmersForOperators)
-            ? farmersForOperators
-            : farmersForOperators.data || [];
-          farmersForOperatorsData.forEach((farmer) => {
-            farmerOperatorMap[farmer.farmer_id] = farmer;
-          });
-
-          // Enrich operators with farmer information
-          const enrichedOperators = operators.map((operator) => {
-            const farmer = farmerOperatorMap[operator.farmer_id];
-            return {
-              ...operator,
-              farmer_name: farmer
-                ? farmer.name ||
-                  `${farmer.first_name || ""} ${farmer.last_name || ""}`.trim()
-                : "Unknown",
-              barangay: farmer ? farmer.barangay : "Unknown",
-            };
-          });
-
-          processedData = enrichedOperators;
-          break;
-
-        default:
-          processedData = [];
-      }
-
-      // Extract filter options from the data
-      extractFilterOptions(processedData);
-
-      // Set the new data
-      setAllData(processedData);
-
-      // Apply pagination to the fetched data
-      const startIndex = (currentPage - 1) * pageSize;
-      const paginatedResults = processedData.slice(
-        startIndex,
-        startIndex + pageSize
-      );
-
-      setData(paginatedResults);
-      setTotalRecords(processedData.length);
-      setLoading(false);
-    } catch (err) {
-      console.error(`Error fetching ${selectedDataType} data:`, err);
-      setError(`Failed to fetch ${selectedDataType} data: ${err.message}`);
-      setLoading(false);
-      setAllData([]);
-      setData([]);
-      setTotalRecords(0);
-    }
-  };
-
-  // Extract unique barangays and years from data
-  const extractFilterOptions = (data) => {
+  // Extract unique barangays and years from data - memoized with useCallback
+  const extractFilterOptions = useCallback((data) => {
     // Extract unique barangays
     const barangays = [
       ...new Set(data.map((item) => item.barangay).filter(Boolean)),
@@ -467,16 +254,316 @@ const Inventory = () => {
     }
 
     setYearOptions(years);
-  };
+  }, []);
 
-  // Client-side filtering function
-  const filterData = () => {
-    if (
+  // Fetch all data for client-side filtering
+  const fetchAllData = useCallback(
+    async (signal) => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Clear existing data to prevent mixing
+        setData([]);
+
+        let response;
+        let processedData = [];
+
+        switch (selectedDataType) {
+          case "farmers":
+            response = await farmerAPI.getAllFarmers(1, 1000, "", [], signal);
+            processedData = Array.isArray(response)
+              ? response
+              : response.data || [];
+            break;
+
+          case "crops":
+            // First get all farmers
+            const farmersResponse = await farmerAPI.getAllFarmers(
+              1,
+              1000,
+              "",
+              [],
+              signal
+            );
+            const farmers = Array.isArray(farmersResponse)
+              ? farmersResponse
+              : farmersResponse.data || [];
+
+            // Extract all crops from farmers
+            const allCrops = [];
+            for (const farmer of farmers) {
+              if (farmer.crops && Array.isArray(farmer.crops)) {
+                // Filter out high value crops (they'll be in their own section)
+                const regularCrops = farmer.crops.filter(
+                  (crop) => crop.crop_type !== "High Value Crops"
+                );
+
+                // Add farmer info to each crop
+                const farmerCrops = regularCrops.map((crop) => {
+                  // Parse production_data
+                  const productionData = parseProductionData(crop);
+
+                  return {
+                    ...crop,
+                    farmer_id: farmer.farmer_id,
+                    farmer_name:
+                      farmer.name ||
+                      `${farmer.first_name || ""} ${
+                        farmer.last_name || ""
+                      }`.trim() ||
+                      "Unknown",
+                    barangay: farmer.barangay,
+                    // Add parsed production data fields
+                    crop_value: productionData.crop || crop.crop_value || "",
+                    quantity: productionData.quantity || crop.quantity || "",
+                    // Keep original production_data for reference
+                    production_data: crop.production_data,
+                  };
+                });
+                allCrops.push(...farmerCrops);
+              }
+            }
+
+            processedData = allCrops;
+            break;
+
+          case "highValueCrops":
+            // First get all farmers
+            const farmersForHVC = await farmerAPI.getAllFarmers(
+              1,
+              1000,
+              "",
+              [],
+              signal
+            );
+            const farmersDataForHVC = Array.isArray(farmersForHVC)
+              ? farmersForHVC
+              : farmersForHVC.data || [];
+
+            // Extract all high value crops from farmers
+            const allHighValueCrops = [];
+            for (const farmer of farmersDataForHVC) {
+              if (farmer.crops && Array.isArray(farmer.crops)) {
+                // Filter only high value crops
+                const highValueCrops = farmer.crops.filter(
+                  (crop) => crop.crop_type === "High Value Crops"
+                );
+
+                // Add farmer info to each crop
+                const farmerHVCs = highValueCrops.map((crop) => {
+                  // Parse production_data
+                  const productionData = parseProductionData(crop);
+
+                  return {
+                    ...crop,
+                    farmer_id: farmer.farmer_id,
+                    farmer_name:
+                      farmer.name ||
+                      `${farmer.first_name || ""} ${
+                        farmer.last_name || ""
+                      }`.trim() ||
+                      "Unknown",
+                    barangay: farmer.barangay,
+                    // Add parsed production data fields
+                    month: productionData.month || "",
+                    crop_value: productionData.crop || crop.crop_value || "",
+                    quantity: productionData.quantity || crop.quantity || "",
+                    // Keep original production_data for reference
+                    production_data: crop.production_data,
+                  };
+                });
+                allHighValueCrops.push(...farmerHVCs);
+              }
+            }
+
+            processedData = allHighValueCrops;
+            break;
+
+          case "rice":
+            // First get all farmers
+            const farmersForRice = await farmerAPI.getAllFarmers(
+              1,
+              1000,
+              "",
+              [],
+              signal
+            );
+            const farmersDataForRice = Array.isArray(farmersForRice)
+              ? farmersForRice
+              : farmersForRice.data || [];
+
+            // Extract all rice data from farmers
+            const allRice = [];
+            for (const farmer of farmersDataForRice) {
+              if (farmer.rice && Array.isArray(farmer.rice)) {
+                // Add farmer info to each rice entry
+                const farmerRice = farmer.rice.map((rice) => ({
+                  ...rice,
+                  farmer_id: farmer.farmer_id,
+                  farmer_name:
+                    farmer.name ||
+                    `${farmer.first_name || ""} ${
+                      farmer.last_name || ""
+                    }`.trim() ||
+                    "Unknown",
+                  barangay: farmer.barangay,
+                }));
+                allRice.push(...farmerRice);
+              }
+            }
+
+            processedData = allRice;
+            break;
+
+          case "livestock":
+            // Get all livestock records
+            const livestockResponse = await livestockAPI.getAllLivestockRecords(
+              1,
+              1000,
+              "",
+              signal
+            );
+            const livestockRecords = Array.isArray(livestockResponse)
+              ? livestockResponse
+              : livestockResponse.data || [];
+
+            // Get all farmers to add farmer information to livestock records
+            const farmersForLivestock = await farmerAPI.getAllFarmers(
+              1,
+              1000,
+              "",
+              [],
+              signal
+            );
+
+            // Create a map of farmer_id to farmer data for quick lookup
+            const farmersMap = {};
+            const farmersForLivestockData = Array.isArray(farmersForLivestock)
+              ? farmersForLivestock
+              : farmersForLivestock.data || [];
+
+            farmersForLivestockData.forEach((farmer) => {
+              farmersMap[farmer.farmer_id] = farmer;
+            });
+
+            // Enrich livestock records with farmer information
+            const enrichedLivestockRecords = livestockRecords.map((record) => {
+              const farmer = farmersMap[record.farmer_id];
+              return {
+                ...record,
+                farmer_name: farmer
+                  ? farmer.name ||
+                    `${farmer.first_name || ""} ${
+                      farmer.last_name || ""
+                    }`.trim()
+                  : "Unknown",
+                barangay: farmer ? farmer.barangay : "Unknown",
+              };
+            });
+
+            processedData = enrichedLivestockRecords;
+            break;
+
+          case "operators":
+            // Get all operators
+            const operatorsResponse = await operatorAPI.getAllOperators(
+              1,
+              1000,
+              "",
+              signal
+            );
+            const operators = Array.isArray(operatorsResponse)
+              ? operatorsResponse
+              : operatorsResponse.data || [];
+
+            // Get all farmers to add farmer information to operators
+            const farmersForOperators = await farmerAPI.getAllFarmers(
+              1,
+              1000,
+              "",
+              [],
+              signal
+            );
+
+            // Create a map of farmer_id to farmer data for quick lookup
+            const farmerOperatorMap = {};
+            const farmersForOperatorsData = Array.isArray(farmersForOperators)
+              ? farmersForOperators
+              : farmersForOperators.data || [];
+
+            farmersForOperatorsData.forEach((farmer) => {
+              farmerOperatorMap[farmer.farmer_id] = farmer;
+            });
+
+            // Enrich operators with farmer information
+            const enrichedOperators = operators.map((operator) => {
+              const farmer = farmerOperatorMap[operator.farmer_id];
+              return {
+                ...operator,
+                farmer_name: farmer
+                  ? farmer.name ||
+                    `${farmer.first_name || ""} ${
+                      farmer.last_name || ""
+                    }`.trim()
+                  : "Unknown",
+                barangay: farmer ? farmer.barangay : "Unknown",
+              };
+            });
+
+            processedData = enrichedOperators;
+            break;
+
+          default:
+            processedData = [];
+        }
+
+        // Extract filter options from the data
+        extractFilterOptions(processedData);
+
+        // Set the new data
+        setAllData(processedData);
+
+        // Apply pagination to the fetched data
+        const startIndex = (currentPage - 1) * pageSize;
+        const paginatedResults = processedData.slice(
+          startIndex,
+          startIndex + pageSize
+        );
+
+        setData(paginatedResults);
+        setTotalRecords(processedData.length);
+        setLoading(false);
+      } catch (err) {
+        // Only set error if not an abort error (which happens during cleanup)
+        if (err.name !== "AbortError") {
+          console.error(`Error fetching ${selectedDataType} data:`, err);
+          setError(`Failed to fetch ${selectedDataType} data: ${err.message}`);
+          setLoading(false);
+          setAllData([]);
+          setData([]);
+          setTotalRecords(0);
+        }
+      }
+    },
+    [
+      selectedDataType,
+      parseProductionData,
+      extractFilterOptions,
+      currentPage,
+      pageSize,
+    ]
+  );
+
+  // Client-side filtering function - memoized with useCallback
+  const filterData = useCallback(() => {
+    const shouldPaginateDirectly =
       !debouncedSearchText.trim() &&
       !barangayFilter &&
       !monthFilter &&
-      !yearFilter
-    ) {
+      !yearFilter;
+
+    if (shouldPaginateDirectly) {
       paginateData();
       return;
     }
@@ -674,98 +761,128 @@ const Inventory = () => {
     setData(paginatedResults);
     setTotalRecords(filtered.length);
     setLoading(false);
-  };
+  }, [
+    allData,
+    barangayFilter,
+    currentPage,
+    debouncedSearchText,
+    monthFilter,
+    pageSize,
+    paginateData,
+    parseProductionData,
+    selectedDataType,
+    yearFilter,
+  ]);
 
-  const handleSearch = (selectedKeys, confirm, dataIndex) => {
+  const handleSearch = useCallback((selectedKeys, confirm, dataIndex) => {
     confirm();
     setSearchText(selectedKeys[0]);
     setSearchedColumn(dataIndex);
     setCurrentPage(1);
-  };
+  }, []);
 
-  const handleReset = (clearFilters) => {
+  const handleReset = useCallback((clearFilters) => {
     clearFilters();
     setSearchText("");
-  };
+  }, []);
 
-  const handleDelete = async (id) => {
-    try {
-      switch (selectedDataType) {
-        case "farmers":
-          await farmerAPI.deleteFarmer(id);
-          break;
-        case "crops":
-        case "highValueCrops":
-          // Need farmer_id and crop_id
-          if (currentItem && currentItem.farmer_id) {
-            await farmerAPI.deleteCrop(currentItem.farmer_id, id);
-          }
-          break;
-        case "rice":
-          // Need farmer_id and rice_id
-          if (currentItem && currentItem.farmer_id) {
-            await farmerAPI.deleteRice(currentItem.farmer_id, id);
-          }
-          break;
-        case "livestock":
-          await livestockAPI.deleteLivestockRecord(id);
-          break;
-        case "operators":
-          await operatorAPI.deleteOperator(id);
-          break;
+  const handleDelete = useCallback(
+    async (id) => {
+      try {
+        switch (selectedDataType) {
+          case "farmers":
+            await farmerAPI.deleteFarmer(id);
+            break;
+          case "crops":
+          case "highValueCrops":
+            // Need farmer_id and crop_id
+            if (currentItem && currentItem.farmer_id) {
+              await farmerAPI.deleteCrop(currentItem.farmer_id, id);
+            }
+            break;
+          case "rice":
+            // Need farmer_id and rice_id
+            if (currentItem && currentItem.farmer_id) {
+              await farmerAPI.deleteRice(currentItem.farmer_id, id);
+            }
+            break;
+          case "livestock":
+            await livestockAPI.deleteLivestockRecord(id);
+            break;
+          case "operators":
+            await operatorAPI.deleteOperator(id);
+            break;
+        }
+
+        // Create a new AbortController for this request
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+        abortControllerRef.current = new AbortController();
+        const signal = abortControllerRef.current.signal;
+
+        // Refresh data after deletion
+        await fetchAllData(signal);
+
+        showToast(
+          `${selectedDataType.slice(0, -1)} deleted successfully`,
+          "success"
+        );
+        setShowDeleteConfirm(null);
+      } catch (err) {
+        console.error(`Error deleting ${selectedDataType.slice(0, -1)}:`, err);
+        showToast(
+          `Failed to delete ${selectedDataType.slice(0, -1)}: ${err.message}`,
+          "error"
+        );
       }
+    },
+    [currentItem, selectedDataType, fetchAllData]
+  );
 
-      // Refresh data after deletion
-      fetchAllData();
-      showToast(
-        `${selectedDataType.slice(0, -1)} deleted successfully`,
-        "success"
-      );
-      setShowDeleteConfirm(null);
-    } catch (err) {
-      console.error(`Error deleting ${selectedDataType.slice(0, -1)}:`, err);
-      showToast(
-        `Failed to delete ${selectedDataType.slice(0, -1)}: ${err.message}`,
-        "error"
-      );
-    }
-  };
-
-  const handleView = (record) => {
+  const handleView = useCallback((record) => {
     setCurrentItem(record);
     setIsViewMode(true);
-  };
+  }, []);
 
-  const handleEdit = (record) => {
+  const handleEdit = useCallback((record) => {
     setCurrentItem(record);
     setIsEditMode(true);
-  };
+  }, []);
 
-  const handleCloseView = () => {
+  const handleCloseView = useCallback(() => {
     setIsViewMode(false);
     setCurrentItem(null);
-  };
+  }, []);
 
-  const handleCloseEdit = () => {
+  const handleCloseEdit = useCallback(() => {
     setIsEditMode(false);
     setCurrentItem(null);
-    // Refresh data after editing
-    fetchAllData();
-  };
 
-  const handleSearchInputChange = (e) => {
+    // Create a new AbortController for this request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
+    // Refresh data after editing
+    fetchAllData(signal);
+  }, [fetchAllData]);
+
+  const handleSearchInputChange = useCallback((e) => {
     const value = e.target.value;
     setSearchText(value);
     setCurrentPage(1); // Reset to first page when searching
-  };
+  }, []);
 
   // Simple toast notification function
-  const showToast = (message, type = "info") => {
+  const showToast = useCallback((message, type = "info") => {
     // In a real app, you'd use a toast library or custom component
     alert(message);
-  };
+  }, []);
 
-  const handleFilterChange = (filterType, value) => {
+  const handleFilterChange = useCallback((filterType, value) => {
     setCurrentPage(1); // Reset to first page when filters change
 
     switch (filterType) {
@@ -781,56 +898,20 @@ const Inventory = () => {
       default:
         break;
     }
-  };
+  }, []);
 
-  // Add this function to clear all filters
-  const clearAllFilters = () => {
+  // Add this function to clear all filters - memoized with useCallback
+  const clearAllFilters = useCallback(() => {
     setBarangayFilter("");
     setMonthFilter("");
     setYearFilter("");
     setSearchText("");
     setDebouncedSearchText("");
     setCurrentPage(1);
-  };
+  }, []);
 
-  // If in edit mode, show the edit page instead of the inventory list
-  if (isEditMode && currentItem) {
-    // For now, we only support editing farmers
-    if (selectedDataType === "farmers") {
-      return (
-        <EditFarmer
-          farmer={currentItem}
-          onClose={handleCloseEdit}
-          colors={{}}
-        />
-      );
-    } else {
-      // For other data types, just close edit mode
-      setIsEditMode(false);
-      return null;
-    }
-  }
-
-  // If in view mode, show a detailed view of the item
-  if (isViewMode && currentItem) {
-    // For now, we only support viewing farmers
-    if (selectedDataType === "farmers") {
-      return (
-        <ViewFarmer
-          farmer={currentItem}
-          onClose={handleCloseView}
-          colors={{}}
-        />
-      );
-    } else {
-      // For other data types, just close view mode
-      setIsViewMode(false);
-      return null;
-    }
-  }
-
-  // Render table columns based on selected data type
-  const renderTableColumns = () => {
+  // Render table columns based on selected data type - memoized with useCallback
+  const renderTableColumns = useCallback(() => {
     switch (selectedDataType) {
       case "farmers":
         return (
@@ -997,10 +1078,10 @@ const Inventory = () => {
       default:
         return null;
     }
-  };
+  }, [selectedDataType]);
 
-  // Render table rows based on selected data type
-  const renderTableRows = () => {
+  // Render table rows based on selected data type - memoized with useCallback
+  const renderTableRows = useCallback(() => {
     if (data.length === 0 && !loading) {
       return (
         <tr>
@@ -1382,7 +1463,37 @@ const Inventory = () => {
       default:
         return null;
     }
-  };
+  }, [
+    data,
+    handleEdit,
+    handleView,
+    loading,
+    parseProductionData,
+    searchText,
+    searchedColumn,
+    selectedDataType,
+  ]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  if (isViewMode && currentItem) {
+    return (
+      <ViewFarmer farmer={currentItem} onClose={handleCloseView} colors={{}} />
+    );
+  }
+
+  if (isEditMode && currentItem) {
+    return (
+      <EditFarmer farmer={currentItem} onClose={handleCloseEdit} colors={{}} />
+    );
+  }
 
   return (
     <div className="p-2 sm:p-3 bg-[#F5F7F9] min-h-screen max-w-full overflow-hidden flex flex-col">
@@ -1772,7 +1883,7 @@ const Inventory = () => {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-30">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="w-full max-w-sm p-4 bg-white rounded-lg shadow-xl sm:p-6">
             <h3 className="mb-2 text-sm font-medium sm:text-lg">
               Delete this {selectedDataType.slice(0, -1)}?

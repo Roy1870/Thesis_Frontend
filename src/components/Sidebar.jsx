@@ -6,7 +6,6 @@ import {
   FormOutlined,
   InboxOutlined,
   LineChartOutlined,
-  SettingOutlined,
   UserOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -170,6 +169,15 @@ const Sidebar = () => {
     setDropdownVisible(!dropdownVisible);
   };
 
+  // Show loading state while fetching user data
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">
+        <div className="w-12 h-12 border-t-4 border-b-4 border-green-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   // Mobile menu overlay
   const mobileMenuOverlay = (
     <div
@@ -179,18 +187,6 @@ const Sidebar = () => {
       onClick={() => setMobileMenuOpen(false)}
     />
   );
-
-  // Show loading state while fetching user data
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="w-8 h-8 border-t-2 border-b-2 border-green-500 rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  // Calculate the number of menu items to adjust height
-  const menuItemCount = 5 + (isAdmin ? 1 : 0); // 5 standard items + 1 if admin
 
   // Sidebar content - reused for both mobile and desktop
   const sidebarContent = (

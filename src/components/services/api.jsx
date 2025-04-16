@@ -33,8 +33,6 @@ class PersistentCache {
             this.ttls.set(key, item.expiry);
           }
         });
-
-        console.log(`Loaded ${this.cache.size} items from persistent cache`);
       }
     } catch (e) {
       console.error("Failed to load cache from storage:", e);

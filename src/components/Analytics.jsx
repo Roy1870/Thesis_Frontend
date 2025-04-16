@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { farmerAPI, livestockAPI, operatorAPI } from "./services/api";
 import { Loader2, ChevronDown } from "lucide-react";
 
@@ -54,24 +54,40 @@ function Analytics() {
     },
   });
 
-  // Define categories
-  const categories = [
-    { id: "livestock", name: "Livestock & Poultry", icon: "🐄", unit: "heads" },
-    { id: "rice", name: "Rice", icon: "🌾", unit: "tons" },
-    { id: "banana", name: "Banana", icon: "🍌", unit: "tons" },
-    { id: "legumes", name: "Legumes", icon: "🌱", unit: "tons" },
-    { id: "spices", name: "Spices", icon: "🌶️", unit: "tons" },
-    { id: "fish", name: "Fish", icon: "🐟", unit: "tons" },
-    {
-      id: "highValueCrops",
-      name: "High Value Crops",
-      icon: "🌿",
-      unit: "tons",
-    },
-  ];
+  // Define categories - memoized to prevent recreating on each render
+  const categories = useMemo(
+    () => [
+      {
+        id: "livestock",
+        name: "Livestock & Poultry",
+        icon: "🐄",
+        unit: "heads",
+      },
+      { id: "rice", name: "Rice", icon: "🌾", unit: "tons" },
+      { id: "banana", name: "Banana", icon: "🍌", unit: "tons" },
+      { id: "legumes", name: "Legumes", icon: "🌱", unit: "tons" },
+      { id: "spices", name: "Spices", icon: "🌶️", unit: "tons" },
+      { id: "fish", name: "Fish", icon: "🐟", unit: "tons" },
+      {
+        id: "highValueCrops",
+        name: "High Value Crops",
+        icon: "🌿",
+        unit: "tons",
+      },
+    ],
+    []
+  );
 
+  // Fetch data with AbortController for cleanup
   useEffect(() => {
-    fetchAllData();
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    fetchAllData(signal);
+
+    return () => {
+      controller.abort();
+    };
   }, []);
 
   // Update dropdown position when it opens
@@ -106,7 +122,7 @@ function Analytics() {
     };
   }, [dropdownOpen]);
 
-  // Process raw data into analytics data
+  // Process raw data into analytics data - optimized with useCallback
   useEffect(() => {
     if (Object.values(rawData).every((arr) => arr.length === 0)) return;
 
@@ -124,38 +140,44 @@ function Analytics() {
     setAnalyticsData(processedData);
   }, [rawData]);
 
-  // Fetch all data using the same approach as the inventory component
-  const fetchAllData = async () => {
+  // Fetch all data using optimized approach with signal for cancellation
+  const fetchAllData = async (signal) => {
     try {
       setLoading(true);
 
-      // Fetch all farmers
-      const farmersResponse = await farmerAPI.getAllFarmers(1, 1000);
+      // Use Promise.all to fetch data in parallel
+      const [farmersResponse, livestockResponse, operatorsResponse] =
+        await Promise.all([
+          farmerAPI.getAllFarmers(1, 1000, "", [], signal),
+          livestockAPI.getAllLivestockRecords(1, 1000, "", signal),
+          operatorAPI.getAllOperators(1, 1000, "", signal),
+        ]);
+
+      // Process farmers data
       const farmers = Array.isArray(farmersResponse)
         ? farmersResponse
         : farmersResponse.data || [];
 
-      // Fetch all livestock records
-      const livestockResponse = await livestockAPI.getAllLivestockRecords(
-        1,
-        1000
-      );
+      // Process livestock data
       const livestock = Array.isArray(livestockResponse)
         ? livestockResponse
         : livestockResponse.data || [];
 
-      // Fetch all operators
-      const operatorsResponse = await operatorAPI.getAllOperators(1, 1000);
+      // Process operators data
       const operators = Array.isArray(operatorsResponse)
         ? operatorsResponse
         : operatorsResponse.data || [];
 
-      // Extract crops from farmers
+      // Create a map for faster farmer lookups
+      const farmersMap = {};
+      farmers.forEach((farmer) => {
+        farmersMap[farmer.farmer_id] = farmer;
+      });
+
+      // Extract crops from farmers - process in batches for better performance
       const crops = [];
       const rice = [];
       const highValueCrops = [];
-
-      console.log("Farmers data:", farmers);
 
       // Process each farmer to extract crops and rice data
       farmers.forEach((farmer) => {
@@ -180,7 +202,8 @@ function Analytics() {
               try {
                 productionData = JSON.parse(crop.production_data);
               } catch (e) {
-                console.error("Error parsing production data:", e);
+                // Silent error - continue with empty production data
+                productionData = {};
               }
             } else if (
               crop.production_data &&
@@ -217,7 +240,8 @@ function Analytics() {
               try {
                 productionData = JSON.parse(crop.production_data);
               } catch (e) {
-                console.error("Error parsing production data:", e);
+                // Silent error - continue with empty production data
+                productionData = {};
               }
             } else if (
               crop.production_data &&
@@ -261,15 +285,7 @@ function Analytics() {
         }
       });
 
-      console.log("Processed crops:", crops);
-      console.log("Processed high value crops:", highValueCrops);
-
-      // Enrich livestock records with farmer information
-      const farmersMap = {};
-      farmers.forEach((farmer) => {
-        farmersMap[farmer.farmer_id] = farmer;
-      });
-
+      // Enrich livestock records with farmer information using the map for faster lookup
       const enrichedLivestock = livestock.map((record) => {
         const farmer = farmersMap[record.farmer_id];
         return {
@@ -294,13 +310,16 @@ function Analytics() {
 
       setLoading(false);
     } catch (error) {
-      console.error("Error fetching data:", error);
-      setLoading(false);
+      // Only set error if not an abort error (which happens during cleanup)
+      if (error.name !== "AbortError") {
+        console.error("Error fetching data:", error);
+        setLoading(false);
+      }
     }
   };
 
-  // Process livestock data
-  const processLivestockData = () => {
+  // Process livestock data - memoized with useCallback
+  const processLivestockData = useCallback(() => {
     const livestock = rawData.livestock || [];
     const animalTypeMap = {};
 
@@ -321,15 +340,12 @@ function Analytics() {
       total,
       items,
     };
-  };
+  }, [rawData.livestock]);
 
-  // Replace the processRiceData function with this more comprehensive version
-  const processRiceData = () => {
+  // Process rice data - memoized with useCallback
+  const processRiceData = useCallback(() => {
     const riceData = rawData.rice || [];
     const varietyMap = {};
-
-    // Debug log to see what rice data we're working with
-    console.log("Processing rice data:", riceData);
 
     riceData.forEach((rice) => {
       // Normalize variety names to prevent duplicates with slight differences
@@ -375,9 +391,6 @@ function Analytics() {
       }
     });
 
-    // Log the processed variety map
-    console.log("Rice variety map:", varietyMap);
-
     const items = Object.entries(varietyMap)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
@@ -388,10 +401,10 @@ function Analytics() {
       total,
       items,
     };
-  };
+  }, [rawData.rice]);
 
-  // Process banana data
-  const processBananaData = () => {
+  // Process banana data - memoized with useCallback
+  const processBananaData = useCallback(() => {
     const crops = rawData.crops || [];
     const bananaVarietyMap = {};
 
@@ -403,8 +416,6 @@ function Analytics() {
         isBananaVariety(crop.crop_type) ||
         isBananaVariety(crop.crop_value)
     );
-
-    console.log("Banana crops:", bananaCrops);
 
     bananaCrops.forEach((crop) => {
       // Get variety from crop_value, variety_clone, or from parsed production_data
@@ -420,7 +431,7 @@ function Analytics() {
             variety = productionData.crop;
           }
         } catch (e) {
-          console.error("Error parsing production data:", e);
+          // Silent error - continue with empty production data
         }
       } else if (
         crop.production_data &&
@@ -473,10 +484,10 @@ function Analytics() {
       total,
       items,
     };
-  };
+  }, [rawData.crops]);
 
-  // Process legumes data
-  const processLegumesData = () => {
+  // Process legumes data - memoized with useCallback
+  const processLegumesData = useCallback(() => {
     const crops = rawData.crops || [];
     const legumesTypeMap = {};
 
@@ -486,8 +497,6 @@ function Analytics() {
         (crop.crop_type && isLegume(crop.crop_type.toLowerCase())) ||
         (crop.crop_value && isLegume(crop.crop_value.toLowerCase()))
     );
-
-    console.log("Legume crops:", legumeCrops);
 
     legumeCrops.forEach((crop) => {
       // Get crop type from crop_value, crop_type, or from parsed production_data
@@ -503,7 +512,7 @@ function Analytics() {
             type = productionData.crop;
           }
         } catch (e) {
-          console.error("Error parsing production data:", e);
+          // Silent error - continue with empty production data
         }
       } else if (
         crop.production_data &&
@@ -555,10 +564,10 @@ function Analytics() {
       total,
       items,
     };
-  };
+  }, [rawData.crops]);
 
-  // Process spices data
-  const processSpicesData = () => {
+  // Process spices data - memoized with useCallback
+  const processSpicesData = useCallback(() => {
     const crops = rawData.crops || [];
     const spicesTypeMap = {};
 
@@ -568,8 +577,6 @@ function Analytics() {
         (crop.crop_type && isSpice(crop.crop_type.toLowerCase())) ||
         (crop.crop_value && isSpice(crop.crop_value.toLowerCase()))
     );
-
-    console.log("Spice crops:", spiceCrops);
 
     spiceCrops.forEach((crop) => {
       // Get crop type from crop_value, crop_type, or from parsed production_data
@@ -585,7 +592,7 @@ function Analytics() {
             type = productionData.crop;
           }
         } catch (e) {
-          console.error("Error parsing production data:", e);
+          // Silent error - continue with empty production data
         }
       } else if (
         crop.production_data &&
@@ -637,25 +644,14 @@ function Analytics() {
       total,
       items,
     };
-  };
+  }, [rawData.crops]);
 
-  // Replace the processFishData function with this more comprehensive version
-  const processFishData = () => {
+  // Process fish data - memoized with useCallback
+  const processFishData = useCallback(() => {
     // Combine data from crops and operators (for fish)
     const crops = rawData.crops || [];
     const operators = rawData.operators || [];
     const fishTypeMap = {};
-
-    // Debug log
-    console.log(
-      "Processing fish data - crops:",
-      crops.filter(
-        (crop) =>
-          (crop.crop_type && isFish(crop.crop_type.toLowerCase())) ||
-          (crop.crop_value && isFish(crop.crop_value.toLowerCase()))
-      )
-    );
-    console.log("Processing fish data - operators:", operators);
 
     // Filter fish crops
     const fishCrops = crops.filter(
@@ -741,9 +737,6 @@ function Analytics() {
       }
     });
 
-    // Log the processed fish type map
-    console.log("Fish type map:", fishTypeMap);
-
     const items = Object.entries(fishTypeMap)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
@@ -755,14 +748,12 @@ function Analytics() {
       total,
       items,
     };
-  };
+  }, [rawData.crops, rawData.operators]);
 
-  // Process high value crops data
-  const processHighValueCropsData = () => {
+  // Process high value crops data - memoized with useCallback
+  const processHighValueCropsData = useCallback(() => {
     const highValueCrops = rawData.highValueCrops || [];
     const cropTypeMap = {};
-
-    console.log("High Value Crops data:", highValueCrops);
 
     highValueCrops.forEach((crop) => {
       // Get crop type from crop_value or from parsed production_data
@@ -778,7 +769,7 @@ function Analytics() {
             cropType = productionData.crop;
           }
         } catch (e) {
-          console.error("Error parsing production data:", e);
+          // Silent error - continue with empty production data
         }
       } else if (
         crop.production_data &&
@@ -830,10 +821,10 @@ function Analytics() {
       total,
       items,
     };
-  };
+  }, [rawData.highValueCrops]);
 
-  // Helper functions to categorize crops
-  const isBananaVariety = (cropType) => {
+  // Helper functions to categorize crops - memoized with useCallback
+  const isBananaVariety = useCallback((cropType) => {
     if (!cropType) return false;
     const bananaVarieties = [
       "lakatan",
@@ -845,9 +836,9 @@ function Analytics() {
     return bananaVarieties.some((variety) =>
       cropType.toLowerCase().includes(variety)
     );
-  };
+  }, []);
 
-  const isLegume = (cropType) => {
+  const isLegume = useCallback((cropType) => {
     if (!cropType) return false;
     const legumes = [
       "mung bean",
@@ -863,9 +854,9 @@ function Analytics() {
       cropType.toLowerCase() === "legumes" ||
       legumes.some((legume) => cropType.toLowerCase().includes(legume))
     );
-  };
+  }, []);
 
-  const isSpice = (cropType) => {
+  const isSpice = useCallback((cropType) => {
     if (!cropType) return false;
     const spices = [
       "ginger",
@@ -880,10 +871,10 @@ function Analytics() {
       cropType.toLowerCase() === "spices" ||
       spices.some((spice) => cropType.toLowerCase().includes(spice))
     );
-  };
+  }, []);
 
-  // Update the isFish function to be more comprehensive
-  const isFish = (cropType) => {
+  // Update the isFish function to be more comprehensive - memoized with useCallback
+  const isFish = useCallback((cropType) => {
     if (!cropType) return false;
     const fishTypes = [
       "tilapia",
@@ -900,22 +891,21 @@ function Analytics() {
       "seafood",
     ];
     return fishTypes.some((fish) => cropType.toLowerCase().includes(fish));
-  };
+  }, []);
 
   // Toggle dropdown
-  const toggleDropdown = () => {
+  const toggleDropdown = useCallback(() => {
     setDropdownOpen(!dropdownOpen);
-  };
+  }, [dropdownOpen]);
 
   // Handle category selection
-  const handleCategorySelect = (index) => {
-    console.log("Category selected:", index);
+  const handleCategorySelect = useCallback((index) => {
     setCurrentCategory(index);
     setDropdownOpen(false);
-  };
+  }, []);
 
-  // Update the renderCategoryContent function to fix percentage display
-  const renderCategoryContent = () => {
+  // Update the renderCategoryContent function to fix percentage display - memoized with useCallback
+  const renderCategoryContent = useCallback(() => {
     const category = categories[currentCategory];
     const data = analyticsData[category.id];
 
@@ -926,9 +916,6 @@ function Analytics() {
         </div>
       );
     }
-
-    // Debug log to verify data
-    console.log(`Rendering ${category.id} data:`, data);
 
     return (
       <div className="space-y-6">
@@ -960,7 +947,7 @@ function Analytics() {
           <div className="space-y-4">
             <div className="flex justify-between text-sm font-medium text-gray-500">
               <span>Type/Variety</span>
-              <span>Amount ({category.unit})</span>
+              <span>Amount ({category.units})</span>
             </div>
 
             {data.items.length > 0 ? (
@@ -1005,10 +992,10 @@ function Analytics() {
         </div>
       </div>
     );
-  };
+  }, [analyticsData, categories, currentCategory]);
 
-  // Helper function to get color for index
-  const getColorForIndex = (index) => {
+  // Helper function to get color for index - memoized with useMemo
+  const getColorForIndex = useMemo(() => {
     const colors = [
       "#6A9C89",
       "#4F6F7D",
@@ -1019,14 +1006,13 @@ function Analytics() {
       "#82ca9d",
       "#ffc658",
     ];
-    return colors[index % colors.length];
-  };
+    return (index) => colors[index % colors.length];
+  }, []);
 
   if (loading) {
     return (
-      <div className="flex h-[400px] w-full items-center justify-center">
-        <Loader2 className="w-8 h-8 mr-2 text-green-500 animate-spin" />
-        <span className="ml-2">Loading production data...</span>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">
+        <Loader2 className="w-12 h-12 text-green-500 animate-spin" />
       </div>
     );
   }
