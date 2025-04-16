@@ -9,6 +9,8 @@ import OperatorTab from "./operator-tab";
 import LivestockTab from "./livestock-tab";
 import RiceTab from "./rice-tab";
 import CropsTab from "./crops-tab";
+// Add this at the top of the file, after the imports
+import { prefetchRouteData, prefetchFarmerDetails } from "./services/api";
 
 const EditFarmer = ({ farmer, onClose, colors }) => {
   const [formData, setFormData] = useState({
@@ -152,6 +154,87 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
     refreshTrigger,
   ]);
 
+  // Enhanced prefetching for EditFarmer component
+  useEffect(() => {
+    // When editing a farmer, prefetch data for the inventory page for when they go back
+    prefetchRouteData("/inventory");
+
+    // Also prefetch data for ViewFarmer in case they want to view instead of edit
+    if (farmer && farmer.farmer_id) {
+      // Prefetch related farmers that might be viewed next
+      setTimeout(async () => {
+        try {
+          // Get a list of farmers to find related ones
+          const farmersResponse = await farmerAPI.getAllFarmers(1, 10, "", [
+            "farmer_id",
+            "name",
+            "barangay",
+          ]);
+          const farmers = Array.isArray(farmersResponse)
+            ? farmersResponse
+            : farmersResponse.data || [];
+
+          // Find the current farmer's index
+          const currentIndex = farmers.findIndex(
+            (f) => f.farmer_id === farmer.farmer_id
+          );
+
+          if (currentIndex !== -1) {
+            // Prefetch the next farmer if available (user might navigate to next)
+            if (currentIndex < farmers.length - 1) {
+              const nextFarmer = farmers[currentIndex + 1];
+              console.log(`Prefetching next farmer: ${nextFarmer.farmer_id}`);
+              prefetchFarmerDetails(nextFarmer.farmer_id);
+            }
+
+            // Prefetch the previous farmer if available (user might navigate to previous)
+            if (currentIndex > 0) {
+              const prevFarmer = farmers[currentIndex - 1];
+              console.log(
+                `Prefetching previous farmer: ${prevFarmer.farmer_id}`
+              );
+              prefetchFarmerDetails(prevFarmer.farmer_id);
+            }
+          }
+        } catch (err) {
+          console.error("Error prefetching related farmers:", err);
+        }
+      }, 2000); // Delay to ensure main data is loaded first
+    }
+  }, [farmer]);
+
+  // Add a tab change handler that prefetches data for the selected tab
+  const handleTabChange = useCallback(
+    (newTab) => {
+      setActiveTab(newTab);
+
+      // Prefetch data specific to the selected tab
+      switch (newTab) {
+        case "crops":
+          // Prefetch any additional crops data if needed
+          if (farmerData && farmerData.farmer_id) {
+            console.log("Prefetching additional crops data");
+            // This will use the cached data if available
+            farmerAPI.getFarmerById(farmerData.farmer_id);
+          }
+          break;
+        case "livestock":
+          // Prefetch livestock data
+          console.log("Prefetching livestock data");
+          fetchLivestockRecords();
+          break;
+        case "operator":
+          // Prefetch operator data
+          console.log("Prefetching operator data");
+          fetchOperatorData();
+          break;
+        default:
+          break;
+      }
+    },
+    [farmerData, fetchLivestockRecords, fetchOperatorData]
+  );
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -169,6 +252,9 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
       alert("Farmer updated successfully.");
       refreshAllData(); // Refresh data after update
       setLoading(false);
+
+      // After successful update, prefetch inventory data for when they go back
+      prefetchRouteData("/inventory");
     } catch (error) {
       alert(`Failed to update farmer. ${error.message}`);
       setLoading(false);
@@ -257,7 +343,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
         {/* Navigation buttons - Always show all tabs */}
         <div className="flex gap-2 px-1 pb-2 mb-2 -mx-1 overflow-x-auto flex-nowrap sm:gap-4 hide-scrollbar sm:mx-0 sm:px-0">
           <button
-            onClick={() => setActiveTab("info")}
+            onClick={() => handleTabChange("info")}
             className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm whitespace-nowrap ${
               activeTab === "info"
                 ? "bg-[#5A8C79] text-white"
@@ -272,7 +358,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
           </button>
 
           <button
-            onClick={() => setActiveTab("crops")}
+            onClick={() => handleTabChange("crops")}
             className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm whitespace-nowrap ${
               activeTab === "crops"
                 ? "bg-[#5A8C79] text-white"
@@ -296,7 +382,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
           </button>
 
           <button
-            onClick={() => setActiveTab("rice")}
+            onClick={() => handleTabChange("rice")}
             className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm whitespace-nowrap ${
               activeTab === "rice"
                 ? "bg-[#5A8C79] text-white"
@@ -320,7 +406,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
           </button>
 
           <button
-            onClick={() => setActiveTab("livestock")}
+            onClick={() => handleTabChange("livestock")}
             className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm whitespace-nowrap ${
               activeTab === "livestock"
                 ? "bg-[#5A8C79] text-white"
@@ -344,7 +430,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
           </button>
 
           <button
-            onClick={() => setActiveTab("operator")}
+            onClick={() => handleTabChange("operator")}
             className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm whitespace-nowrap ${
               activeTab === "operator"
                 ? "bg-[#5A8C79] text-white"

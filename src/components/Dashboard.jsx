@@ -30,7 +30,12 @@ import {
   MilkIcon as Cow,
 } from "lucide-react";
 
-import { farmerAPI, livestockAPI, operatorAPI } from "./services/api";
+import {
+  farmerAPI,
+  livestockAPI,
+  operatorAPI,
+  prefetchRouteData,
+} from "./services/api";
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
@@ -155,6 +160,21 @@ export default function Dashboard() {
     if (Object.values(rawData).every((arr) => arr.length === 0)) return;
     processData();
   }, [rawData]);
+
+  // Prefetch data for other routes when dashboard is loaded
+  useEffect(() => {
+    // Prefetch inventory data when dashboard is loaded
+    prefetchRouteData("/inventory");
+
+    // Prefetch analytics data with a delay to avoid overwhelming the network
+    const analyticsTimer = setTimeout(() => {
+      prefetchRouteData("/analytics");
+    }, 5000); // 5 second delay
+
+    return () => {
+      clearTimeout(analyticsTimer);
+    };
+  }, []);
 
   // Fetch all data using optimized approach with signal for cancellation
   const fetchAllData = async (signal) => {

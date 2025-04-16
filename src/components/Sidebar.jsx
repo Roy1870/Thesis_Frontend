@@ -17,6 +17,8 @@ import {
 import { useNavigate, useLocation } from "react-router-dom";
 import logo from "../images/logo.png";
 import axios from "axios";
+// Add this at the top of the file, after the imports
+import { prefetchRouteData, prefetchCriticalData } from "./services/api";
 
 const SIDEBAR_COLLAPSED_KEY = "sidebar_collapsed";
 
@@ -33,6 +35,7 @@ const Sidebar = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [userName, setUserName] = useState("User");
   const [loading, setLoading] = useState(true);
+  const [prefetchedRoutes, setPrefetchedRoutes] = useState({}); // Track which routes have been prefetched
   const navigate = useNavigate();
 
   // Update selected key when location changes
@@ -107,6 +110,12 @@ const Sidebar = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, [mobileMenuOpen]);
 
+  // Initial prefetch of critical data
+  useEffect(() => {
+    // Prefetch critical data when sidebar loads
+    prefetchCriticalData();
+  }, []);
+
   const toggleSidebar = () => {
     if (mobile) {
       // On mobile, toggle the mobile menu
@@ -156,11 +165,73 @@ const Sidebar = () => {
     }, 2000);
   };
 
+  // Enhanced menu click handler with intelligent prefetching
   const handleMenuClick = (path) => {
     setSelectedKey(path);
+
+    // Check if we've already prefetched this route
+    if (!prefetchedRoutes[path]) {
+      // Prefetch data for the route being navigated to
+      console.log(`Prefetching data for route: ${path}`);
+      prefetchRouteData(path);
+
+      // Mark this route as prefetched
+      setPrefetchedRoutes((prev) => ({
+        ...prev,
+        [path]: true,
+      }));
+
+      // Also prefetch related routes that might be visited next
+      setTimeout(() => {
+        // Determine related routes based on current selection
+        const relatedRoutes = getRelatedRoutes(path);
+
+        // Prefetch each related route with a small delay between each
+        relatedRoutes.forEach((route, index) => {
+          if (!prefetchedRoutes[route]) {
+            setTimeout(() => {
+              console.log(`Prefetching related route: ${route}`);
+              prefetchRouteData(route);
+
+              // Update prefetched routes
+              setPrefetchedRoutes((prev) => ({
+                ...prev,
+                [route]: true,
+              }));
+            }, index * 500); // 500ms between each prefetch
+          }
+        });
+      }, 1000); // Start prefetching related routes after 1 second
+    }
+
+    // Navigate to the selected route
     navigate(path);
+
     if (mobile) {
       setMobileMenuOpen(false);
+    }
+  };
+
+  // Helper function to determine related routes based on current route
+  const getRelatedRoutes = (currentPath) => {
+    switch (currentPath) {
+      case "/":
+        // From dashboard, users often go to inventory or analytics
+        return ["/inventory", "/analytics"];
+      case "/inventory":
+        // From inventory, users often go to dashboard or add-data
+        return ["/", "/add-data"];
+      case "/analytics":
+        // From analytics, users often go to dashboard or inventory
+        return ["/", "/inventory"];
+      case "/add-data":
+        // From add-data, users often go to inventory
+        return ["/inventory"];
+      case "/user-management":
+        // From user management, users often go to dashboard
+        return ["/"];
+      default:
+        return ["/"];
     }
   };
 
@@ -236,6 +307,13 @@ const Sidebar = () => {
               className={`w-full flex items-center px-4 py-2 text-white hover:bg-[#5A8C79] ${
                 selectedKey === "/" ? "bg-[#5A8C79]" : ""
               }`}
+              onMouseEnter={() => {
+                // Prefetch on hover for better responsiveness
+                if (!prefetchedRoutes["/"]) {
+                  prefetchRouteData("/");
+                  setPrefetchedRoutes((prev) => ({ ...prev, ["/"]: true }));
+                }
+              }}
             >
               <DashboardOutlined className="mr-3" />
               {(!collapsed || mobile) && <span>Dashboard</span>}
@@ -247,6 +325,16 @@ const Sidebar = () => {
               className={`w-full flex items-center px-4 py-2 text-white hover:bg-[#5A8C79] ${
                 selectedKey === "/add-data" ? "bg-[#5A8C79]" : ""
               }`}
+              onMouseEnter={() => {
+                // Prefetch on hover
+                if (!prefetchedRoutes["/add-data"]) {
+                  prefetchRouteData("/add-data");
+                  setPrefetchedRoutes((prev) => ({
+                    ...prev,
+                    ["/add-data"]: true,
+                  }));
+                }
+              }}
             >
               <FormOutlined className="mr-3" />
               {(!collapsed || mobile) && <span>Data Entry</span>}
@@ -258,6 +346,16 @@ const Sidebar = () => {
               className={`w-full flex items-center px-4 py-2 text-white hover:bg-[#5A8C79] ${
                 selectedKey === "/inventory" ? "bg-[#5A8C79]" : ""
               }`}
+              onMouseEnter={() => {
+                // Prefetch on hover
+                if (!prefetchedRoutes["/inventory"]) {
+                  prefetchRouteData("/inventory");
+                  setPrefetchedRoutes((prev) => ({
+                    ...prev,
+                    ["/inventory"]: true,
+                  }));
+                }
+              }}
             >
               <InboxOutlined className="mr-3" />
               {(!collapsed || mobile) && <span>Inventory</span>}
@@ -269,6 +367,16 @@ const Sidebar = () => {
               className={`w-full flex items-center px-4 py-2 text-white hover:bg-[#5A8C79] ${
                 selectedKey === "/analytics" ? "bg-[#5A8C79]" : ""
               }`}
+              onMouseEnter={() => {
+                // Prefetch on hover
+                if (!prefetchedRoutes["/analytics"]) {
+                  prefetchRouteData("/analytics");
+                  setPrefetchedRoutes((prev) => ({
+                    ...prev,
+                    ["/analytics"]: true,
+                  }));
+                }
+              }}
             >
               <LineChartOutlined className="mr-3" />
               {(!collapsed || mobile) && <span>Analytics</span>}
@@ -283,6 +391,16 @@ const Sidebar = () => {
                 className={`w-full flex items-center px-4 py-2 text-white hover:bg-[#5A8C79] ${
                   selectedKey === "/user-management" ? "bg-[#5A8C79]" : ""
                 }`}
+                onMouseEnter={() => {
+                  // Prefetch on hover
+                  if (!prefetchedRoutes["/user-management"]) {
+                    prefetchRouteData("/user-management");
+                    setPrefetchedRoutes((prev) => ({
+                      ...prev,
+                      ["/user-management"]: true,
+                    }));
+                  }
+                }}
               >
                 <TeamOutlined className="mr-3" />
                 {(!collapsed || mobile) && <span>User Management</span>}

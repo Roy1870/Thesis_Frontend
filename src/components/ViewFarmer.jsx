@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { farmerAPI, livestockAPI, operatorAPI } from "./services/api";
 import EditFarmer from "./EditFarmer";
+// Add this at the top of the file, after the imports
+import { prefetchRouteData } from "./services/api";
 
 const ViewFarmer = ({ farmer, onClose, colors }) => {
   const [farmerData, setFarmerData] = useState(null);
@@ -19,11 +21,11 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
   const [cropSubTab, setCropSubTab] = useState("regular"); // "regular" or "highValue"
 
   // Function to fetch farmer details (declared here to be accessible in handleCloseEdit)
-  const fetchFarmerDetails = async () => {
+  const fetchFarmerDetails = async (farmerId) => {
     try {
       setFetchLoading(true);
 
-      const response = await farmerAPI.getFarmerById(farmer.farmer_id);
+      const response = await farmerAPI.getFarmerById(farmerId);
 
       // Determine the crop data type from the first crop item
       if (response.crops && response.crops.length > 0) {
@@ -118,12 +120,81 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
     }
   };
 
-  // Fetch the farmer data, livestock records, and operator data
+  // Add this inside the ViewFarmer component, after the useEffect hooks
+  // Prefetch edit data when viewing a farmer
   useEffect(() => {
-    fetchFarmerDetails();
-    fetchLivestockRecords();
-    fetchOperatorData();
-  }, [farmer.farmer_id]);
+    // First check if we already have the data in cache before fetching
+    const checkCacheAndFetch = async () => {
+      try {
+        // Try to get the farmer data directly from the API service
+        // The API service will return cached data if available
+        const farmerResponse = await farmerAPI.getFarmerById(farmer.farmer_id);
+
+        // Process the data as before
+        if (farmerResponse) {
+          // Determine the crop data type from the first crop item
+          if (farmerResponse.crops && farmerResponse.crops.length > 0) {
+            try {
+              const firstCrop = farmerResponse.crops[0];
+              if (firstCrop.production_data) {
+                const data = JSON.parse(firstCrop.production_data);
+                if (data.month) {
+                  setCropDataType("Month");
+                } else if (data.crop) {
+                  setCropDataType("Crop");
+                }
+              }
+            } catch (e) {
+              console.error("Error parsing crop data:", e);
+            }
+          }
+
+          // Process the crops data to extract JSON values
+          if (farmerResponse.crops && farmerResponse.crops.length > 0) {
+            farmerResponse.crops = farmerResponse.crops.map((crop) => {
+              if (crop.production_data) {
+                try {
+                  const data = JSON.parse(crop.production_data);
+                  return {
+                    ...crop,
+                    crop_value: data.crop || null,
+                    month_value: data.month || null,
+                    quantity_value: data.quantity || null,
+                  };
+                } catch (e) {
+                  return {
+                    ...crop,
+                    crop_value: null,
+                    month_value: null,
+                    quantity_value: null,
+                  };
+                }
+              }
+              return crop;
+            });
+          }
+
+          setFarmerData(farmerResponse);
+          setFetchLoading(false);
+
+          // After setting the main farmer data, fetch related data
+          fetchLivestockRecords();
+          fetchOperatorData();
+        }
+      } catch (err) {
+        console.error("Error fetching farmer details:", err);
+        setError(`Failed to fetch farmer details: ${err.message}`);
+        setFetchLoading(false);
+      }
+    };
+
+    // Start the fetch process
+    setFetchLoading(true);
+    checkCacheAndFetch();
+
+    // Prefetch data for inventory page for when they go back
+    prefetchRouteData("/inventory");
+  }, [farmer]);
 
   const riceColumns = [
     {
@@ -297,7 +368,14 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
     },
   ];
 
+  // Enhance the handleEdit function to ensure data is ready before editing
   const handleEdit = (farmer) => {
+    // Ensure we have the latest data before transitioning to edit mode
+    if (farmer && farmer.farmer_id) {
+      // Quick prefetch to ensure fresh data
+      prefetchFarmerDetails(farmer.farmer_id);
+    }
+
     setIsEditMode(true);
   };
 
@@ -314,7 +392,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
   const handleCloseEdit = () => {
     setIsEditMode(false);
     // Refresh farmer data after editing
-    fetchFarmerDetails();
+    fetchFarmerDetails(farmerData.farmer_id);
     fetchLivestockRecords();
     fetchOperatorData();
   };
@@ -361,6 +439,17 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
   const hasCrops = farmerData?.crops && farmerData.crops.length > 0;
   const hasLivestock = livestockRecords.length > 0;
   const hasOperators = operatorData.length > 0;
+
+  // Function to prefetch farmer details
+  const prefetchFarmerDetails = async (farmerId) => {
+    try {
+      // Trigger the API call to prefetch farmer details
+      await farmerAPI.getFarmerById(farmerId);
+      console.log(`Prefetched farmer details for farmer ${farmerId}`);
+    } catch (error) {
+      console.error("Error prefetching farmer details:", error);
+    }
+  };
 
   return (
     <div className="min-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden pb-20">
@@ -682,7 +771,7 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
                   viewBox="0 0 20 20"
                   fill="currentColor"
                 >
-                  <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                  <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
                 </svg>
                 <h3 className="text-sm font-medium sm:text-base">
                   Address Information

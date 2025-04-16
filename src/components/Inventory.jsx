@@ -24,6 +24,9 @@ import Highlighter from "react-highlight-words";
 import EditFarmer from "./EditFarmer";
 import ViewFarmer from "./ViewFarmer";
 
+// Add this at the top of the file, after the imports
+import { prefetchRouteData, prefetchFarmerDetails } from "./services/api";
+
 // Custom MilkIcon component since it's not in lucide-react
 const MilkIcon = (props) => (
   <svg
@@ -175,6 +178,85 @@ const Inventory = () => {
       }
     };
   }, [selectedDataType]);
+
+  // Add this inside the Inventory component, after the useEffect hooks
+  // Prefetch data for other routes when inventory is loaded
+  useEffect(() => {
+    // Prefetch dashboard data when inventory is loaded
+    prefetchRouteData("/dashboard");
+
+    // Prefetch analytics data with a delay
+    const analyticsTimer = setTimeout(() => {
+      prefetchRouteData("/analytics");
+    }, 5000); // 5 second delay
+
+    // Enhanced prefetching strategy - load ALL farmer details in batches
+    const prefetchAllFarmersTimer = setTimeout(() => {
+      if (allData.length > 0 && selectedDataType === "farmers") {
+        console.log(
+          `Starting background prefetch of all ${allData.length} farmers...`
+        );
+
+        // Process farmers in batches to avoid overwhelming the browser
+        const batchSize = 5;
+        const totalFarmers = allData.length;
+
+        // Function to process a batch of farmers
+        const processBatch = (startIndex) => {
+          // If we've processed all farmers, we're done
+          if (startIndex >= totalFarmers) {
+            console.log("Completed prefetching all farmer details");
+            return;
+          }
+
+          // Get the current batch
+          const endIndex = Math.min(startIndex + batchSize, totalFarmers);
+          const batch = allData.slice(startIndex, endIndex);
+
+          console.log(
+            `Prefetching batch of farmers ${
+              startIndex + 1
+            }-${endIndex} of ${totalFarmers}`
+          );
+
+          // Process each farmer in the batch sequentially with small delays
+          let farmerIndex = 0;
+          const processFarmer = () => {
+            if (farmerIndex >= batch.length) {
+              // This batch is done, schedule the next batch
+              setTimeout(() => processBatch(startIndex + batchSize), 1000);
+              return;
+            }
+
+            const farmer = batch[farmerIndex];
+            if (farmer && farmer.farmer_id) {
+              console.log(
+                `Prefetching data for farmer ${farmer.farmer_id} (${
+                  startIndex + farmerIndex + 1
+                }/${totalFarmers})`
+              );
+              prefetchFarmerDetails(farmer.farmer_id);
+            }
+
+            // Schedule the next farmer in this batch
+            farmerIndex++;
+            setTimeout(processFarmer, 300);
+          };
+
+          // Start processing this batch
+          processFarmer();
+        };
+
+        // Start with the first batch
+        processBatch(0);
+      }
+    }, 2000); // Start after 2 seconds to ensure main UI is responsive first
+
+    return () => {
+      clearTimeout(analyticsTimer);
+      clearTimeout(prefetchAllFarmersTimer);
+    };
+  }, [allData, selectedDataType]);
 
   // Handle pagination, debounced search, and filters
   useEffect(() => {
@@ -840,10 +922,44 @@ const Inventory = () => {
     [currentItem, selectedDataType, fetchAllData]
   );
 
-  const handleView = useCallback((record) => {
-    setCurrentItem(record);
-    setIsViewMode(true);
-  }, []);
+  // Modify the handleView function to prefetch additional data
+  const handleView = useCallback(
+    (record) => {
+      // Set the current item first to ensure the component has data to work with
+      setCurrentItem(record);
+      setIsViewMode(true);
+
+      // Log that we're viewing this farmer
+      console.log(`Viewing farmer ${record.farmer_id}`);
+
+      // No need to explicitly fetch here as the ViewFarmer component will use cached data
+      // if available, or fetch if needed
+
+      // Prefetch the next few farmers in the list for even faster navigation
+      if (record && record.farmer_id && data.length > 1) {
+        // Find the current index
+        const currentIndex = data.findIndex(
+          (item) => item.farmer_id === record.farmer_id
+        );
+
+        if (currentIndex !== -1) {
+          // Prefetch the next 2 farmers if available
+          for (let i = 1; i <= 2; i++) {
+            const nextIndex = (currentIndex + i) % data.length;
+            const nextFarmer = data[nextIndex];
+
+            if (nextFarmer && nextFarmer.farmer_id) {
+              setTimeout(() => {
+                console.log(`Prefetching next farmer ${nextFarmer.farmer_id}`);
+                prefetchFarmerDetails(nextFarmer.farmer_id);
+              }, i * 200); // Stagger the prefetches
+            }
+          }
+        }
+      }
+    },
+    [data]
+  );
 
   const handleEdit = useCallback((record) => {
     setCurrentItem(record);

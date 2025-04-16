@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { farmerAPI, livestockAPI, operatorAPI } from "./services/api";
+import {
+  farmerAPI,
+  livestockAPI,
+  operatorAPI,
+  prefetchRouteData,
+} from "./services/api";
 import { Loader2, ChevronDown } from "lucide-react";
 
 function Analytics() {
@@ -121,6 +126,14 @@ function Analytics() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [dropdownOpen]);
+
+  // Prefetch data for other routes when analytics is loaded
+  useEffect(() => {
+    // Prefetch inventory data when analytics is loaded
+    prefetchRouteData("/inventory");
+
+    // No need to prefetch dashboard data as it's lighter and will load quickly
+  }, []);
 
   // Process raw data into analytics data - optimized with useCallback
   useEffect(() => {

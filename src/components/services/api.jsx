@@ -477,21 +477,242 @@ export const batchRequests = async (requests) => {
   }
 };
 
-// Prefetch critical data immediately on load
+// Update the prefetchCriticalData function to include prefetching for ViewFarmer and EditFarmer
 export const prefetchCriticalData = () => {
   if (typeof window === "undefined") return;
 
   // Execute with a small delay to not block initial render
   setTimeout(() => {
     try {
-      // Prefetch minimal data with small page sizes
-      farmerAPI.getAllFarmers(1, 5, "", ["farmer_id", "name"]);
-      livestockAPI.getAllLivestockRecords(1, 5);
-      operatorAPI.getAllOperators(1, 5);
+      // Create a queue of prefetch operations to run in sequence
+      const prefetchQueue = [
+        // First priority: Basic farmer data (most commonly needed)
+        () =>
+          farmerAPI.getAllFarmers(1, 10, "", ["farmer_id", "name", "barangay"]),
+
+        // Second priority: Livestock data (smaller dataset)
+        () => livestockAPI.getAllLivestockRecords(1, 10),
+
+        // Third priority: Operator data (smaller dataset)
+        () => operatorAPI.getAllOperators(1, 10),
+
+        // Fourth priority: Prefetch first few farmers' details for ViewFarmer and EditFarmer
+        async () => {
+          try {
+            // Get the first few farmers
+            const farmersResponse = await farmerAPI.getAllFarmers(1, 5, "", [
+              "farmer_id",
+              "name",
+              "barangay",
+            ]);
+            const farmers = Array.isArray(farmersResponse)
+              ? farmersResponse
+              : farmersResponse.data || [];
+
+            // Prefetch details for each farmer (for ViewFarmer and EditFarmer)
+            if (farmers.length > 0) {
+              // Only prefetch the first 2 farmers to avoid too many requests
+              const farmersToPreload = farmers.slice(0, 2);
+
+              // Prefetch each farmer's details sequentially with small delays
+              for (let i = 0; i < farmersToPreload.length; i++) {
+                const farmer = farmersToPreload[i];
+                // Wait a bit before each prefetch to avoid overwhelming the network
+                await new Promise((resolve) => setTimeout(resolve, 300));
+
+                // Prefetch farmer details
+                farmerAPI
+                  .getFarmerById(farmer.farmer_id)
+                  .catch((err) =>
+                    console.error(
+                      `Prefetch error for farmer ${farmer.farmer_id}:`,
+                      err
+                    )
+                  );
+
+                // Wait a bit before prefetching related data
+                await new Promise((resolve) => setTimeout(resolve, 200));
+
+                // Prefetch livestock records for this farmer
+                livestockAPI
+                  .getAllLivestockRecords()
+                  .catch((err) =>
+                    console.error("Prefetch livestock error:", err)
+                  );
+
+                // Wait a bit before next prefetch
+                await new Promise((resolve) => setTimeout(resolve, 200));
+
+                // Prefetch operator data for this farmer
+                operatorAPI
+                  .getAllOperators()
+                  .catch((err) =>
+                    console.error("Prefetch operators error:", err)
+                  );
+              }
+            }
+            return Promise.resolve();
+          } catch (err) {
+            console.error("Error prefetching farmer details:", err);
+            return Promise.resolve(); // Continue with other prefetch operations
+          }
+        },
+
+        // Fifth priority: More detailed farmer data for specific views
+        () => {
+          // Get the current path to determine what to prefetch
+          const path = window.location.pathname;
+
+          if (path.includes("inventory") || path.includes("analytics")) {
+            // For inventory and analytics pages, prefetch more comprehensive data
+            return Promise.all([
+              farmerAPI.getAllFarmers(1, 20, "", [
+                "farmer_id",
+                "name",
+                "barangay",
+                "crops",
+                "rice",
+              ]),
+              livestockAPI.getAllLivestockRecords(1, 20),
+              operatorAPI.getAllOperators(1, 20),
+            ]);
+          }
+
+          return Promise.resolve();
+        },
+      ];
+
+      // Execute prefetch operations with a small delay between each
+      let index = 0;
+      const executeNext = () => {
+        if (index < prefetchQueue.length) {
+          prefetchQueue[index]()
+            .catch((err) =>
+              console.error(`Prefetch operation ${index} error:`, err)
+            )
+            .finally(() => {
+              index++;
+              // Add a small delay between operations to avoid overwhelming the browser
+              setTimeout(executeNext, 300);
+            });
+        }
+      };
+
+      executeNext();
     } catch (err) {
       console.error("Prefetch error:", err);
     }
   }, 100);
+};
+
+// Fix the prefetchFarmerDetails function to ensure it doesn't interfere with direct API calls
+
+// Replace the existing prefetchFarmerDetails function with this corrected version
+export const prefetchFarmerDetails = (farmerId) => {
+  if (typeof window === "undefined" || !farmerId) return;
+
+  // Don't block the UI
+  setTimeout(async () => {
+    try {
+      // Use a flag in the cache to indicate this is a prefetch request
+      const cacheKey = `farmer|${farmerId}|prefetch`;
+
+      // Check if we've already prefetched this farmer
+      if (cache.has(cacheKey)) {
+        console.log(`Farmer ${farmerId} already prefetched, skipping`);
+        return;
+      }
+
+      // Mark this farmer as being prefetched to prevent duplicate requests
+      cache.set(cacheKey, { prefetching: true }, 60000); // 1 minute TTL for the prefetch flag
+
+      // Prefetch farmer details
+      const farmerResponse = await farmerAPI.getFarmerById(farmerId);
+
+      // If we successfully got the farmer data, update the cache
+      if (farmerResponse) {
+        // Mark this farmer as prefetched
+        cache.set(
+          cacheKey,
+          { prefetched: true, timestamp: Date.now() },
+          CACHE_TTL
+        );
+        console.log(`Successfully prefetched farmer ${farmerId}`);
+
+        // Start prefetching related data in parallel with small delays
+        setTimeout(() => {
+          // Filter livestock records for this farmer
+          livestockAPI
+            .getAllLivestockRecords()
+            .then((response) => {
+              console.log(`Prefetched livestock data for farmer ${farmerId}`);
+            })
+            .catch((err) => console.error("Prefetch livestock error:", err));
+        }, 100);
+
+        setTimeout(() => {
+          // Filter operators for this farmer
+          operatorAPI
+            .getAllOperators()
+            .then((response) => {
+              console.log(`Prefetched operator data for farmer ${farmerId}`);
+            })
+            .catch((err) => console.error("Prefetch operators error:", err));
+        }, 200);
+      }
+    } catch (err) {
+      console.error(`Prefetch error for farmer ${farmerId}:`, err);
+    }
+  }, 50); // Start very quickly after the request
+};
+
+// Add a function to prefetch data based on the current route
+export const prefetchRouteData = (route) => {
+  if (typeof window === "undefined") return;
+
+  setTimeout(() => {
+    try {
+      switch (route) {
+        case "/dashboard":
+          // Prefetch data needed for dashboard
+          farmerAPI.getAllFarmers(1, 20, "", [
+            "farmer_id",
+            "name",
+            "barangay",
+            "crops",
+            "rice",
+          ]);
+          livestockAPI.getAllLivestockRecords(1, 20);
+          operatorAPI.getAllOperators(1, 20);
+          break;
+
+        case "/analytics":
+          // Prefetch data needed for analytics
+          farmerAPI.getAllFarmers(1, 50, "", [
+            "farmer_id",
+            "name",
+            "barangay",
+            "crops",
+            "rice",
+          ]);
+          livestockAPI.getAllLivestockRecords(1, 50);
+          operatorAPI.getAllOperators(1, 50);
+          break;
+
+        case "/inventory":
+          // Prefetch data needed for inventory
+          farmerAPI.getAllFarmers(1, 30, "", ["farmer_id", "name", "barangay"]);
+          break;
+
+        default:
+          // Default prefetch for any other route
+          prefetchCriticalData();
+          break;
+      }
+    } catch (err) {
+      console.error("Route-based prefetch error:", err);
+    }
+  }, 200);
 };
 
 // Call prefetch immediately
