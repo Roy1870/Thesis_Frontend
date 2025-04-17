@@ -19,6 +19,7 @@ import {
   Users,
   Loader2,
   Coffee,
+  FileDown,
 } from "lucide-react";
 import Highlighter from "react-highlight-words";
 import EditFarmer from "./EditFarmer";
@@ -140,6 +141,14 @@ const Inventory = () => {
 
     fetchAllData(signal);
 
+    // Load ExcelJS library if not already loaded
+    if (!window.ExcelJS) {
+      const script = document.createElement("script");
+      script.src = "https://unpkg.com/exceljs/dist/exceljs.min.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+
     return () => {
       // Abort any in-flight requests when component unmounts or effect re-runs
       if (abortControllerRef.current) {
@@ -190,71 +199,27 @@ const Inventory = () => {
       prefetchRouteData("/analytics");
     }, 5000); // 5 second delay
 
-    // Enhanced prefetching strategy - load ALL farmer details in batches
-    const prefetchAllFarmersTimer = setTimeout(() => {
+    // Prefetch first few farmers for ViewFarmer and EditFarmer components
+    const prefetchFarmersTimer = setTimeout(() => {
       if (allData.length > 0 && selectedDataType === "farmers") {
-        console.log(
-          `Starting background prefetch of all ${allData.length} farmers...`
-        );
+        // Only prefetch the first 3 farmers to avoid too many requests
+        const farmersToPreload = allData.slice(0, 3);
 
-        // Process farmers in batches to avoid overwhelming the browser
-        const batchSize = 5;
-        const totalFarmers = allData.length;
-
-        // Function to process a batch of farmers
-        const processBatch = (startIndex) => {
-          // If we've processed all farmers, we're done
-          if (startIndex >= totalFarmers) {
-            console.log("Completed prefetching all farmer details");
-            return;
-          }
-
-          // Get the current batch
-          const endIndex = Math.min(startIndex + batchSize, totalFarmers);
-          const batch = allData.slice(startIndex, endIndex);
-
-          console.log(
-            `Prefetching batch of farmers ${
-              startIndex + 1
-            }-${endIndex} of ${totalFarmers}`
-          );
-
-          // Process each farmer in the batch sequentially with small delays
-          let farmerIndex = 0;
-          const processFarmer = () => {
-            if (farmerIndex >= batch.length) {
-              // This batch is done, schedule the next batch
-              setTimeout(() => processBatch(startIndex + batchSize), 1000);
-              return;
-            }
-
-            const farmer = batch[farmerIndex];
+        // Prefetch each farmer's details with a delay between each
+        farmersToPreload.forEach((farmer, index) => {
+          setTimeout(() => {
             if (farmer && farmer.farmer_id) {
-              console.log(
-                `Prefetching data for farmer ${farmer.farmer_id} (${
-                  startIndex + farmerIndex + 1
-                }/${totalFarmers})`
-              );
+              console.log(`Prefetching data for farmer ${farmer.farmer_id}`);
               prefetchFarmerDetails(farmer.farmer_id);
             }
-
-            // Schedule the next farmer in this batch
-            farmerIndex++;
-            setTimeout(processFarmer, 300);
-          };
-
-          // Start processing this batch
-          processFarmer();
-        };
-
-        // Start with the first batch
-        processBatch(0);
+          }, index * 1000); // 1 second between each farmer prefetch
+        });
       }
     }, 2000); // Start after 2 seconds to ensure main UI is responsive first
 
     return () => {
       clearTimeout(analyticsTimer);
-      clearTimeout(prefetchAllFarmersTimer);
+      clearTimeout(prefetchFarmersTimer);
     };
   }, [allData, selectedDataType]);
 
@@ -923,43 +888,33 @@ const Inventory = () => {
   );
 
   // Modify the handleView function to prefetch additional data
-  const handleView = useCallback(
-    (record) => {
-      // Set the current item first to ensure the component has data to work with
-      setCurrentItem(record);
-      setIsViewMode(true);
+  // Replace the existing handleView function with this corrected version
+  const handleView = useCallback((record) => {
+    // Set the current item first to ensure the component has data to work with
+    setCurrentItem(record);
+    setIsViewMode(true);
 
-      // Log that we're viewing this farmer
-      console.log(`Viewing farmer ${record.farmer_id}`);
+    // Then prefetch additional data for this farmer
+    if (record && record.farmer_id) {
+      console.log(`Prefetching additional data for farmer ${record.farmer_id}`);
 
-      // No need to explicitly fetch here as the ViewFarmer component will use cached data
-      // if available, or fetch if needed
+      // Explicitly fetch the farmer details to ensure we have the latest data
+      farmerAPI
+        .getFarmerById(record.farmer_id)
+        .then((data) => {
+          console.log("Successfully fetched farmer details for viewing");
+        })
+        .catch((err) => {
+          console.error("Error fetching farmer details for viewing:", err);
+        });
 
-      // Prefetch the next few farmers in the list for even faster navigation
-      if (record && record.farmer_id && data.length > 1) {
-        // Find the current index
-        const currentIndex = data.findIndex(
-          (item) => item.farmer_id === record.farmer_id
-        );
-
-        if (currentIndex !== -1) {
-          // Prefetch the next 2 farmers if available
-          for (let i = 1; i <= 2; i++) {
-            const nextIndex = (currentIndex + i) % data.length;
-            const nextFarmer = data[nextIndex];
-
-            if (nextFarmer && nextFarmer.farmer_id) {
-              setTimeout(() => {
-                console.log(`Prefetching next farmer ${nextFarmer.farmer_id}`);
-                prefetchFarmerDetails(nextFarmer.farmer_id);
-              }, i * 200); // Stagger the prefetches
-            }
-          }
-        }
-      }
-    },
-    [data]
-  );
+      // Also prefetch data that might be needed for editing this farmer
+      setTimeout(() => {
+        console.log(`Prefetching edit data for farmer ${record.farmer_id}`);
+        prefetchFarmerDetails(record.farmer_id);
+      }, 500); // Small delay to prioritize view data first
+    }
+  }, []);
 
   const handleEdit = useCallback((record) => {
     setCurrentItem(record);
@@ -1025,6 +980,196 @@ const Inventory = () => {
     setDebouncedSearchText("");
     setCurrentPage(1);
   }, []);
+
+  // Export to Excel function - memoized with useCallback
+  const exportToExcel = useCallback(() => {
+    if (selectedDataType === "farmers") return; // Skip export for farmers
+
+    // Show loading state
+    setLoading(true);
+
+    try {
+      // Create a workbook with a worksheet
+      const workbook = new window.ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet(selectedDataType);
+
+      // Define columns based on data type
+      let columns = [];
+
+      switch (selectedDataType) {
+        case "crops":
+          columns = [
+            { header: "Crop Type", key: "crop_type" },
+            { header: "Crop", key: "crop_value" },
+            { header: "Area (ha)", key: "area_hectare" },
+            { header: "Quantity", key: "quantity" },
+            { header: "Farmer", key: "farmer_name" },
+            { header: "Barangay", key: "barangay" },
+            { header: "Date Recorded", key: "created_at" },
+          ];
+          break;
+
+        case "highValueCrops":
+          columns = [
+            { header: "Crop", key: "crop_value" },
+            { header: "Variety/Clone", key: "variety_clone" },
+            { header: "Month", key: "month" },
+            { header: "Area (ha)", key: "area_hectare" },
+            { header: "Quantity", key: "quantity" },
+            { header: "Farmer", key: "farmer_name" },
+            { header: "Barangay", key: "barangay" },
+            { header: "Date Recorded", key: "created_at" },
+          ];
+          break;
+
+        case "rice":
+          columns = [
+            { header: "Area Type", key: "area_type" },
+            { header: "Seed Type", key: "seed_type" },
+            { header: "Area (ha)", key: "area_harvested" },
+            { header: "Production", key: "production" },
+            { header: "Farmer", key: "farmer_name" },
+            { header: "Barangay", key: "barangay" },
+            { header: "Date Recorded", key: "created_at" },
+          ];
+          break;
+
+        case "livestock":
+          columns = [
+            { header: "Animal Type", key: "animal_type" },
+            { header: "Subcategory", key: "subcategory" },
+            { header: "Quantity", key: "quantity" },
+            { header: "Farmer", key: "farmer_name" },
+            { header: "Barangay", key: "barangay" },
+            { header: "Date Recorded", key: "created_at" },
+          ];
+          break;
+
+        case "operators":
+          columns = [
+            { header: "Location", key: "fishpond_location" },
+            { header: "Species", key: "cultured_species" },
+            { header: "Area (sqm)", key: "productive_area_sqm" },
+            { header: "Production (kg)", key: "production_kg" },
+            { header: "Status", key: "operational_status" },
+            { header: "Farmer", key: "farmer_name" },
+            { header: "Barangay", key: "barangay" },
+            { header: "Date Recorded", key: "created_at" },
+          ];
+          break;
+
+        default:
+          break;
+      }
+
+      // Set the columns
+      worksheet.columns = columns;
+
+      // Process data for export
+      const dataToExport = allData.map((item) => {
+        // Create a new object with processed values
+        const processedItem = { ...item };
+
+        // Format date fields
+        if (processedItem.created_at) {
+          processedItem.created_at = new Date(
+            processedItem.created_at
+          ).toLocaleDateString();
+        }
+
+        // Process production_data for crops and highValueCrops
+        if (
+          (selectedDataType === "crops" ||
+            selectedDataType === "highValueCrops") &&
+          processedItem.production_data
+        ) {
+          const productionData = parseProductionData(processedItem);
+          processedItem.crop_value =
+            productionData.crop || processedItem.crop_value || "";
+          processedItem.quantity =
+            productionData.quantity || processedItem.quantity || "";
+
+          if (selectedDataType === "highValueCrops") {
+            processedItem.month =
+              productionData.month || processedItem.month || "";
+          }
+        }
+
+        // Format numeric fields
+        if (processedItem.area_hectare) {
+          processedItem.area_hectare = Number.parseFloat(
+            processedItem.area_hectare
+          ).toFixed(2);
+        }
+
+        if (processedItem.area_harvested) {
+          processedItem.area_harvested = Number.parseFloat(
+            processedItem.area_harvested
+          ).toFixed(2);
+        }
+
+        if (processedItem.production) {
+          processedItem.production = Number.parseFloat(
+            processedItem.production
+          ).toFixed(2);
+        }
+
+        return processedItem;
+      });
+
+      // Add rows to the worksheet
+      worksheet.addRows(dataToExport);
+
+      // Style the header row
+      worksheet.getRow(1).font = { bold: true };
+      worksheet.getRow(1).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFE6F5E4" },
+      };
+
+      // Auto-size columns
+      worksheet.columns.forEach((column) => {
+        let maxLength = 0;
+        column.eachCell({ includeEmpty: true }, (cell) => {
+          const columnLength = cell.value ? cell.value.toString().length : 10;
+          if (columnLength > maxLength) {
+            maxLength = columnLength;
+          }
+        });
+        column.width = Math.min(maxLength + 2, 30);
+      });
+
+      // Generate Excel file
+      workbook.xlsx.writeBuffer().then((buffer) => {
+        // Create a blob from the buffer
+        const blob = new Blob([buffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        // Create a download link
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${selectedDataType}_${
+          new Date().toISOString().split("T")[0]
+        }.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+
+        // Clean up
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        showToast(`${selectedDataType} data exported successfully`, "success");
+      });
+    } catch (error) {
+      console.error("Error exporting to Excel:", error);
+      showToast(`Failed to export data: ${error.message}`, "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [allData, parseProductionData, selectedDataType, showToast]);
 
   // Render table columns based on selected data type - memoized with useCallback
   const renderTableColumns = useCallback(() => {
@@ -1712,10 +1857,21 @@ const Inventory = () => {
               )}
             </div>
 
-            <div className="flex items-center">
+            <div className="flex items-center space-x-2">
               <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium bg-[#6A9C89] text-white">
                 Total Records: {totalRecords}
               </span>
+
+              {selectedDataType !== "farmers" && (
+                <button
+                  onClick={exportToExcel}
+                  disabled={loading || allData.length === 0}
+                  className="inline-flex items-center px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium bg-[#5A8C79] text-white hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FileDown className="w-3.5 h-3.5 mr-1" />
+                  Export to Excel
+                </button>
+              )}
             </div>
           </div>
 
