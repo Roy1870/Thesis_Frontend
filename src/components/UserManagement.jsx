@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
 const UserManagement = () => {
@@ -22,9 +22,42 @@ const UserManagement = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [isCurrentUserAdmin, setIsCurrentUserAdmin] = useState(false);
+  const [dataFetched, setDataFetched] = useState(false);
+  const prefetchTimeoutRef = useRef(null);
+
+  const prefetchUsersData = async () => {
+    try {
+      const authToken = localStorage.getItem("authToken");
+      if (!authToken) return;
+
+      console.log("Prefetching users data...");
+      const response = await axios.get(
+        "https://thesis-backend-tau.vercel.app/api/api/usermanagement/data",
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      );
+
+      // Store the prefetched data
+      setUsers(response.data);
+      setDataFetched(true);
+      console.log("Users data prefetched successfully");
+    } catch (err) {
+      console.error("Error prefetching users data:", err);
+    }
+  };
 
   useEffect(() => {
     const fetchUsers = async () => {
+      // If data has already been prefetched, skip fetching
+      if (dataFetched) {
+        console.log("Using prefetched users data");
+        setLoading(false);
+        return;
+      }
+
       try {
         const authToken = localStorage.getItem("authToken");
         if (!authToken) {
@@ -152,6 +185,20 @@ const UserManagement = () => {
     };
 
     fetchUsers();
+  }, []);
+
+  useEffect(() => {
+    // Start prefetching data after a short delay
+    prefetchTimeoutRef.current = setTimeout(() => {
+      prefetchUsersData();
+    }, 1000); // 1 second delay
+
+    return () => {
+      // Clean up the timeout if component unmounts
+      if (prefetchTimeoutRef.current) {
+        clearTimeout(prefetchTimeoutRef.current);
+      }
+    };
   }, []);
 
   // Delete user function
@@ -563,6 +610,7 @@ const UserManagement = () => {
                         >
                           <option value="user">User</option>
                           <option value="admin">Admin</option>
+                          <option value="planner">Planner</option>
                         </select>
                         <button
                           onClick={() => updateUserRole(user.id, newRole)}
@@ -828,6 +876,7 @@ const UserManagement = () => {
                     >
                       <option value="user">User</option>
                       <option value="admin">Admin</option>
+                      <option value="planner">Planner</option>
                     </select>
                     {formErrors.role && (
                       <p className="mt-1 text-sm text-red-600">
