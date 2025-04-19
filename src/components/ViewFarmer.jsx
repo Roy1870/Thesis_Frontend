@@ -410,9 +410,55 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
 
   if (fetchLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="w-10 h-10 border-t-2 border-b-2 border-green-500 rounded-full animate-spin"></div>
-        <span className="ml-3">Loading farmer details...</span>
+      <div className="p-4 space-y-4">
+        {/* Header skeleton */}
+        <div className="p-3 bg-white rounded-lg shadow-sm sm:p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-20 h-6 bg-gray-200 rounded animate-pulse"></div>
+            <div className="flex space-x-2">
+              <div className="w-16 h-8 bg-gray-200 rounded animate-pulse"></div>
+              <div className="w-16 h-8 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+          </div>
+          <div className="flex space-x-2 overflow-x-auto">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="flex-shrink-0 w-24 h-8 bg-gray-200 rounded animate-pulse"
+              ></div>
+            ))}
+          </div>
+        </div>
+
+        {/* Info section skeleton */}
+        <div className="p-3 bg-white rounded-lg shadow-sm sm:p-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="p-3 border border-gray-200 rounded-lg sm:p-4">
+              <div className="flex items-center mb-3">
+                <div className="w-5 h-5 mr-2 bg-gray-200 rounded-full animate-pulse"></div>
+                <div className="w-32 h-5 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="mb-3">
+                  <div className="w-20 h-4 mb-1 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="w-full h-5 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+            <div className="p-3 border border-gray-200 rounded-lg sm:p-4">
+              <div className="flex items-center mb-3">
+                <div className="w-5 h-5 mr-2 bg-gray-200 rounded-full animate-pulse"></div>
+                <div className="w-32 h-5 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="mb-3">
+                  <div className="w-20 h-4 mb-1 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="w-full h-5 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1139,11 +1185,25 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
           </div>
 
           {livestockLoading ? (
-            <div className="flex justify-center py-8 sm:py-10">
-              <div className="w-6 h-6 border-t-2 border-b-2 border-green-500 rounded-full sm:w-8 sm:h-8 animate-spin"></div>
-              <span className="ml-2 text-xs sm:text-sm">
-                Loading livestock records...
-              </span>
+            <div className="px-3 py-4 sm:px-4">
+              <div className="p-2 bg-gray-50">
+                <div className="flex mb-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="flex-1 px-2 py-2">
+                      <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                    </div>
+                  ))}
+                </div>
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex mb-2">
+                    {[1, 2, 3, 4].map((j) => (
+                      <div key={j} className="flex-1 px-2 py-2">
+                        <div className="h-5 bg-gray-200 rounded animate-pulse"></div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
             </div>
           ) : hasLivestock ? (
             <div className="px-3 overflow-x-auto sm:px-4">
@@ -1229,11 +1289,25 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
           </div>
 
           {operatorLoading ? (
-            <div className="flex justify-center py-8 sm:py-10">
-              <div className="w-6 h-6 border-t-2 border-b-2 border-green-500 rounded-full sm:w-8 sm:h-8 animate-spin"></div>
-              <span className="ml-2 text-xs sm:text-sm">
-                Loading operator records...
-              </span>
+            <div className="px-3 py-4 sm:px-4">
+              <div className="p-2 bg-gray-50">
+                <div className="flex mb-3">
+                  {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                    <div key={i} className="flex-1 px-2 py-2">
+                      <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                    </div>
+                  ))}
+                </div>
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex mb-2">
+                    {[1, 2, 3, 4, 5, 6, 7].map((j) => (
+                      <div key={j} className="flex-1 px-2 py-2">
+                        <div className="h-5 bg-gray-200 rounded animate-pulse"></div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
             </div>
           ) : hasOperators ? (
             <div className="px-3 overflow-x-auto sm:px-4">

@@ -263,12 +263,53 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
 
   if (fetchLoading || livestockLoading || operatorLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="flex flex-col items-center">
-          <Loader className="w-8 h-8 sm:w-10 sm:h-10 animate-spin text-[#6A9C89] mb-2" />
-          <p className="text-sm text-gray-600 sm:text-base">
-            Loading farmer details...
-          </p>
+      <div className="p-4 space-y-4">
+        {/* Header skeleton */}
+        <div className="p-3 bg-white rounded-lg shadow-sm sm:p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-20 h-6 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+          <div className="flex space-x-2 overflow-x-auto">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className="flex-shrink-0 w-24 h-8 bg-gray-200 rounded animate-pulse"
+              ></div>
+            ))}
+          </div>
+        </div>
+
+        {/* Form skeleton */}
+        <div className="p-3 bg-white rounded-lg shadow-sm sm:p-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="p-3 bg-white rounded-lg shadow sm:p-4">
+              <div className="flex items-center mb-3">
+                <div className="w-5 h-5 mr-2 bg-gray-200 rounded-full animate-pulse"></div>
+                <div className="w-40 h-6 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="mb-4">
+                  <div className="w-24 h-4 mb-1 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="w-full h-10 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+            <div className="p-3 bg-white rounded-lg shadow sm:p-4">
+              <div className="flex items-center mb-3">
+                <div className="w-5 h-5 mr-2 bg-gray-200 rounded-full animate-pulse"></div>
+                <div className="w-40 h-6 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="mb-4">
+                  <div className="w-24 h-4 mb-1 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="w-full h-10 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="flex justify-center mt-6">
+            <div className="w-40 h-10 bg-gray-200 rounded animate-pulse"></div>
+          </div>
         </div>
       </div>
     );

@@ -17,7 +17,6 @@ import {
   Wheat,
   Sprout,
   Users,
-  Loader2,
   Coffee,
   FileDown,
 } from "lucide-react";
@@ -1681,11 +1680,6 @@ const Inventory = () => {
               </span>
             </td>
             <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
-              <span className="text-xs text-gray-900 sm:text-sm">
-                {operator.productive_area_sqm || "N/A"}
-              </span>
-            </td>
-            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
                 {operator.production_kg || "N/A"}
               </span>
@@ -2005,151 +1999,202 @@ const Inventory = () => {
             </div>
           )}
 
-          <div className="relative">
-            {loading && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-white bg-opacity-70">
-                <Loader2 className="w-3.5 h-3.5 sm:w-12 sm:h-12 animate-spin text-[#6A9C89]" />
-              </div>
-            )}
-
-            <div className="-mx-3 overflow-x-auto sm:mx-0">
-              <table className="min-w-full text-xs border divide-y divide-gray-200 sm:text-sm">
-                <thead className="bg-gray-50">{renderTableColumns()}</thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {renderTableRows()}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex justify-center mt-3">
-              <nav
-                className="inline-flex items-center rounded-md shadow-sm"
-                aria-label="Pagination"
-              >
-                <button
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium rounded-l-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="sr-only">First</span>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="w-4 h-4"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M15.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 010 1.414zm-6 0a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L5.414 10l4.293 4.293a1 1 0 010 1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium border-t border-b border-l border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="sr-only">Previous</span>
-                  <ChevronLeftIcon className="w-4 h-4" aria-hidden="true" />
-                </button>
-
-                <div className="hidden sm:flex">
-                  {(() => {
-                    const totalPages = Math.ceil(totalRecords / pageSize);
-                    const pageNumbers = [];
-
-                    // Logic to show current page, first, last, and pages around current
-                    for (let i = 1; i <= totalPages; i++) {
-                      if (
-                        i === 1 || // First page
-                        i === totalPages || // Last page
-                        (i >= currentPage - 1 && i <= currentPage + 1) // Pages around current
-                      ) {
-                        pageNumbers.push(
-                          <button
-                            key={i}
-                            onClick={() => setCurrentPage(i)}
-                            aria-current={
-                              currentPage === i ? "page" : undefined
-                            }
-                            className={`relative inline-flex items-center px-3 py-1.5 text-xs font-medium border ${
-                              currentPage === i
-                                ? "z-10 bg-[#6A9C89] text-white border-[#6A9C89]"
-                                : "bg-white text-gray-500 border-gray-300 hover:bg-gray-50"
-                            }`}
-                          >
-                            {i}
-                          </button>
-                        );
-                      } else if (
-                        (i === 2 && currentPage > 3) || // Show ellipsis after first page
-                        (i === totalPages - 1 && currentPage < totalPages - 2) // Show ellipsis before last page
-                      ) {
-                        pageNumbers.push(
-                          <span
-                            key={`ellipsis-${i}`}
-                            className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300"
-                          >
-                            ...
-                          </span>
-                        );
-                      }
-                    }
-
-                    return pageNumbers;
-                  })()}
+          {loading && (
+            <div className="relative">
+              <div className="p-3 sm:p-4">
+                {/* Header skeleton */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-40 h-6 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="h-10 bg-gray-200 rounded w-80 animate-pulse"></div>
                 </div>
 
-                {/* Mobile page indicator */}
-                <span className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 sm:hidden">
-                  {currentPage} / {Math.ceil(totalRecords / pageSize)}
-                </span>
+                {/* Buttons skeleton */}
+                <div className="flex mb-6 space-x-2">
+                  <div className="w-32 h-10 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="w-32 h-10 bg-gray-200 rounded animate-pulse"></div>
+                </div>
 
-                <button
-                  onClick={() =>
-                    setCurrentPage(
-                      Math.min(
-                        Math.ceil(totalRecords / pageSize),
-                        currentPage + 1
-                      )
-                    )
-                  }
-                  disabled={currentPage >= Math.ceil(totalRecords / pageSize)}
-                  className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium border-t border-b border-r border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="sr-only">Next</span>
-                  <ChevronRightIcon className="w-4 h-4" aria-hidden="true" />
-                </button>
-                <button
-                  onClick={() =>
-                    setCurrentPage(Math.ceil(totalRecords / pageSize))
-                  }
-                  disabled={currentPage >= Math.ceil(totalRecords / pageSize)}
-                  className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium rounded-r-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="sr-only">Last</span>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="w-4 h-4"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10.293 15.707a1 1 0 010-1.414L14.586 10l-4.293-4.293a1 1 0 111.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z"
-                      clipRule="evenodd"
-                    />
-                    <path
-                      fillRule="evenodd"
-                      d="M4.293 15.707a1 1 0 010-1.414L8.586 10 4.293 5.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </button>
-              </nav>
+                {/* Table skeleton */}
+                <div className="-mx-3 overflow-x-auto sm:mx-0">
+                  <div className="min-w-full border divide-y divide-gray-200">
+                    {/* Table header skeleton */}
+                    <div className="h-12 bg-gray-50">
+                      <div className="flex">
+                        {[1, 2, 3, 4, 5, 6].map((i) => (
+                          <div
+                            key={i}
+                            className="flex-1 px-2 py-2 sm:px-6 sm:py-3"
+                          >
+                            <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Table body skeleton */}
+                    <div className="bg-white divide-y divide-gray-200">
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                        <div key={i} className="flex">
+                          {[1, 2, 3, 4, 5, 6].map((j) => (
+                            <div key={j} className="flex-1 px-2 py-4 sm:px-6">
+                              <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pagination skeleton */}
+                <div className="flex justify-center mt-3">
+                  <div className="w-64 h-8 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {!loading && (
+            <div className="relative">
+              <div className="-mx-3 overflow-x-auto sm:mx-0">
+                <table className="min-w-full text-xs border divide-y divide-gray-200 sm:text-sm">
+                  <thead className="bg-gray-50">{renderTableColumns()}</thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {renderTableRows()}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex justify-center mt-3">
+                <nav
+                  className="inline-flex items-center rounded-md shadow-sm"
+                  aria-label="Pagination"
+                >
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium rounded-l-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="sr-only">First</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="w-4 h-4"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M15.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 010 1.414zm-6 0a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L5.414 10l4.293 4.293a1 1 0 010 1.414z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium border-t border-b border-l border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="sr-only">Previous</span>
+                    <ChevronLeftIcon className="w-4 h-4" aria-hidden="true" />
+                  </button>
+
+                  <div className="hidden sm:flex">
+                    {(() => {
+                      const totalPages = Math.ceil(totalRecords / pageSize);
+                      const pageNumbers = [];
+
+                      // Logic to show current page, first, last, and pages around current
+                      for (let i = 1; i <= totalPages; i++) {
+                        if (
+                          i === 1 || // First page
+                          i === totalPages || // Last page
+                          (i >= currentPage - 1 && i <= currentPage + 1) // Pages around current
+                        ) {
+                          pageNumbers.push(
+                            <button
+                              key={i}
+                              onClick={() => setCurrentPage(i)}
+                              aria-current={
+                                currentPage === i ? "page" : undefined
+                              }
+                              className={`relative inline-flex items-center px-3 py-1.5 text-xs font-medium border ${
+                                currentPage === i
+                                  ? "z-10 bg-[#6A9C89] text-white border-[#6A9C89]"
+                                  : "bg-white text-gray-500 border-gray-300 hover:bg-gray-50"
+                              }`}
+                            >
+                              {i}
+                            </button>
+                          );
+                        } else if (
+                          (i === 2 && currentPage > 3) || // Show ellipsis after first page
+                          (i === totalPages - 1 && currentPage < totalPages - 2) // Show ellipsis before last page
+                        ) {
+                          pageNumbers.push(
+                            <span
+                              key={`ellipsis-${i}`}
+                              className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300"
+                            >
+                              ...
+                            </span>
+                          );
+                        }
+                      }
+
+                      return pageNumbers;
+                    })()}
+                  </div>
+
+                  {/* Mobile page indicator */}
+                  <span className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 sm:hidden">
+                    {currentPage} / {Math.ceil(totalRecords / pageSize)}
+                  </span>
+
+                  <button
+                    onClick={() =>
+                      setCurrentPage(
+                        Math.min(
+                          Math.ceil(totalRecords / pageSize),
+                          currentPage + 1
+                        )
+                      )
+                    }
+                    disabled={currentPage >= Math.ceil(totalRecords / pageSize)}
+                    className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium border-t border-b border-r border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="sr-only">Next</span>
+                    <ChevronRightIcon className="w-4 h-4" aria-hidden="true" />
+                  </button>
+                  <button
+                    onClick={() =>
+                      setCurrentPage(Math.ceil(totalRecords / pageSize))
+                    }
+                    disabled={currentPage >= Math.ceil(totalRecords / pageSize)}
+                    className="relative inline-flex items-center px-2 py-1.5 text-xs font-medium rounded-r-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="sr-only">Last</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="w-4 h-4"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10.293 15.707a1 1 0 010-1.414L14.586 10l-4.293-4.293a1 1 0 111.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z"
+                        clipRule="evenodd"
+                      />
+                      <path
+                        fillRule="evenodd"
+                        d="M4.293 15.707a1 1 0 010-1.414L8.586 10 4.293 5.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </button>
+                </nav>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

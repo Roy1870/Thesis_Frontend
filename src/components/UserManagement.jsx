@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import axios from "axios";
+import { userAPI } from "./services/api"; // Update this path to match your project structure
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -31,17 +31,10 @@ const UserManagement = () => {
       if (!authToken) return;
 
       console.log("Prefetching users data...");
-      const response = await axios.get(
-        "https://thesis-backend-tau.vercel.app/api/api/usermanagement/data",
-        {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        }
-      );
+      const response = await userAPI.getAllUsers();
 
       // Store the prefetched data
-      setUsers(response.data);
+      setUsers(response);
       setDataFetched(true);
       console.log("Users data prefetched successfully");
     } catch (err) {
@@ -66,23 +59,15 @@ const UserManagement = () => {
           return;
         }
 
-        // First, get the current user info directly
+        // First, get the current user info
         let currentUserData = null;
         try {
-          // Try to get current user info from a user profile endpoint
-          const userResponse = await axios.get(
-            "https://thesis-backend-tau.vercel.app/api/api/user", // Adjust this endpoint to match your API
-            {
-              headers: {
-                Authorization: `Bearer ${authToken}`,
-              },
-            }
-          );
+          const userResponse = await userAPI.getCurrentUser();
 
-          console.log("Current user API response:", userResponse.data);
-          if (userResponse.data && userResponse.data.user) {
+          console.log("Current user API response:", userResponse);
+          if (userResponse && userResponse.user) {
             // Extract the user object from the response
-            currentUserData = userResponse.data.user;
+            currentUserData = userResponse.user;
             console.log("Extracted user data:", currentUserData);
           }
         } catch (userErr) {
@@ -90,20 +75,13 @@ const UserManagement = () => {
           // Continue with the users list even if we can't get the current user directly
         }
 
-        // Fetch users data from the API
-        const response = await axios.get(
-          "https://thesis-backend-tau.vercel.app/api/api/usermanagement/data",
-          {
-            headers: {
-              Authorization: `Bearer ${authToken}`,
-            },
-          }
-        );
+        // Fetch users data
+        const response = await userAPI.getAllUsers();
 
-        console.log("Raw API response:", response.data);
+        console.log("Raw API response:", response);
 
         // The backend returns users with role in the response directly
-        const processedUsers = response.data;
+        const processedUsers = response;
 
         // If we couldn't get the current user directly, try to find it in the users list
         if (!currentUserData) {
@@ -216,14 +194,7 @@ const UserManagement = () => {
         return;
       }
 
-      await axios.delete(
-        `https://thesis-backend-tau.vercel.app/api/api/usermanagement/delete/${userId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        }
-      );
+      await userAPI.deleteUser(userId);
 
       showToast("User deleted successfully.", "success");
       // Refresh the user data
@@ -251,21 +222,10 @@ const UserManagement = () => {
 
       console.log(`Updating user ${userId} to role: ${newRole}`);
 
-      // Send the update to the correct endpoint with the proper field name
-      const response = await axios.put(
-        `https://thesis-backend-tau.vercel.app/api/api/usermanagement/change-type/${userId}`,
-        {
-          role: newRole, // Use 'role' as the field name for the backend
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      // Send the update using our API service
+      const response = await userAPI.updateUserRole(userId, newRole);
 
-      console.log("Update role response:", response.data);
+      console.log("Update role response:", response);
       showToast("User role updated successfully.", "success");
 
       // Update the local state to reflect the change
@@ -289,14 +249,6 @@ const UserManagement = () => {
   const filteredData = users.filter((user) =>
     user.name.toLowerCase().includes(searchText.toLowerCase())
   );
-
-  // Export function to Excel
-  // const handleExport = () => {
-  //   const ws = XLSX.utils.json_to_sheet(filteredData);
-  //   const wb = XLSX.utils.book_new();
-  //   XLSX.utils.book_append_sheet(wb, ws, "Users Data");
-  //   XLSX.writeFile(wb, "UsersData.xlsx");
-  // };
 
   // Handle modal visibility and form submission
   const showAddUserModal = () => {
@@ -378,15 +330,7 @@ const UserManagement = () => {
         ...formValues,
       };
 
-      const response = await axios.post(
-        "https://thesis-backend-tau.vercel.app/api/api/register",
-        userData,
-        {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        }
-      );
+      const response = await userAPI.createUser(userData);
 
       showToast("User added successfully.", "success");
       setIsModalVisible(false);
@@ -399,19 +343,11 @@ const UserManagement = () => {
       });
 
       // Refresh the user list
-      const usersResponse = await axios.get(
-        "https://thesis-backend-tau.vercel.app/api/usermanagement/data",
-        {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        }
-      );
-
-      setUsers(usersResponse.data);
+      const usersResponse = await userAPI.getAllUsers();
+      setUsers(usersResponse);
     } catch (err) {
       console.error("Error adding user:", err);
-      const errorMessage = err.response?.data?.message || "Failed to add user.";
+      const errorMessage = err.message || "Failed to add user.";
       showToast(errorMessage, "error");
     } finally {
       setLoading(false);
@@ -486,12 +422,6 @@ const UserManagement = () => {
 
       {/* Export and Add User Buttons */}
       <div className="flex mb-6 space-x-2">
-        {/* <button
-          onClick={handleExport}
-          className="px-4 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-        >
-          Export to Excel
-        </button> */}
         <button
           onClick={showAddUserModal}
           disabled={!isCurrentUserAdmin}
@@ -538,9 +468,51 @@ const UserManagement = () => {
 
       {/* Loading and Error States */}
       {loading && (
-        <div className="flex items-center justify-center py-10">
-          <div className="w-10 h-10 border-t-2 border-b-2 border-green-500 rounded-full animate-spin"></div>
-          <span className="ml-3">Loading...</span>
+        <div className="p-4">
+          {/* Header skeleton */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-40 h-6 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-10 bg-gray-200 rounded w-80 animate-pulse"></div>
+          </div>
+
+          {/* Buttons skeleton */}
+          <div className="flex mb-6 space-x-2">
+            <div className="w-32 h-10 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+
+          {/* Table skeleton */}
+          <div className="overflow-x-auto rounded-lg shadow-md">
+            <div className="min-w-full divide-y divide-gray-200">
+              {/* Table header skeleton */}
+              <div className="h-12 bg-green-600">
+                <div className="flex">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="flex-1 px-6 py-3">
+                      <div className="h-4 rounded bg-white/30 animate-pulse"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Table body skeleton */}
+              <div className="bg-white divide-y divide-gray-200">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div
+                    key={i}
+                    className={`flex ${
+                      i % 2 === 0 ? "bg-white" : "bg-gray-50"
+                    }`}
+                  >
+                    {[1, 2, 3, 4].map((j) => (
+                      <div key={j} className="flex-1 px-6 py-4">
+                        <div className="h-5 bg-gray-200 rounded animate-pulse"></div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

@@ -7,7 +7,7 @@ import {
   operatorAPI,
   prefetchRouteData,
 } from "./services/api";
-import { Loader2, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 function Analytics() {
   const [loading, setLoading] = useState(true);
@@ -58,6 +58,91 @@ function Analytics() {
       items: [],
     },
   });
+
+  // Helper functions to categorize crops - memoized with useCallback
+  const isBananaVariety = useCallback((cropType) => {
+    if (!cropType) return false;
+    const bananaVarieties = [
+      "lakatan",
+      "latundan",
+      "saba",
+      "cavendish",
+      "señorita",
+    ];
+    return bananaVarieties.some((variety) =>
+      cropType.toLowerCase().includes(variety)
+    );
+  }, []);
+
+  const isLegume = useCallback((cropType) => {
+    if (!cropType) return false;
+    const legumes = [
+      "mung bean",
+      "peanut",
+      "soybean",
+      "cowpea",
+      "pigeon pea",
+      "beans",
+      "legume",
+      "legumes",
+    ];
+    return (
+      cropType.toLowerCase() === "legumes" ||
+      legumes.some((legume) => cropType.toLowerCase().includes(legume))
+    );
+  }, []);
+
+  const isSpice = useCallback((cropType) => {
+    if (!cropType) return false;
+    const spices = [
+      "ginger",
+      "turmeric",
+      "pepper",
+      "chili",
+      "lemongrass",
+      "spice",
+      "spices",
+    ];
+    return (
+      cropType.toLowerCase() === "spices" ||
+      spices.some((spice) => cropType.toLowerCase().includes(spice))
+    );
+  }, []);
+
+  // Update the isFish function to be more comprehensive - memoized with useCallback
+  const isFish = useCallback((cropType) => {
+    if (!cropType) return false;
+    const fishTypes = [
+      "tilapia",
+      "bangus",
+      "milkfish",
+      "catfish",
+      "hito",
+      "carp",
+      "shrimp",
+      "hipon",
+      "fish",
+      "isda",
+      "aquaculture",
+      "seafood",
+    ];
+    return fishTypes.some((fish) => cropType.toLowerCase().includes(fish));
+  }, []);
+
+  // Helper function to get color for index - memoized with useMemo
+  const getColorForIndex = useMemo(() => {
+    const colors = [
+      "#6A9C89",
+      "#4F6F7D",
+      "#388E3C",
+      "#FF8042",
+      "#FFBB28",
+      "#8884d8",
+      "#82ca9d",
+      "#ffc658",
+    ];
+    return (index) => colors[index % colors.length];
+  }, []);
 
   // Define categories - memoized to prevent recreating on each render
   const categories = useMemo(
@@ -497,7 +582,7 @@ function Analytics() {
       total,
       items,
     };
-  }, [rawData.crops]);
+  }, [rawData.crops, isBananaVariety]);
 
   // Process legumes data - memoized with useCallback
   const processLegumesData = useCallback(() => {
@@ -577,7 +662,7 @@ function Analytics() {
       total,
       items,
     };
-  }, [rawData.crops]);
+  }, [rawData.crops, isLegume]);
 
   // Process spices data - memoized with useCallback
   const processSpicesData = useCallback(() => {
@@ -657,7 +742,7 @@ function Analytics() {
       total,
       items,
     };
-  }, [rawData.crops]);
+  }, [rawData.crops, isSpice]);
 
   // Process fish data - memoized with useCallback
   const processFishData = useCallback(() => {
@@ -761,7 +846,7 @@ function Analytics() {
       total,
       items,
     };
-  }, [rawData.crops, rawData.operators]);
+  }, [rawData.crops, rawData.operators, isFish]);
 
   // Process high value crops data - memoized with useCallback
   const processHighValueCropsData = useCallback(() => {
@@ -836,76 +921,6 @@ function Analytics() {
     };
   }, [rawData.highValueCrops]);
 
-  // Helper functions to categorize crops - memoized with useCallback
-  const isBananaVariety = useCallback((cropType) => {
-    if (!cropType) return false;
-    const bananaVarieties = [
-      "lakatan",
-      "latundan",
-      "saba",
-      "cavendish",
-      "señorita",
-    ];
-    return bananaVarieties.some((variety) =>
-      cropType.toLowerCase().includes(variety)
-    );
-  }, []);
-
-  const isLegume = useCallback((cropType) => {
-    if (!cropType) return false;
-    const legumes = [
-      "mung bean",
-      "peanut",
-      "soybean",
-      "cowpea",
-      "pigeon pea",
-      "beans",
-      "legume",
-      "legumes",
-    ];
-    return (
-      cropType.toLowerCase() === "legumes" ||
-      legumes.some((legume) => cropType.toLowerCase().includes(legume))
-    );
-  }, []);
-
-  const isSpice = useCallback((cropType) => {
-    if (!cropType) return false;
-    const spices = [
-      "ginger",
-      "turmeric",
-      "pepper",
-      "chili",
-      "lemongrass",
-      "spice",
-      "spices",
-    ];
-    return (
-      cropType.toLowerCase() === "spices" ||
-      spices.some((spice) => cropType.toLowerCase().includes(spice))
-    );
-  }, []);
-
-  // Update the isFish function to be more comprehensive - memoized with useCallback
-  const isFish = useCallback((cropType) => {
-    if (!cropType) return false;
-    const fishTypes = [
-      "tilapia",
-      "bangus",
-      "milkfish",
-      "catfish",
-      "hito",
-      "carp",
-      "shrimp",
-      "hipon",
-      "fish",
-      "isda",
-      "aquaculture",
-      "seafood",
-    ];
-    return fishTypes.some((fish) => cropType.toLowerCase().includes(fish));
-  }, []);
-
   // Toggle dropdown
   const toggleDropdown = useCallback(() => {
     setDropdownOpen(!dropdownOpen);
@@ -960,7 +975,7 @@ function Analytics() {
           <div className="space-y-4">
             <div className="flex justify-between text-sm font-medium text-gray-500">
               <span>Type/Variety</span>
-              <span>Amount ({category.units})</span>
+              <span>Amount ({category.unit})</span>
             </div>
 
             {data.items.length > 0 ? (
@@ -1005,27 +1020,61 @@ function Analytics() {
         </div>
       </div>
     );
-  }, [analyticsData, categories, currentCategory]);
-
-  // Helper function to get color for index - memoized with useMemo
-  const getColorForIndex = useMemo(() => {
-    const colors = [
-      "#6A9C89",
-      "#4F6F7D",
-      "#388E3C",
-      "#FF8042",
-      "#FFBB28",
-      "#8884d8",
-      "#82ca9d",
-      "#ffc658",
-    ];
-    return (index) => colors[index % colors.length];
-  }, []);
+  }, [analyticsData, categories, currentCategory, getColorForIndex]);
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">
-        <Loader2 className="w-12 h-12 text-green-500 animate-spin" />
+      <div className="container p-4 mx-auto">
+        {/* Header skeleton */}
+        <div className="flex flex-col mb-4 space-y-2">
+          <div className="w-64 h-8 bg-gray-200 rounded animate-pulse"></div>
+          <div className="w-48 h-5 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+
+        {/* Dropdown skeleton */}
+        <div className="w-full mb-4">
+          <div className="w-full h-12 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+
+        {/* Content skeleton */}
+        <div className="space-y-6">
+          <div className="p-6 bg-white rounded-lg shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="w-48 mb-2 bg-gray-200 rounded h-7 animate-pulse"></div>
+                <div className="h-4 bg-gray-200 rounded w-36 animate-pulse"></div>
+              </div>
+              <div className="w-32 h-8 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+
+            <div className="w-full h-2 mb-6 bg-gray-100 rounded-full">
+              <div
+                className="h-2 bg-gray-200 rounded-full animate-pulse"
+                style={{ width: "100%" }}
+              ></div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex justify-between">
+                <div className="w-24 h-4 bg-gray-200 rounded animate-pulse"></div>
+                <div className="w-24 h-4 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 mr-2 bg-gray-200 rounded-full animate-pulse"></div>
+                    <div className="w-32 h-5 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-16 h-5 bg-gray-200 rounded animate-pulse"></div>
+                    <div className="w-12 h-4 ml-1 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

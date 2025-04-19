@@ -728,6 +728,86 @@ const invalidateCache = (pattern) => {
   });
 };
 
+// User Management API endpoints
+export const userAPI = {
+  // Get all users with pagination and search
+  getAllUsers: async () => {
+    const cacheKey = `users`;
+
+    return fetchWithFastLoading(
+      cacheKey,
+      async () => {
+        try {
+          const response = await apiClient.get(`/usermanagement/data`);
+          return response.data;
+        } catch (error) {
+          throw new Error(`Failed to fetch users: ${error.message}`);
+        }
+      },
+      { ttl: CACHE_TTL_CRITICAL }
+    );
+  },
+
+  // Get current user info
+  getCurrentUser: async () => {
+    const cacheKey = `current-user`;
+
+    return fetchWithFastLoading(
+      cacheKey,
+      async () => {
+        try {
+          const response = await apiClient.get(`/user`);
+          return response.data;
+        } catch (error) {
+          throw new Error(`Failed to fetch current user: ${error.message}`);
+        }
+      },
+      { ttl: CACHE_TTL_CRITICAL }
+    );
+  },
+
+  // Create a new user
+  createUser: async (userData) => {
+    try {
+      const response = await apiClient.post(`/register`, userData);
+      // Invalidate users cache after creating
+      invalidateCache("users");
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to create user: ${error.message}`);
+    }
+  },
+
+  // Update user role
+  updateUserRole: async (userId, role) => {
+    try {
+      const response = await apiClient.put(
+        `/usermanagement/change-type/${userId}`,
+        { role }
+      );
+      // Invalidate users cache
+      invalidateCache("users");
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to update user role: ${error.message}`);
+    }
+  },
+
+  // Delete a user
+  deleteUser: async (userId) => {
+    try {
+      const response = await apiClient.delete(
+        `/usermanagement/delete/${userId}`
+      );
+      // Invalidate users cache
+      invalidateCache("users");
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to delete user: ${error.message}`);
+    }
+  },
+};
+
 // Farmer API endpoints
 export const farmerAPI = {
   // Get all farmers with pagination and search
@@ -1169,4 +1249,5 @@ export default {
   farmer: farmerAPI,
   livestock: livestockAPI,
   operator: operatorAPI,
+  user: userAPI,
 };

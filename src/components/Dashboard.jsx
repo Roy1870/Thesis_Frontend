@@ -1,34 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  AreaChart,
-  Area,
-} from "recharts";
-import {
-  BarChart2,
-  TrendingUp,
-  Sprout,
-  Loader2,
-  Calendar,
-  Award,
-  ArrowUp,
-  ArrowDown,
-  Activity,
-  Fish,
-  MilkIcon as Cow,
-} from "lucide-react";
 
 import {
   farmerAPI,
@@ -36,6 +8,34 @@ import {
   operatorAPI,
   prefetchRouteData,
 } from "./services/api";
+import {
+  BarChart2,
+  TrendingUp,
+  Sprout,
+  Award,
+  Calendar,
+  Activity,
+  ArrowUp,
+  ArrowDown,
+  User,
+  MilkIcon as Cow,
+  Fish,
+} from "lucide-react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  Legend,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  BarChart,
+  Bar,
+} from "recharts";
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
@@ -1359,9 +1359,145 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex h-[400px] w-full items-center justify-center">
-        <Loader2 className="w-8 h-8 mr-2 text-green-500 animate-spin" />
-        <span className="ml-2">Loading production data...</span>
+      <div className="p-5 bg-[#F5F7F9] min-h-screen overflow-y-auto">
+        {/* Dashboard Header Skeleton */}
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="w-64 h-8 mb-2 bg-gray-200 rounded animate-pulse"></div>
+              <div className="w-48 h-5 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+            <div className="mt-4 md:mt-0">
+              <div className="w-32 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+            </div>
+          </div>
+
+          {/* Production Trend Indicator Skeleton */}
+          <div className="inline-flex items-center p-3 mt-4 bg-white border border-gray-100 rounded-lg shadow-sm">
+            <div className="w-5 h-5 mr-2 bg-gray-200 rounded animate-pulse"></div>
+            <div className="w-32 h-5 mr-2 bg-gray-200 rounded animate-pulse"></div>
+            <div className="w-24 h-5 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+        </div>
+
+        {/* Top Stats Cards Skeleton */}
+        <div className="grid grid-cols-1 gap-6 mb-8 sm:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="p-6 bg-white shadow-md rounded-xl">
+              <div className="flex items-center mb-4">
+                <div className="w-10 h-10 p-2 mr-4 bg-gray-200 rounded-lg animate-pulse"></div>
+                <div>
+                  <div className="w-32 h-5 mb-2 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="w-24 bg-gray-200 rounded h-7 animate-pulse"></div>
+                </div>
+              </div>
+              <div className="w-48 h-5 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+          ))}
+        </div>
+
+        {/* Farmer Type Distribution Skeleton */}
+        <div className="p-6 mb-8 bg-white border border-gray-100 shadow-md rounded-xl">
+          <div className="w-48 h-6 mb-6 bg-gray-200 rounded animate-pulse"></div>
+          <div className="h-[320px] bg-gray-100 rounded animate-pulse"></div>
+        </div>
+
+        {/* Secondary Stats Row Skeleton */}
+        <div className="grid grid-cols-1 gap-6 mb-8 sm:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="p-6 bg-white border border-gray-100 shadow-md rounded-xl"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-40 h-6 bg-gray-200 rounded animate-pulse"></div>
+                <div className="w-8 h-8 p-2 bg-gray-200 rounded-lg animate-pulse"></div>
+              </div>
+              <div className="w-32 h-8 mb-2 bg-gray-200 rounded animate-pulse"></div>
+              <div className="w-48 h-5 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+          ))}
+        </div>
+
+        {/* Charts Row Skeleton */}
+        <div className="grid grid-cols-1 gap-6 mb-8 lg:grid-cols-2">
+          {[1, 2].map((i) => (
+            <div
+              key={i}
+              className="p-6 bg-white border border-gray-100 shadow-md rounded-xl"
+            >
+              <div className="w-48 h-6 mb-6 bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-[320px] bg-gray-100 rounded animate-pulse"></div>
+            </div>
+          ))}
+        </div>
+
+        {/* Barangay Production Distribution Skeleton */}
+        <div className="p-6 mb-8 bg-white border border-gray-100 shadow-md rounded-xl">
+          <div className="w-48 h-6 mb-6 bg-gray-200 rounded animate-pulse"></div>
+          <div className="h-[400px] bg-gray-100 rounded animate-pulse"></div>
+        </div>
+
+        {/* Top Performing Items Skeleton */}
+        <div className="p-6 mb-8 bg-white border border-gray-100 shadow-md rounded-xl">
+          <div className="flex items-center justify-between mb-6">
+            <div className="w-48 h-6 bg-gray-200 rounded animate-pulse"></div>
+            <div className="w-32 h-6 bg-gray-200 rounded-full animate-pulse"></div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className="p-4 border border-gray-100 rounded-lg bg-gray-50"
+              >
+                <div className="flex items-center mb-2">
+                  <div className="w-8 h-8 mr-2 bg-gray-200 rounded-full animate-pulse"></div>
+                  <div className="w-20 h-5 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+                <div className="mt-2">
+                  <div className="w-16 h-6 mb-1 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="w-12 h-4 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+                <div className="w-full h-2 mt-3 bg-gray-200 rounded-full animate-pulse"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Recent Harvests Skeleton */}
+        <div className="p-6 bg-white border border-gray-100 shadow-md rounded-xl">
+          <div className="flex items-center justify-between mb-6">
+            <div className="w-40 h-6 bg-gray-200 rounded animate-pulse"></div>
+            <div className="w-32 h-5 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr>
+                  {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                    <th key={i} className="px-6 py-3 bg-gray-50">
+                      <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <tr
+                    key={i}
+                    className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7].map((j) => (
+                      <td key={j} className="px-6 py-4">
+                        <div className="h-5 bg-gray-200 rounded animate-pulse"></div>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1627,7 +1763,7 @@ export default function Dashboard() {
               Registered Farmers
             </h3>
             <div className="p-2 rounded-lg bg-blue-50">
-              <UserIcon className="w-5 h-5 text-blue-600" />
+              <User className="w-5 h-5 text-blue-600" />
             </div>
           </div>
           <p className="text-3xl font-bold text-gray-900">
@@ -2171,26 +2307,5 @@ export default function Dashboard() {
         )}
       </div>
     </div>
-  );
-}
-
-// UserIcon component for the dashboard
-function UserIcon(props) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
   );
 }
