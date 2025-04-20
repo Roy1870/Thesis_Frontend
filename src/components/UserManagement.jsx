@@ -16,7 +16,7 @@ const UserManagement = () => {
     email: "",
     password: "",
     password_confirmation: "",
-    role: "user",
+    role: "collector",
   });
   const [formErrors, setFormErrors] = useState({});
   const [currentUser, setCurrentUser] = useState(null);
@@ -222,6 +222,15 @@ const UserManagement = () => {
 
       console.log(`Updating user ${userId} to role: ${newRole}`);
 
+      // Validate role before sending to API
+      if (!["admin", "collector", "planner"].includes(newRole)) {
+        showToast(
+          `Invalid role: ${newRole}. Role must be admin, collector, or planner.`,
+          "error"
+        );
+        return;
+      }
+
       // Send the update using our API service
       const response = await userAPI.updateUserRole(userId, newRole);
 
@@ -237,7 +246,10 @@ const UserManagement = () => {
       setEditingUserId(null); // Exit editing mode after update
     } catch (err) {
       console.error("Error updating role:", err);
-      showToast("Failed to update user role.", "error");
+      showToast(
+        `Failed to update user role: ${err.message}. Please check the server logs.`,
+        "error"
+      );
     }
   };
 
@@ -268,7 +280,7 @@ const UserManagement = () => {
       email: "",
       password: "",
       password_confirmation: "",
-      role: "user",
+      role: "collector",
     });
     setFormErrors({});
   };
@@ -339,7 +351,7 @@ const UserManagement = () => {
         email: "",
         password: "",
         password_confirmation: "",
-        role: "user",
+        role: "collector",
       });
 
       // Refresh the user list
@@ -580,7 +592,7 @@ const UserManagement = () => {
                           onChange={(e) => setNewRole(e.target.value)}
                           className="block w-32 px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                         >
-                          <option value="user">User</option>
+                          <option value="collector">Collector</option>
                           <option value="admin">Admin</option>
                           <option value="planner">Planner</option>
                         </select>
@@ -846,7 +858,7 @@ const UserManagement = () => {
                         formErrors.role ? "border-red-300" : "border-gray-300"
                       } bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm`}
                     >
-                      <option value="user">User</option>
+                      <option value="collector">Collector</option>
                       <option value="admin">Admin</option>
                       <option value="planner">Planner</option>
                     </select>
