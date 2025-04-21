@@ -21,8 +21,8 @@ import {
   FileDown,
 } from "lucide-react";
 import Highlighter from "react-highlight-words";
-import EditFarmer from "./EditFarmer";
-import ViewFarmer from "./ViewFarmer";
+import EditFarmer from "./inventory/EditFarmer";
+import ViewFarmer from "./inventory/ViewFarmer";
 
 // Add this at the top of the file, after the imports
 import { prefetchRouteData, prefetchFarmerDetails } from "./services/api";

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { farmerAPI, livestockAPI, operatorAPI } from "./services/api";
+import { farmerAPI, livestockAPI, operatorAPI } from "../services/api";
 import EditFarmer from "./EditFarmer";
 // Add this at the top of the file, after the imports
-import { prefetchRouteData } from "./services/api";
+import { prefetchRouteData } from "../services/api";
 
 const ViewFarmer = ({ farmer, onClose, colors }) => {
   const [farmerData, setFarmerData] = useState(null);

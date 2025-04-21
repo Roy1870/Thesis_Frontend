@@ -1458,14 +1458,6 @@ const AddData = () => {
                       <div className="flex space-x-2">
                         <button
                           type="button"
-                          onClick={getCurrentLocation}
-                          className="flex items-center px-2 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700"
-                        >
-                          <MapPin className="w-3 h-3 mr-1" />
-                          Use My Location
-                        </button>
-                        <button
-                          type="button"
                           onClick={() => setShowMap(!showMap)}
                           className="flex items-center px-2 py-1 text-xs text-white rounded bg-emerald-600 hover:bg-emerald-700"
                         >

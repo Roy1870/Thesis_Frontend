@@ -1,70 +1,75 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import Sidebar from "./components/Sidebar"
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
-import Dashboard from "./components/Dashboard"
-import AddData from "./components/AddData"
-import Inventory from "./components/Inventory"
-import Analytics from "./components/Analytics"
-import Settings from "./components/Settings"
-import Login from "./components/Login"
-import "./components/sidebar.css"
-import Profile from "./components/Profile"
-import UserManagement from "./components/UserManagement"
+import { useState, useEffect } from "react";
+import Sidebar from "./components/Sidebar";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import Dashboard from "./components/Dashboard";
+import AddData from "./components/AddData";
+import Inventory from "./components/Inventory";
+import Analytics from "./components/Analytics";
+import Settings from "./components/Settings";
+import Login from "./components/Login";
+import "./components/sidebar.css";
+import Profile from "./components/Profile";
+import UserManagement from "./components/UserManagement";
 
-const SIDEBAR_COLLAPSED_KEY = "sidebar_collapsed"
+const SIDEBAR_COLLAPSED_KEY = "sidebar_collapsed";
 
 function App() {
-  const isAuthenticated = !!localStorage.getItem("authToken") // Check if token is in localStorage
+  const isAuthenticated = !!localStorage.getItem("authToken"); // Check if token is in localStorage
 
   // Get initial collapsed state from localStorage
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    const savedState = localStorage.getItem(SIDEBAR_COLLAPSED_KEY)
-    return savedState ? JSON.parse(savedState) : false
-  })
+    const savedState = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    return savedState ? JSON.parse(savedState) : false;
+  });
 
   // Check if we're on mobile
-  const isMobile = () => window.innerWidth < 768
-  const [mobile, setMobile] = useState(isMobile())
+  const isMobile = () => window.innerWidth < 768;
+  const [mobile, setMobile] = useState(isMobile());
 
   // Update mobile state on resize
   useEffect(() => {
     const handleResize = () => {
-      setMobile(isMobile())
-    }
+      setMobile(isMobile());
+    };
 
-    window.addEventListener("resize", handleResize)
-    return () => window.removeEventListener("resize", handleResize)
-  }, [])
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Listen for sidebar toggle events
   useEffect(() => {
     const handleSidebarToggle = (event) => {
-      setSidebarCollapsed(event.detail.collapsed)
-    }
+      setSidebarCollapsed(event.detail.collapsed);
+    };
 
-    window.addEventListener("sidebarToggle", handleSidebarToggle)
+    window.addEventListener("sidebarToggle", handleSidebarToggle);
 
     // Check for changes to localStorage directly
     const checkLocalStorage = () => {
-      const currentState = localStorage.getItem(SIDEBAR_COLLAPSED_KEY)
+      const currentState = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
       if (currentState) {
-        const parsedState = JSON.parse(currentState)
+        const parsedState = JSON.parse(currentState);
         if (parsedState !== sidebarCollapsed) {
-          setSidebarCollapsed(parsedState)
+          setSidebarCollapsed(parsedState);
         }
       }
-    }
+    };
 
     // Check localStorage periodically
-    const interval = setInterval(checkLocalStorage, 500)
+    const interval = setInterval(checkLocalStorage, 500);
 
     return () => {
-      window.removeEventListener("sidebarToggle", handleSidebarToggle)
-      clearInterval(interval)
-    }
-  }, [sidebarCollapsed])
+      window.removeEventListener("sidebarToggle", handleSidebarToggle);
+      clearInterval(interval);
+    };
+  }, [sidebarCollapsed]);
 
   return (
     <Router>
@@ -78,7 +83,9 @@ function App() {
             className={`flex-1 overflow-hidden transition-all duration-300 w-full`}
             style={{
               marginLeft: mobile ? "0" : sidebarCollapsed ? "80px" : "256px",
-              width: mobile ? "100%" : `calc(100% - ${sidebarCollapsed ? "80px" : "256px"})`,
+              width: mobile
+                ? "100%"
+                : `calc(100% - ${sidebarCollapsed ? "80px" : "256px"})`,
               marginTop: mobile ? "14px" : "0",
             }}
           >
@@ -106,8 +113,7 @@ function App() {
         </Routes>
       )}
     </Router>
-  )
+  );
 }
 
-export default App
-
+export default App;

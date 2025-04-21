@@ -2,15 +2,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Save, User, Home, Info, MapPin, Loader } from "lucide-react";
-import { farmerAPI } from "./services/api";
-import { livestockAPI } from "./services/api";
-import { operatorAPI } from "./services/api";
-import OperatorTab from "./operator-tab";
-import LivestockTab from "./livestock-tab";
-import RiceTab from "./rice-tab";
-import CropsTab from "./crops-tab";
+import { farmerAPI } from "../services/api";
+import { livestockAPI } from "../services/api";
+import { operatorAPI } from "../services/api";
+import OperatorTab from "../operator-tab";
+import LivestockTab from "../livestock-tab";
+import RiceTab from "../rice-tab";
+import CropsTab from "../crops-tab";
 // Add this at the top of the file, after the imports
-import { prefetchRouteData, prefetchFarmerDetails } from "./services/api";
+import { prefetchRouteData, prefetchFarmerDetails } from "../services/api";
 
 const EditFarmer = ({ farmer, onClose, colors }) => {
   const [formData, setFormData] = useState({

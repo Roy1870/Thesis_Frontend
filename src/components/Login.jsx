@@ -1,51 +1,91 @@
+"use client";
+
+import { useState } from "react";
 import { Button, Input, Form, message } from "antd";
 import axios from "axios";
-import { CheckCircleOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, LoadingOutlined } from "@ant-design/icons";
 import logo from "../images/logo.png";
-import backgroundImage from "../images/logo4.png"; // Import the background image
+import backgroundImage from "../images/logo4.png";
 
 const Login = () => {
+  const [loading, setLoading] = useState(false);
+  const [form] = Form.useForm();
+
   const onFinish = async (values) => {
+    setLoading(true);
+
     try {
       const response = await axios.post(
-        "https://thesis-backend-tau.vercel.app/api/api/login",
+        "http://localhost:8000/api/login",
         {
           email: values.email,
           password: values.password,
+        },
+        {
+          // Add timeout to prevent hanging requests
+          timeout: 10000,
+          // Prevent multiple identical requests
+          headers: {
+            "Cache-Control": "no-cache",
+          },
         }
       );
 
       if (response.data.token) {
-        const token = response.data.token;
-        const user_type = response.data.user_type;
-        const user_name = response.data.name;
+        const { token, user_type, name: user_name } = response.data;
 
+        // Store user data in localStorage
         localStorage.setItem("authToken", token);
         localStorage.setItem("userType", user_type);
         localStorage.setItem("userName", user_name);
 
         message.success({
-          content: "Login success!",
-          duration: 4,
+          content: "Login successful!",
+          duration: 2,
           icon: <CheckCircleOutlined style={{ color: "#52c41a" }} />,
         });
 
+        // Redirect after successful login
         setTimeout(() => {
           window.location.reload();
-        }, 2000);
+        }, 1000);
       } else {
+        // Handle unexpected response format
         message.error(
           response.data.message || "Login failed. Please try again."
         );
       }
     } catch (error) {
-      message.error("An error occurred during login. Please try again.");
-      console.error("Login error:", error);
-    }
-  };
+      // Handle different error scenarios
+      if (error.response) {
+        // Server responded with an error status
+        const status = error.response.status;
+        const errorData = error.response.data;
 
-  const onFinishFailed = (errorInfo) => {
-    console.log("Failed:", errorInfo);
+        if (status === 401) {
+          message.error("Invalid email or password. Please try again.");
+        } else if (status === 404) {
+          message.error("User not found. Please check your email.");
+        } else if (status === 429) {
+          message.error("Too many login attempts. Please try again later.");
+        } else {
+          message.error(errorData.message || "Login failed. Please try again.");
+        }
+      } else if (error.request) {
+        // Request was made but no response received (network issues)
+        message.error("Network error. Please check your internet connection.");
+      } else if (error.code === "ECONNABORTED") {
+        // Request timeout
+        message.error("Request timed out. Please try again.");
+      } else {
+        // Something else happened while setting up the request
+        message.error("An unexpected error occurred. Please try again.");
+      }
+
+      console.error("Login error:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -69,14 +109,15 @@ const Login = () => {
       </div>
 
       {/* Login form wrapper */}
-      <div className="relative z-[2] bg-white bg-opacity-90 p-10 rounded-lg shadow-lg text-center w-[300px]">
+      <div className="relative z-[2] bg-white bg-opacity-90 p-10 rounded-lg shadow-lg text-center w-[320px] max-w-[90%]">
         <h2 className="mb-5 text-2xl text-gray-800">Sign in</h2>
 
         <Form
+          form={form}
           name="login"
           onFinish={onFinish}
-          onFinishFailed={onFinishFailed}
           className="w-full"
+          validateTrigger={["onBlur", "onChange"]}
         >
           <Form.Item
             name="email"
@@ -85,23 +126,36 @@ const Login = () => {
               { type: "email", message: "Please enter a valid email!" },
             ]}
           >
-            <Input placeholder="Email" className="h-10 rounded" />
+            <Input
+              placeholder="Email"
+              className="h-10 rounded"
+              disabled={loading}
+              autoComplete="email"
+            />
           </Form.Item>
 
           <Form.Item
             name="password"
             rules={[{ required: true, message: "Please enter your password!" }]}
           >
-            <Input.Password placeholder="Password" className="h-10 rounded" />
+            <Input.Password
+              placeholder="Password"
+              className="h-10 rounded"
+              disabled={loading}
+              autoComplete="current-password"
+            />
           </Form.Item>
 
           <Form.Item>
             <Button
               type="primary"
               htmlType="submit"
-              className="w-full h-10 rounded bg-[#6a9c89] border-[#6a9c89] hover:bg-white hover:border-[#57826d] transition-colors duration-300"
+              className="w-full h-10 rounded bg-[#6a9c89] border-[#6a9c89] hover:bg-white hover:text-[#6a9c89] hover:border-[#57826d] transition-colors duration-300"
+              loading={loading}
+              icon={loading ? <LoadingOutlined /> : null}
+              disabled={loading}
             >
-              Log In
+              {loading ? "Logging in..." : "Log In"}
             </Button>
           </Form.Item>
         </Form>
