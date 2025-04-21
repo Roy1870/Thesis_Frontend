@@ -16,7 +16,7 @@ const Login = () => {
 
     try {
       const response = await axios.post(
-        "http://localhost:8000/api/login",
+        "https://thesis-backend-tau.vercel.app/api/api/login",
         {
           email: values.email,
           password: values.password,
