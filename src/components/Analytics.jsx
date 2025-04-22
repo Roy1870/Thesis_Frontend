@@ -7,10 +7,12 @@ import {
   operatorAPI,
   prefetchRouteData,
 } from "./services/api";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, RefreshCw } from "lucide-react";
 
 function Analytics() {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState(null);
   const [currentCategory, setCurrentCategory] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({
@@ -168,12 +170,50 @@ function Analytics() {
     []
   );
 
+  // Function to format a date to readable string
+  const formatRefreshTime = (date) => {
+    if (!date) return "";
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
+
   // Fetch data with AbortController for cleanup
   useEffect(() => {
     const controller = new AbortController();
     const signal = controller.signal;
 
     fetchAllData(signal);
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
+
+  // Set up polling to refresh data periodically
+  useEffect(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    // Don't start polling until initial load is complete
+    if (loading) return;
+
+    const pollingInterval = setInterval(() => {
+      fetchAllData(signal, true); // true means background refresh
+    }, 60000); // Refresh every minute
+
+    return () => {
+      clearInterval(pollingInterval);
+      controller.abort();
+    };
+  }, [loading]);
+
+  // Function to handle data change notifications from other components
+  const handleDataChange = useCallback(() => {
+    const controller = new AbortController();
+    fetchAllData(controller.signal, true);
 
     return () => {
       controller.abort();
@@ -238,10 +278,22 @@ function Analytics() {
     setAnalyticsData(processedData);
   }, [rawData]);
 
+  // Manual refresh function
+  const handleManualRefresh = useCallback(() => {
+    const controller = new AbortController();
+    fetchAllData(controller.signal, true);
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
+
   // Fetch all data using optimized approach with signal for cancellation
-  const fetchAllData = async (signal) => {
+  const fetchAllData = async (signal, isBackgroundRefresh = false) => {
+    const isInitialLoad = false;
     try {
-      setLoading(true);
+      // Always use background refreshing, even on initial load
+      setIsBackgroundRefreshing(true);
 
       // Use Promise.all to fetch data in parallel
       const [farmersResponse, livestockResponse, operatorsResponse] =
@@ -406,12 +458,21 @@ function Analytics() {
         highValueCrops,
       });
 
+      // Always turn off loading states when done
       setLoading(false);
+      setIsBackgroundRefreshing(false);
+
+      // Update last refreshed timestamp
+      setLastRefreshed(new Date());
     } catch (error) {
       // Only set error if not an abort error (which happens during cleanup)
       if (error.name !== "AbortError") {
         console.error("Error fetching data:", error);
-        setLoading(false);
+        if (isInitialLoad) {
+          setLoading(false);
+        } else {
+          setIsBackgroundRefreshing(false);
+        }
       }
     }
   };
@@ -1022,63 +1083,6 @@ function Analytics() {
     );
   }, [analyticsData, categories, currentCategory, getColorForIndex]);
 
-  if (loading) {
-    return (
-      <div className="container p-4 mx-auto">
-        {/* Header skeleton */}
-        <div className="flex flex-col mb-4 space-y-2">
-          <div className="w-64 h-8 bg-gray-200 rounded animate-pulse"></div>
-          <div className="w-48 h-5 bg-gray-200 rounded animate-pulse"></div>
-        </div>
-
-        {/* Dropdown skeleton */}
-        <div className="w-full mb-4">
-          <div className="w-full h-12 bg-gray-200 rounded animate-pulse"></div>
-        </div>
-
-        {/* Content skeleton */}
-        <div className="space-y-6">
-          <div className="p-6 bg-white rounded-lg shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <div className="w-48 mb-2 bg-gray-200 rounded h-7 animate-pulse"></div>
-                <div className="h-4 bg-gray-200 rounded w-36 animate-pulse"></div>
-              </div>
-              <div className="w-32 h-8 bg-gray-200 rounded animate-pulse"></div>
-            </div>
-
-            <div className="w-full h-2 mb-6 bg-gray-100 rounded-full">
-              <div
-                className="h-2 bg-gray-200 rounded-full animate-pulse"
-                style={{ width: "100%" }}
-              ></div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex justify-between">
-                <div className="w-24 h-4 bg-gray-200 rounded animate-pulse"></div>
-                <div className="w-24 h-4 bg-gray-200 rounded animate-pulse"></div>
-              </div>
-
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 mr-2 bg-gray-200 rounded-full animate-pulse"></div>
-                    <div className="w-32 h-5 bg-gray-200 rounded animate-pulse"></div>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-16 h-5 bg-gray-200 rounded animate-pulse"></div>
-                    <div className="w-12 h-4 ml-1 bg-gray-200 rounded animate-pulse"></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="container p-4 mx-auto overflow-auto">
       <div className="flex flex-col mb-4 space-y-2">
@@ -1086,6 +1090,29 @@ function Analytics() {
         <p className="text-gray-600">
           Total production and breakdown by category
         </p>
+      </div>
+
+      {/* Status indicator and refresh button */}
+      <div className="flex items-center mb-4 text-sm">
+        {isBackgroundRefreshing ? (
+          <div className="flex items-center text-amber-600">
+            <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+            <span>Updating data...</span>
+          </div>
+        ) : (
+          lastRefreshed && (
+            <div className="flex items-center text-gray-500">
+              <span>Last updated: {formatRefreshTime(lastRefreshed)}</span>
+              <button
+                onClick={handleManualRefresh}
+                className="flex items-center ml-4 text-blue-600 hover:text-blue-800"
+              >
+                <RefreshCw className="w-4 h-4 mr-1" />
+                <span>Refresh</span>
+              </button>
+            </div>
+          )
+        )}
       </div>
 
       {/* Dropdown section with fixed position */}

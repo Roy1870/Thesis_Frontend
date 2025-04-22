@@ -19,13 +19,11 @@ import {
   Users,
   Coffee,
   FileDown,
+  RefreshCw,
 } from "lucide-react";
 import Highlighter from "react-highlight-words";
 import EditFarmer from "./inventory/EditFarmer";
 import ViewFarmer from "./inventory/ViewFarmer";
-
-// Add this at the top of the file, after the imports
-import { prefetchRouteData, prefetchFarmerDetails } from "./services/api";
 
 // Custom MilkIcon component since it's not in lucide-react
 const MilkIcon = (props) => (
@@ -58,7 +56,7 @@ const Inventory = () => {
   const [searchText, setSearchText] = useState("");
   const [debouncedSearchText, setDebouncedSearchText] = useState(""); // For debounced search
   const [searchedColumn, setSearchedColumn] = useState("");
-  const [loading, setLoading] = useState(true); // Start with loading true
+  const [loading, setLoading] = useState(false); // Start with loading false
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
@@ -70,6 +68,7 @@ const Inventory = () => {
   const [currentItem, setCurrentItem] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
 
+  // Filters
   const [barangayFilter, setBarangayFilter] = useState("");
   const [monthFilter, setMonthFilter] = useState("");
   const [yearFilter, setYearFilter] = useState("");
@@ -90,6 +89,10 @@ const Inventory = () => {
   ]);
   const [yearOptions, setYearOptions] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+
+  // New refresh state
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
 
   // Refs for cleanup
   const abortControllerRef = useRef(null);
@@ -138,7 +141,8 @@ const Inventory = () => {
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
 
-    fetchAllData(signal);
+    // Fetch fresh data for initial load
+    fetchAllData(signal, true);
 
     // Load ExcelJS library if not already loaded
     if (!window.ExcelJS) {
@@ -176,8 +180,8 @@ const Inventory = () => {
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
 
-    // Then fetch new data with AbortController
-    fetchAllData(signal);
+    // Always fetch fresh data when changing data type
+    fetchAllData(signal, true);
 
     return () => {
       // Abort any in-flight requests when component unmounts or effect re-runs
@@ -186,41 +190,6 @@ const Inventory = () => {
       }
     };
   }, [selectedDataType]);
-
-  // Add this inside the Inventory component, after the useEffect hooks
-  // Prefetch data for other routes when inventory is loaded
-  useEffect(() => {
-    // Prefetch dashboard data when inventory is loaded
-    prefetchRouteData("/dashboard");
-
-    // Prefetch analytics data with a delay
-    const analyticsTimer = setTimeout(() => {
-      prefetchRouteData("/analytics");
-    }, 5000); // 5 second delay
-
-    // Prefetch first few farmers for ViewFarmer and EditFarmer components
-    const prefetchFarmersTimer = setTimeout(() => {
-      if (allData.length > 0 && selectedDataType === "farmers") {
-        // Only prefetch the first 3 farmers to avoid too many requests
-        const farmersToPreload = allData.slice(0, 3);
-
-        // Prefetch each farmer's details with a delay between each
-        farmersToPreload.forEach((farmer, index) => {
-          setTimeout(() => {
-            if (farmer && farmer.farmer_id) {
-              console.log(`Prefetching data for farmer ${farmer.farmer_id}`);
-              prefetchFarmerDetails(farmer.farmer_id);
-            }
-          }, index * 1000); // 1 second between each farmer prefetch
-        });
-      }
-    }, 2000); // Start after 2 seconds to ensure main UI is responsive first
-
-    return () => {
-      clearTimeout(analyticsTimer);
-      clearTimeout(prefetchFarmersTimer);
-    };
-  }, [allData, selectedDataType]);
 
   // Handle pagination, debounced search, and filters
   useEffect(() => {
@@ -302,22 +271,53 @@ const Inventory = () => {
     setYearOptions(years);
   }, []);
 
-  // Fetch all data for client-side filtering
+  // Add a manual refresh function to get fresh data
+  const refreshData = useCallback(() => {
+    setIsRefreshing(true);
+
+    // Create a new AbortController
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
+    // Fetch fresh data
+    fetchAllData(signal, true)
+      .then(() => {
+        // Update last refresh timestamp
+        setLastRefresh(new Date());
+        // Show success toast
+        showToast("Data refreshed successfully", "success");
+      })
+      .catch((err) => {
+        console.error("Error refreshing data:", err);
+        showToast("Failed to refresh data", "error");
+      })
+      .finally(() => {
+        setIsRefreshing(false);
+      });
+  }, []);
+
+  // Modify the fetchAllData function to avoid clearing existing data during refreshes
   const fetchAllData = useCallback(
-    async (signal) => {
+    async (signal, forceRefresh = false) => {
       try {
-        setLoading(true);
+        // Always use background refreshing, even on initial load
+        setIsBackgroundRefreshing(true);
+
         setError(null);
 
-        // Clear existing data to prevent mixing
-        setData([]);
-
+        // Don't clear existing data during refreshes to keep the table visible
+        // Only store new data in temporary variables until ready to update UI
         let response;
         let processedData = [];
 
         switch (selectedDataType) {
           case "farmers":
-            response = await farmerAPI.getAllFarmers(1, 1000, "", [], signal);
+            response = await farmerAPI.getAllFarmers(1, 1000, "", [], {
+              forceRefresh,
+            });
             processedData = Array.isArray(response)
               ? response
               : response.data || [];
@@ -330,7 +330,7 @@ const Inventory = () => {
               1000,
               "",
               [],
-              signal
+              { forceRefresh }
             );
             const farmers = Array.isArray(farmersResponse)
               ? farmersResponse
@@ -381,7 +381,7 @@ const Inventory = () => {
               1000,
               "",
               [],
-              signal
+              { forceRefresh }
             );
             const farmersDataForHVC = Array.isArray(farmersForHVC)
               ? farmersForHVC
@@ -433,7 +433,7 @@ const Inventory = () => {
               1000,
               "",
               [],
-              signal
+              { forceRefresh }
             );
             const farmersDataForRice = Array.isArray(farmersForRice)
               ? farmersForRice
@@ -468,7 +468,7 @@ const Inventory = () => {
               1,
               1000,
               "",
-              signal
+              { forceRefresh }
             );
             const livestockRecords = Array.isArray(livestockResponse)
               ? livestockResponse
@@ -480,7 +480,7 @@ const Inventory = () => {
               1000,
               "",
               [],
-              signal
+              { forceRefresh }
             );
 
             // Create a map of farmer_id to farmer data for quick lookup
@@ -517,7 +517,7 @@ const Inventory = () => {
               1,
               1000,
               "",
-              signal
+              { forceRefresh }
             );
             const operators = Array.isArray(operatorsResponse)
               ? operatorsResponse
@@ -529,7 +529,7 @@ const Inventory = () => {
               1000,
               "",
               [],
-              signal
+              { forceRefresh }
             );
 
             // Create a map of farmer_id to farmer data for quick lookup
@@ -567,7 +567,7 @@ const Inventory = () => {
         // Extract filter options from the data
         extractFilterOptions(processedData);
 
-        // Set the new data
+        // Only update the UI once all data is ready
         setAllData(processedData);
 
         // Apply pagination to the fetched data
@@ -579,16 +579,17 @@ const Inventory = () => {
 
         setData(paginatedResults);
         setTotalRecords(processedData.length);
+
+        // Always turn off loading when done
         setLoading(false);
+        setIsBackgroundRefreshing(false);
       } catch (err) {
         // Only set error if not an abort error (which happens during cleanup)
         if (err.name !== "AbortError") {
           console.error(`Error fetching ${selectedDataType} data:`, err);
           setError(`Failed to fetch ${selectedDataType} data: ${err.message}`);
           setLoading(false);
-          setAllData([]);
-          setData([]);
-          setTotalRecords(0);
+          setIsBackgroundRefreshing(false);
         }
       }
     },
@@ -598,6 +599,8 @@ const Inventory = () => {
       extractFilterOptions,
       currentPage,
       pageSize,
+      data.length,
+      allData.length,
     ]
   );
 
@@ -832,9 +835,15 @@ const Inventory = () => {
     setSearchText("");
   }, []);
 
+  // Add a new state for tracking background refreshes
+  const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
+
+  // Modify the handleDelete function to use background refreshing
   const handleDelete = useCallback(
     async (id) => {
       try {
+        setIsBackgroundRefreshing(true);
+
         switch (selectedDataType) {
           case "farmers":
             await farmerAPI.deleteFarmer(id);
@@ -867,8 +876,11 @@ const Inventory = () => {
         abortControllerRef.current = new AbortController();
         const signal = abortControllerRef.current.signal;
 
-        // Refresh data after deletion
-        await fetchAllData(signal);
+        // Refresh data after deletion - always fetch fresh data
+        await fetchAllData(signal, true);
+
+        // Update last refresh timestamp
+        setLastRefresh(new Date());
 
         showToast(
           `${selectedDataType.slice(0, -1)} deleted successfully`,
@@ -881,43 +893,62 @@ const Inventory = () => {
           `Failed to delete ${selectedDataType.slice(0, -1)}: ${err.message}`,
           "error"
         );
+      } finally {
+        setIsBackgroundRefreshing(false);
       }
     },
     [currentItem, selectedDataType, fetchAllData]
   );
 
-  // Modify the handleView function to prefetch additional data
-  // Replace the existing handleView function with this corrected version
+  // Modified handleView to fetch fresh data
   const handleView = useCallback((record) => {
-    // Set the current item first to ensure the component has data to work with
+    // Set the current item first
     setCurrentItem(record);
     setIsViewMode(true);
 
-    // Then prefetch additional data for this farmer
+    // Fetch fresh farmer details
     if (record && record.farmer_id) {
-      console.log(`Prefetching additional data for farmer ${record.farmer_id}`);
-
-      // Explicitly fetch the farmer details to ensure we have the latest data
+      // Always fetch fresh data when viewing a farmer
       farmerAPI
-        .getFarmerById(record.farmer_id)
+        .getFarmerById(record.farmer_id, { forceRefresh: true })
         .then((data) => {
-          console.log("Successfully fetched farmer details for viewing");
+          console.log("Successfully fetched fresh farmer details for viewing");
         })
         .catch((err) => {
           console.error("Error fetching farmer details for viewing:", err);
         });
-
-      // Also prefetch data that might be needed for editing this farmer
-      setTimeout(() => {
-        console.log(`Prefetching edit data for farmer ${record.farmer_id}`);
-        prefetchFarmerDetails(record.farmer_id);
-      }, 500); // Small delay to prioritize view data first
     }
   }, []);
 
   const handleEdit = useCallback((record) => {
-    setCurrentItem(record);
-    setIsEditMode(true);
+    // Fetch fresh data before editing
+    if (record && record.farmer_id) {
+      // Set loading state to indicate data is being refreshed
+      setLoading(true);
+
+      farmerAPI
+        .getFarmerById(record.farmer_id, { forceRefresh: true })
+        .then((freshData) => {
+          // Set the updated data as current item
+          setCurrentItem(freshData);
+          setIsEditMode(true);
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error(
+            "Error fetching fresh farmer details for editing:",
+            err
+          );
+          // Fall back to existing data if refresh fails
+          setCurrentItem(record);
+          setIsEditMode(true);
+          setLoading(false);
+        });
+    } else {
+      // For non-farmer records, use the existing data
+      setCurrentItem(record);
+      setIsEditMode(true);
+    }
   }, []);
 
   const handleCloseView = useCallback(() => {
@@ -925,6 +956,7 @@ const Inventory = () => {
     setCurrentItem(null);
   }, []);
 
+  // Modify the handleCloseEdit function to use background refreshing
   const handleCloseEdit = useCallback(() => {
     setIsEditMode(false);
     setCurrentItem(null);
@@ -936,8 +968,13 @@ const Inventory = () => {
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
 
-    // Refresh data after editing
-    fetchAllData(signal);
+    // Use background refreshing for a smoother experience
+    setIsBackgroundRefreshing(true);
+
+    // Always fetch fresh data after editing
+    fetchAllData(signal, true).finally(() => {
+      setIsBackgroundRefreshing(false);
+    });
   }, [fetchAllData]);
 
   const handleSearchInputChange = useCallback((e) => {
@@ -1680,6 +1717,11 @@ const Inventory = () => {
               </span>
             </td>
             <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
+              <span className="text-xs text-gray-900 sm:text-sm">
+                {operator.productive_area_sqm || "N/A"}
+              </span>
+            </td>
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px] xl:max-w-none">
                 {operator.production_kg || "N/A"}
               </span>
@@ -1737,6 +1779,78 @@ const Inventory = () => {
       }
     };
   }, []);
+
+  // Modify the polling mechanism to use background refreshing
+  useEffect(() => {
+    // Set up polling interval to check for new data
+    const pollInterval = setInterval(() => {
+      // Only poll if not already refreshing and not in edit/view mode
+      if (!isRefreshing && !isEditMode && !isViewMode) {
+        // Create a new AbortController for this request
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+        abortControllerRef.current = new AbortController();
+        const signal = abortControllerRef.current.signal;
+
+        // Set background refreshing state instead of regular refreshing
+        setIsBackgroundRefreshing(true);
+
+        // Fetch fresh data
+        fetchAllData(signal, true)
+          .then(() => {
+            // Update last refresh timestamp
+            setLastRefresh(new Date());
+          })
+          .catch((err) => {
+            // Only log error if not an abort error
+            if (err.name !== "AbortError") {
+              console.error("Error during auto-refresh:", err);
+            }
+          })
+          .finally(() => {
+            setIsBackgroundRefreshing(false);
+          });
+      }
+    }, 30000); // Poll every 30 seconds
+
+    return () => {
+      clearInterval(pollInterval);
+    };
+  }, [fetchAllData, isRefreshing, isEditMode, isViewMode]);
+
+  // Add a function to handle real-time updates from API changes
+  // This would be called by any component that creates or updates data
+  const handleDataChange = useCallback(() => {
+    // Only refresh if not already refreshing
+    if (!isRefreshing && !isBackgroundRefreshing) {
+      // Create a new AbortController for this request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
+
+      // Set background refreshing state
+      setIsBackgroundRefreshing(true);
+
+      // Fetch fresh data
+      fetchAllData(signal, true)
+        .then(() => {
+          // Update last refresh timestamp
+          setLastRefresh(new Date());
+        })
+        .catch((err) => {
+          // Only log error if not an abort error
+          if (err.name !== "AbortError") {
+            console.error("Error during data change refresh:", err);
+          }
+        })
+        .finally(() => {
+          setIsBackgroundRefreshing(false);
+        });
+    }
+  }, [fetchAllData, isRefreshing, isBackgroundRefreshing]);
 
   if (isViewMode && currentItem) {
     return (
@@ -1841,6 +1955,13 @@ const Inventory = () => {
                 />
               </button>
 
+              {isBackgroundRefreshing && (
+                <div className="flex items-center px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-md sm:text-sm">
+                  <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" />
+                  <span>Updating...</span>
+                </div>
+              )}
+
               {(barangayFilter || monthFilter || yearFilter) && (
                 <button
                   onClick={clearAllFilters}
@@ -1854,6 +1975,11 @@ const Inventory = () => {
             <div className="flex items-center space-x-2">
               <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium bg-[#6A9C89] text-white">
                 Total Records: {totalRecords}
+              </span>
+
+              {/* Last refresh time indicator */}
+              <span className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium bg-gray-100 text-gray-700">
+                Last updated: {lastRefresh.toLocaleTimeString()}
               </span>
 
               {selectedDataType !== "farmers" && (
@@ -1971,7 +2097,7 @@ const Inventory = () => {
                       {monthOptions.find((m) => m.value === monthFilter)?.label}
                       <button
                         onClick={() => setMonthFilter("")}
-                        className="ml-1 text-[#6A9C89] hover:text-[#5A8C79] focus:outline-none"
+                        className="ml-1 text-[#6A9C89] hover:text-[#5A9C79] focus:outline-none"
                       >
                         ×
                       </button>
@@ -1982,7 +2108,7 @@ const Inventory = () => {
                       {yearFilter}
                       <button
                         onClick={() => setYearFilter("")}
-                        className="ml-1 text-[#6A9C89] hover:text-[#5A8C79] focus:outline-none"
+                        className="ml-1 text-[#6A9C89] hover:text-[#5A9C79] focus:outline-none"
                       >
                         ×
                       </button>
@@ -1999,60 +2125,7 @@ const Inventory = () => {
             </div>
           )}
 
-          {loading && (
-            <div className="relative">
-              <div className="p-3 sm:p-4">
-                {/* Header skeleton */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-40 h-6 bg-gray-200 rounded animate-pulse"></div>
-                  <div className="h-10 bg-gray-200 rounded w-80 animate-pulse"></div>
-                </div>
-
-                {/* Buttons skeleton */}
-                <div className="flex mb-6 space-x-2">
-                  <div className="w-32 h-10 bg-gray-200 rounded animate-pulse"></div>
-                  <div className="w-32 h-10 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-
-                {/* Table skeleton */}
-                <div className="-mx-3 overflow-x-auto sm:mx-0">
-                  <div className="min-w-full border divide-y divide-gray-200">
-                    {/* Table header skeleton */}
-                    <div className="h-12 bg-gray-50">
-                      <div className="flex">
-                        {[1, 2, 3, 4, 5, 6].map((i) => (
-                          <div
-                            key={i}
-                            className="flex-1 px-2 py-2 sm:px-6 sm:py-3"
-                          >
-                            <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Table body skeleton */}
-                    <div className="bg-white divide-y divide-gray-200">
-                      {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                        <div key={i} className="flex">
-                          {[1, 2, 3, 4, 5, 6].map((j) => (
-                            <div key={j} className="flex-1 px-2 py-4 sm:px-6">
-                              <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                            </div>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Pagination skeleton */}
-                <div className="flex justify-center mt-3">
-                  <div className="w-64 h-8 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Loading state removed */}
 
           {!loading && (
             <div className="relative">

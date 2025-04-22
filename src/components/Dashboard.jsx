@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
 import {
   farmerAPI,
@@ -20,6 +20,7 @@ import {
   User,
   MilkIcon as Cow,
   Fish,
+  RefreshCw,
 } from "lucide-react";
 import {
   PieChart,
@@ -39,6 +40,7 @@ import {
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
+  const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [rawData, setRawData] = useState({
     farmers: [],
@@ -90,6 +92,10 @@ export default function Dashboard() {
       },
     },
   });
+  const [lastRefresh, setLastRefresh] = useState(new Date());
+
+  // Ref for cleanup
+  const abortControllerRef = useRef(null);
 
   // Theme colors - memoized to prevent recreating on each render
   const colors = useMemo(
@@ -148,7 +154,8 @@ export default function Dashboard() {
     const controller = new AbortController();
     const signal = controller.signal;
 
-    fetchAllData(signal);
+    // Initial data fetch
+    fetchAllData(signal, true);
 
     return () => {
       controller.abort();
@@ -176,10 +183,60 @@ export default function Dashboard() {
     };
   }, []);
 
+  // Add polling mechanism to check for data changes
+  useEffect(() => {
+    // Set up polling interval to check for new data
+    const pollInterval = setInterval(() => {
+      // Only poll if not already refreshing
+      if (!isBackgroundRefreshing) {
+        // Create a new AbortController for this request
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+        abortControllerRef.current = new AbortController();
+        const signal = abortControllerRef.current.signal;
+
+        // Set background refreshing state
+        setIsBackgroundRefreshing(true);
+
+        // Fetch fresh data
+        fetchAllData(signal, true)
+          .then(() => {
+            // Update last refresh timestamp
+            setLastRefresh(new Date());
+          })
+          .catch((err) => {
+            // Only log error if not an abort error
+            if (err.name !== "AbortError") {
+              console.error("Error during auto-refresh:", err);
+            }
+          })
+          .finally(() => {
+            setIsBackgroundRefreshing(false);
+          });
+      }
+    }, 60000); // Poll every 60 seconds
+
+    return () => {
+      clearInterval(pollInterval);
+    };
+  }, [isBackgroundRefreshing]);
+
   // Fetch all data using optimized approach with signal for cancellation
-  const fetchAllData = async (signal) => {
+  const fetchAllData = async (signal, forceRefresh = false) => {
     try {
-      setLoading(true);
+      // Only show full loading state when there's no data yet
+      const isInitialLoad = Object.values(rawData).every(
+        (arr) => arr.length === 0
+      );
+      if (isInitialLoad) {
+        setLoading(true);
+      } else {
+        // For subsequent loads, use background refreshing
+        setIsBackgroundRefreshing(true);
+      }
+
+      setError(null);
 
       // Use Promise.all to fetch data in parallel
       const [farmersResponse, livestockResponse, operatorsResponse] =
@@ -204,16 +261,16 @@ export default function Dashboard() {
         ? operatorsResponse
         : operatorsResponse.data || [];
 
-      // Extract crops from farmers - process in batches for better performance
-      const crops = [];
-      const rice = [];
-      const highValueCrops = [];
-
       // Create a map for faster farmer lookups
       const farmersMap = {};
       farmers.forEach((farmer) => {
         farmersMap[farmer.farmer_id] = farmer;
       });
+
+      // Extract crops from farmers - process in batches for better performance
+      const crops = [];
+      const rice = [];
+      const highValueCrops = [];
 
       // Process each farmer to extract crops and rice data
       farmers.forEach((farmer) => {
@@ -229,24 +286,8 @@ export default function Dashboard() {
 
           // Add farmer info to each crop
           const farmerCrops = regularCrops.map((crop) => {
-            // Parse production_data if it exists and is a string
-            let productionData = {};
-            if (
-              crop.production_data &&
-              typeof crop.production_data === "string"
-            ) {
-              try {
-                productionData = JSON.parse(crop.production_data);
-              } catch (e) {
-                // Silent error - continue with empty production data
-                productionData = {};
-              }
-            } else if (
-              crop.production_data &&
-              typeof crop.production_data === "object"
-            ) {
-              productionData = crop.production_data;
-            }
+            // Parse production_data
+            const productionData = parseProductionData(crop);
 
             return {
               ...crop,
@@ -269,24 +310,8 @@ export default function Dashboard() {
 
           // Process high value crops
           const farmerHVCs = hvCrops.map((crop) => {
-            // Parse production_data if it exists and is a string
-            let productionData = {};
-            if (
-              crop.production_data &&
-              typeof crop.production_data === "string"
-            ) {
-              try {
-                productionData = JSON.parse(crop.production_data);
-              } catch (e) {
-                // Silent error - continue with empty production data
-                productionData = {};
-              }
-            } else if (
-              crop.production_data &&
-              typeof crop.production_data === "object"
-            ) {
-              productionData = crop.production_data;
-            }
+            // Parse production_data
+            const productionData = parseProductionData(crop);
 
             return {
               ...crop,
@@ -365,16 +390,54 @@ export default function Dashboard() {
         highValueCrops,
       });
 
+      // Always turn off loading states when done
       setLoading(false);
+      setIsBackgroundRefreshing(false);
+
+      // Update last refresh timestamp
+      setLastRefresh(new Date());
     } catch (error) {
       // Only set error if not an abort error (which happens during cleanup)
       if (error.name !== "AbortError") {
         console.error("Error fetching data:", error);
         setError(error.message);
         setLoading(false);
+        setIsBackgroundRefreshing(false);
       }
     }
   };
+
+  // Add a function to handle real-time updates from API changes
+  const handleDataChange = useCallback(() => {
+    // Only refresh if not already refreshing
+    if (!isBackgroundRefreshing) {
+      // Create a new AbortController for this request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
+
+      // Set background refreshing state
+      setIsBackgroundRefreshing(true);
+
+      // Fetch fresh data
+      fetchAllData(signal, true)
+        .then(() => {
+          // Update last refresh timestamp
+          setLastRefresh(new Date());
+        })
+        .catch((err) => {
+          // Only log error if not an abort error
+          if (err.name !== "AbortError") {
+            console.error("Error during data change refresh:", err);
+          }
+        })
+        .finally(() => {
+          setIsBackgroundRefreshing(false);
+        });
+    }
+  }, [isBackgroundRefreshing]);
 
   // Process all data for dashboard - memoized to prevent unnecessary recalculations
   const processData = useCallback(() => {
@@ -1357,6 +1420,24 @@ export default function Dashboard() {
     return categoryNames[category] || category;
   }, []);
 
+  // Helper function to parse production_data
+  const parseProductionData = useCallback((crop) => {
+    let productionData = {};
+    if (crop.production_data && typeof crop.production_data === "string") {
+      try {
+        productionData = JSON.parse(crop.production_data);
+      } catch (e) {
+        // Silent error - continue with empty production data
+      }
+    } else if (
+      crop.production_data &&
+      typeof crop.production_data === "object"
+    ) {
+      productionData = crop.production_data;
+    }
+    return productionData;
+  }, []);
+
   if (loading) {
     return (
       <div className="p-5 bg-[#F5F7F9] min-h-screen overflow-y-auto">
@@ -1556,6 +1637,19 @@ export default function Dashboard() {
               from previous year
             </span>
           </div>
+        </div>
+
+        {/* Background refresh indicator */}
+        {isBackgroundRefreshing && (
+          <div className="inline-flex items-center p-2 mt-2 ml-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-md">
+            <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" />
+            <span>Updating data...</span>
+          </div>
+        )}
+
+        {/* Last refresh time indicator */}
+        <div className="inline-flex items-center p-2 mt-2 ml-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-md">
+          <span>Last updated: {lastRefresh.toLocaleTimeString()}</span>
         </div>
       </div>
 

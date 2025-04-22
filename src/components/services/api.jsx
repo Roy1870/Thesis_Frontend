@@ -5,8 +5,8 @@ import axios from "axios";
 const API_BASE_URL = "https://thesis-backend-tau.vercel.app/api/api";
 
 // Reduced cache TTL for faster updates
-const CACHE_TTL = 300000; // 5 minutes in milliseconds
-const CACHE_TTL_CRITICAL = 600000; // 10 minutes for critical data
+const CACHE_TTL = 60000; // 1 minute in milliseconds (reduced from 5 minutes)
+const CACHE_TTL_CRITICAL = 120000; // 2 minutes for critical data (reduced from 10 minutes)
 
 // Persistent cache implementation with localStorage backup
 class PersistentCache {
@@ -253,6 +253,12 @@ apiClient.interceptors.request.use(
     // Don't cache if specifically requested
     if (config.headers?.["Cache-Control"] === "no-cache") return config;
 
+    // Don't cache if forceRefresh is set
+    if (config.forceRefresh === true) {
+      delete config.forceRefresh; // Remove the custom property
+      return config;
+    }
+
     const cacheKey = `${config.url}|${JSON.stringify(config.params || {})}`;
 
     // Check if this exact request is already in flight
@@ -382,14 +388,18 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Implement faster data fetching without timeouts
+// Modified data fetching function with forceRefresh option
 const fetchWithFastLoading = async (key, fetcher, options = {}) => {
-  const { ttl = CACHE_TTL, revalidateOnMount = true } = options;
+  const {
+    ttl = CACHE_TTL,
+    revalidateOnMount = true,
+    forceRefresh = false,
+  } = options;
 
-  // Check cache first
-  const cachedData = cache.get(key);
+  // Check cache first (unless forceRefresh is true)
+  const cachedData = forceRefresh ? null : cache.get(key);
 
-  // Start fetching immediately
+  // Create a fetch promise that will update the cache
   const fetchPromise = fetcher()
     .then((freshData) => {
       // Update cache with fresh data
@@ -405,12 +415,17 @@ const fetchWithFastLoading = async (key, fetcher, options = {}) => {
     })
     .catch((error) => {
       console.error(`Error fetching data: ${error.message}`);
-      // If we have cached data, return it on error
-      if (cachedData) {
+      // If we have cached data and not forcing refresh, return it on error
+      if (cachedData && !forceRefresh) {
         return cachedData.data;
       }
       throw error;
     });
+
+  // If forceRefresh is true, always wait for the fetch to complete
+  if (forceRefresh) {
+    return fetchPromise;
+  }
 
   // If we have cached data, return it immediately while fetching in background
   if (cachedData) {
@@ -429,19 +444,26 @@ const fetchWithFastLoading = async (key, fetcher, options = {}) => {
 };
 
 // Optimized batch requests helper with faster parallel execution
-export const batchRequests = async (requests) => {
+export const batchRequests = async (requests, forceRefresh = false) => {
   try {
     // Process all requests in parallel
     const results = await Promise.all(
       requests.map((req) => {
+        // Add forceRefresh flag if specified
+        if (forceRefresh) {
+          req.forceRefresh = true;
+        }
+
         return apiClient(req)
           .then((res) => res.data)
           .catch((err) => {
-            // Try to get from cache on error
-            const cacheKey = `${req.url}|${JSON.stringify(req.params || {})}`;
-            const cachedData = cache.get(cacheKey);
-            if (cachedData) {
-              return cachedData.data;
+            // Try to get from cache on error (only if not forcing refresh)
+            if (!forceRefresh) {
+              const cacheKey = `${req.url}|${JSON.stringify(req.params || {})}`;
+              const cachedData = cache.get(cacheKey);
+              if (cachedData) {
+                return cachedData.data;
+              }
             }
             throw err;
           });
@@ -452,32 +474,34 @@ export const batchRequests = async (requests) => {
   } catch (error) {
     console.error(`Batch request failed: ${error.message}`);
 
-    // Return partial results if available
-    const partialResults = [];
-    for (const req of requests) {
-      try {
-        const cacheKey = `${req.url}|${JSON.stringify(req.params || {})}`;
-        const cachedData = cache.get(cacheKey);
-        if (cachedData) {
-          partialResults.push(cachedData.data);
+    // Return partial results if available and not forcing refresh
+    if (!forceRefresh) {
+      const partialResults = [];
+      for (const req of requests) {
+        try {
+          const cacheKey = `${req.url}|${JSON.stringify(req.params || {})}`;
+          const cachedData = cache.get(cacheKey);
+          if (cachedData) {
+            partialResults.push(cachedData.data);
+          }
+        } catch (e) {
+          // Skip this item if there's an error
         }
-      } catch (e) {
-        // Skip this item if there's an error
       }
-    }
 
-    if (partialResults.length > 0) {
-      console.log(
-        `Returning ${partialResults.length} cached results after batch failure`
-      );
-      return partialResults;
+      if (partialResults.length > 0) {
+        console.log(
+          `Returning ${partialResults.length} cached results after batch failure`
+        );
+        return partialResults;
+      }
     }
 
     throw new Error(`Batch request failed: ${error.message}`);
   }
 };
 
-// Update the prefetchCriticalData function to include prefetching for ViewFarmer and EditFarmer
+// Update the prefetchCriticalData function to be less aggressive
 export const prefetchCriticalData = () => {
   if (typeof window === "undefined") return;
 
@@ -495,91 +519,6 @@ export const prefetchCriticalData = () => {
 
         // Third priority: Operator data (smaller dataset)
         () => operatorAPI.getAllOperators(1, 10),
-
-        // Fourth priority: Prefetch first few farmers' details for ViewFarmer and EditFarmer
-        async () => {
-          try {
-            // Get the first few farmers
-            const farmersResponse = await farmerAPI.getAllFarmers(1, 5, "", [
-              "farmer_id",
-              "name",
-              "barangay",
-            ]);
-            const farmers = Array.isArray(farmersResponse)
-              ? farmersResponse
-              : farmersResponse.data || [];
-
-            // Prefetch details for each farmer (for ViewFarmer and EditFarmer)
-            if (farmers.length > 0) {
-              // Only prefetch the first 2 farmers to avoid too many requests
-              const farmersToPreload = farmers.slice(0, 2);
-
-              // Prefetch each farmer's details sequentially with small delays
-              for (let i = 0; i < farmersToPreload.length; i++) {
-                const farmer = farmersToPreload[i];
-                // Wait a bit before each prefetch to avoid overwhelming the network
-                await new Promise((resolve) => setTimeout(resolve, 300));
-
-                // Prefetch farmer details
-                farmerAPI
-                  .getFarmerById(farmer.farmer_id)
-                  .catch((err) =>
-                    console.error(
-                      `Prefetch error for farmer ${farmer.farmer_id}:`,
-                      err
-                    )
-                  );
-
-                // Wait a bit before prefetching related data
-                await new Promise((resolve) => setTimeout(resolve, 200));
-
-                // Prefetch livestock records for this farmer
-                livestockAPI
-                  .getAllLivestockRecords()
-                  .catch((err) =>
-                    console.error("Prefetch livestock error:", err)
-                  );
-
-                // Wait a bit before next prefetch
-                await new Promise((resolve) => setTimeout(resolve, 200));
-
-                // Prefetch operator data for this farmer
-                operatorAPI
-                  .getAllOperators()
-                  .catch((err) =>
-                    console.error("Prefetch operators error:", err)
-                  );
-              }
-            }
-            return Promise.resolve();
-          } catch (err) {
-            console.error("Error prefetching farmer details:", err);
-            return Promise.resolve(); // Continue with other prefetch operations
-          }
-        },
-
-        // Fifth priority: More detailed farmer data for specific views
-        () => {
-          // Get the current path to determine what to prefetch
-          const path = window.location.pathname;
-
-          if (path.includes("inventory") || path.includes("analytics")) {
-            // For inventory and analytics pages, prefetch more comprehensive data
-            return Promise.all([
-              farmerAPI.getAllFarmers(1, 20, "", [
-                "farmer_id",
-                "name",
-                "barangay",
-                "crops",
-                "rice",
-              ]),
-              livestockAPI.getAllLivestockRecords(1, 20),
-              operatorAPI.getAllOperators(1, 20),
-            ]);
-          }
-
-          return Promise.resolve();
-        },
       ];
 
       // Execute prefetch operations with a small delay between each
@@ -593,7 +532,7 @@ export const prefetchCriticalData = () => {
             .finally(() => {
               index++;
               // Add a small delay between operations to avoid overwhelming the browser
-              setTimeout(executeNext, 300);
+              setTimeout(executeNext, 500);
             });
         }
       };
@@ -602,12 +541,10 @@ export const prefetchCriticalData = () => {
     } catch (err) {
       console.error("Prefetch error:", err);
     }
-  }, 100);
+  }, 500); // Increased delay to prioritize main content
 };
 
-// Fix the prefetchFarmerDetails function to ensure it doesn't interfere with direct API calls
-
-// Replace the existing prefetchFarmerDetails function with this corrected version
+// Simplified prefetchFarmerDetails function
 export const prefetchFarmerDetails = (farmerId) => {
   if (typeof window === "undefined" || !farmerId) return;
 
@@ -627,46 +564,27 @@ export const prefetchFarmerDetails = (farmerId) => {
       cache.set(cacheKey, { prefetching: true }, 60000); // 1 minute TTL for the prefetch flag
 
       // Prefetch farmer details
-      const farmerResponse = await farmerAPI.getFarmerById(farmerId);
-
-      // If we successfully got the farmer data, update the cache
-      if (farmerResponse) {
-        // Mark this farmer as prefetched
-        cache.set(
-          cacheKey,
-          { prefetched: true, timestamp: Date.now() },
-          CACHE_TTL
-        );
-        console.log(`Successfully prefetched farmer ${farmerId}`);
-
-        // Start prefetching related data in parallel with small delays
-        setTimeout(() => {
-          // Filter livestock records for this farmer
-          livestockAPI
-            .getAllLivestockRecords()
-            .then((response) => {
-              console.log(`Prefetched livestock data for farmer ${farmerId}`);
-            })
-            .catch((err) => console.error("Prefetch livestock error:", err));
-        }, 100);
-
-        setTimeout(() => {
-          // Filter operators for this farmer
-          operatorAPI
-            .getAllOperators()
-            .then((response) => {
-              console.log(`Prefetched operator data for farmer ${farmerId}`);
-            })
-            .catch((err) => console.error("Prefetch operators error:", err));
-        }, 200);
-      }
+      farmerAPI
+        .getFarmerById(farmerId)
+        .then(() => {
+          // Mark this farmer as prefetched
+          cache.set(
+            cacheKey,
+            { prefetched: true, timestamp: Date.now() },
+            CACHE_TTL
+          );
+          console.log(`Successfully prefetched farmer ${farmerId}`);
+        })
+        .catch((err) => {
+          console.error(`Prefetch error for farmer ${farmerId}:`, err);
+        });
     } catch (err) {
       console.error(`Prefetch error for farmer ${farmerId}:`, err);
     }
-  }, 50); // Start very quickly after the request
+  }, 100);
 };
 
-// Add a function to prefetch data based on the current route
+// Simplified prefetchRouteData function
 export const prefetchRouteData = (route) => {
   if (typeof window === "undefined") return;
 
@@ -675,33 +593,12 @@ export const prefetchRouteData = (route) => {
       switch (route) {
         case "/dashboard":
           // Prefetch data needed for dashboard
-          farmerAPI.getAllFarmers(1, 20, "", [
-            "farmer_id",
-            "name",
-            "barangay",
-            "crops",
-            "rice",
-          ]);
-          livestockAPI.getAllLivestockRecords(1, 20);
-          operatorAPI.getAllOperators(1, 20);
+          farmerAPI.getAllFarmers(1, 10, "", ["farmer_id", "name", "barangay"]);
           break;
 
         case "/analytics":
           // Prefetch data needed for analytics
-          farmerAPI.getAllFarmers(1, 50, "", [
-            "farmer_id",
-            "name",
-            "barangay",
-            "crops",
-            "rice",
-          ]);
-          livestockAPI.getAllLivestockRecords(1, 50);
-          operatorAPI.getAllOperators(1, 50);
-          break;
-
-        case "/inventory":
-          // Prefetch data needed for inventory
-          farmerAPI.getAllFarmers(1, 30, "", ["farmer_id", "name", "barangay"]);
+          farmerAPI.getAllFarmers(1, 10, "", ["farmer_id", "name", "barangay"]);
           break;
 
         default:
@@ -712,11 +609,13 @@ export const prefetchRouteData = (route) => {
     } catch (err) {
       console.error("Route-based prefetch error:", err);
     }
-  }, 200);
+  }, 500);
 };
 
-// Call prefetch immediately
-prefetchCriticalData();
+// Call prefetch immediately but with a delay
+setTimeout(() => {
+  prefetchCriticalData();
+}, 1000);
 
 // Optimized cache invalidation helper
 const invalidateCache = (pattern) => {
@@ -731,38 +630,42 @@ const invalidateCache = (pattern) => {
 // User Management API endpoints
 export const userAPI = {
   // Get all users with pagination and search
-  getAllUsers: async () => {
+  getAllUsers: async (forceRefresh = false) => {
     const cacheKey = `users`;
 
     return fetchWithFastLoading(
       cacheKey,
       async () => {
         try {
-          const response = await apiClient.get(`/usermanagement/data`);
+          const response = await apiClient.get(`/usermanagement/data`, {
+            forceRefresh,
+          });
           return response.data;
         } catch (error) {
           throw new Error(`Failed to fetch users: ${error.message}`);
         }
       },
-      { ttl: CACHE_TTL_CRITICAL }
+      { ttl: CACHE_TTL_CRITICAL, forceRefresh }
     );
   },
 
   // Get current user info
-  getCurrentUser: async () => {
+  getCurrentUser: async (forceRefresh = false) => {
     const cacheKey = `current-user`;
 
     return fetchWithFastLoading(
       cacheKey,
       async () => {
         try {
-          const response = await apiClient.get(`/user`);
+          const response = await apiClient.get(`/user`, {
+            forceRefresh,
+          });
           return response.data;
         } catch (error) {
           throw new Error(`Failed to fetch current user: ${error.message}`);
         }
       },
-      { ttl: CACHE_TTL_CRITICAL }
+      { ttl: CACHE_TTL_CRITICAL, forceRefresh }
     );
   },
 
@@ -811,7 +714,13 @@ export const userAPI = {
 // Farmer API endpoints
 export const farmerAPI = {
   // Get all farmers with pagination and search
-  getAllFarmers: async (page = 1, perPage = 10, search = "", fields = []) => {
+  getAllFarmers: async (
+    page = 1,
+    perPage = 10,
+    search = "",
+    fields = [],
+    forceRefresh = false
+  ) => {
     const cacheKey = `farmers|${page}|${perPage}|${search}|${fields.join(",")}`;
 
     return fetchWithFastLoading(
@@ -832,18 +741,23 @@ export const farmerAPI = {
         }
 
         try {
-          const response = await apiClient.get(`/farmers?${params.toString()}`);
+          const response = await apiClient.get(
+            `/farmers?${params.toString()}`,
+            {
+              forceRefresh,
+            }
+          );
           return response.data;
         } catch (error) {
           throw new Error(`Failed to fetch farmers: ${error.message}`);
         }
       },
-      { ttl: CACHE_TTL_CRITICAL }
+      { ttl: CACHE_TTL_CRITICAL, forceRefresh }
     );
   },
 
   // Get a single farmer by ID with optimized fallback
-  getFarmerById: async (farmerId) => {
+  getFarmerById: async (farmerId, forceRefresh = false) => {
     const cacheKey = `farmer|${farmerId}`;
 
     return fetchWithFastLoading(
@@ -852,7 +766,9 @@ export const farmerAPI = {
         try {
           // Try to directly get the farmer by ID first
           try {
-            const response = await apiClient.get(`/farmers/${farmerId}`);
+            const response = await apiClient.get(`/farmers/${farmerId}`, {
+              forceRefresh,
+            });
             return response.data;
           } catch (directError) {
             // If direct access fails, try to get all farmers and filter
@@ -866,6 +782,7 @@ export const farmerAPI = {
                 fields: "farmer_id,name,first_name,last_name,barangay",
                 page: -1, // Signal to backend to return all records without pagination
               },
+              forceRefresh,
             });
 
             // Check if response.data is an array
@@ -892,7 +809,7 @@ export const farmerAPI = {
           throw new Error(`Failed to fetch farmer details: ${error.message}`);
         }
       },
-      { ttl: CACHE_TTL_CRITICAL }
+      { ttl: CACHE_TTL_CRITICAL, forceRefresh }
     );
   },
 
@@ -1026,7 +943,12 @@ export const farmerAPI = {
 // Livestock API endpoints
 export const livestockAPI = {
   // Get all livestock records with pagination and search
-  getAllLivestockRecords: async (page = 1, perPage = 10, search = "") => {
+  getAllLivestockRecords: async (
+    page = 1,
+    perPage = 10,
+    search = "",
+    forceRefresh = false
+  ) => {
     const cacheKey = `livestock|${page}|${perPage}|${search}`;
 
     return fetchWithFastLoading(
@@ -1043,7 +965,8 @@ export const livestockAPI = {
 
         try {
           const response = await apiClient.get(
-            `/livestock-records?${params.toString()}`
+            `/livestock-records?${params.toString()}`,
+            { forceRefresh }
           );
           return response.data;
         } catch (error) {
@@ -1052,12 +975,12 @@ export const livestockAPI = {
           );
         }
       },
-      { ttl: CACHE_TTL_CRITICAL }
+      { ttl: CACHE_TTL_CRITICAL, forceRefresh }
     );
   },
 
   // Get a single livestock record by ID
-  getLivestockRecordById: async (recordId) => {
+  getLivestockRecordById: async (recordId, forceRefresh = false) => {
     const cacheKey = `livestock-record|${recordId}`;
 
     return fetchWithFastLoading(
@@ -1065,7 +988,8 @@ export const livestockAPI = {
       async () => {
         try {
           const response = await apiClient.get(
-            `/livestock-records/${recordId}`
+            `/livestock-records/${recordId}`,
+            { forceRefresh }
           );
           return response.data;
         } catch (error) {
@@ -1074,7 +998,7 @@ export const livestockAPI = {
           );
         }
       },
-      { ttl: CACHE_TTL_CRITICAL }
+      { ttl: CACHE_TTL_CRITICAL, forceRefresh }
     );
   },
 
@@ -1145,7 +1069,12 @@ export const livestockAPI = {
 // Operator API endpoints
 export const operatorAPI = {
   // Get all operators with pagination and search
-  getAllOperators: async (page = 1, perPage = 10, search = "") => {
+  getAllOperators: async (
+    page = 1,
+    perPage = 10,
+    search = "",
+    forceRefresh = false
+  ) => {
     const cacheKey = `operators|${page}|${perPage}|${search}`;
 
     return fetchWithFastLoading(
@@ -1162,32 +1091,35 @@ export const operatorAPI = {
 
         try {
           const response = await apiClient.get(
-            `/operators?${params.toString()}`
+            `/operators?${params.toString()}`,
+            { forceRefresh }
           );
           return response.data;
         } catch (error) {
           throw new Error(`Failed to fetch operators: ${error.message}`);
         }
       },
-      { ttl: CACHE_TTL_CRITICAL }
+      { ttl: CACHE_TTL_CRITICAL, forceRefresh }
     );
   },
 
   // Get a single operator by ID
-  getOperatorById: async (operatorId) => {
+  getOperatorById: async (operatorId, forceRefresh = false) => {
     const cacheKey = `operator|${operatorId}`;
 
     return fetchWithFastLoading(
       cacheKey,
       async () => {
         try {
-          const response = await apiClient.get(`/operators/${operatorId}`);
+          const response = await apiClient.get(`/operators/${operatorId}`, {
+            forceRefresh,
+          });
           return response.data;
         } catch (error) {
           throw new Error(`Failed to fetch operator details: ${error.message}`);
         }
       },
-      { ttl: CACHE_TTL_CRITICAL }
+      { ttl: CACHE_TTL_CRITICAL, forceRefresh }
     );
   },
 
