@@ -24,6 +24,7 @@ import {
 import Highlighter from "react-highlight-words";
 import EditFarmer from "./inventory/EditFarmer";
 import ViewFarmer from "./inventory/ViewFarmer";
+import { exportDataToExcel } from "./utils/excel-export";
 
 // Custom MilkIcon component since it's not in lucide-react
 const MilkIcon = (props) => (
@@ -67,6 +68,7 @@ const Inventory = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [currentItem, setCurrentItem] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+  const [isEditLoading, setIsEditLoading] = useState(false);
 
   // Filters
   const [barangayFilter, setBarangayFilter] = useState("");
@@ -554,6 +556,14 @@ const Inventory = () => {
                     }`.trim()
                   : "Unknown",
                 barangay: farmer ? farmer.barangay : "Unknown",
+                operational_status:
+                  operator.operational_status || operator.remarks || "N/A",
+                fishpond_location: operator.fishpond_location || "N/A",
+                cultured_species: operator.cultured_species || "N/A",
+                productive_area_sqm:
+                  operator.productive_area_sqm || operator.area || "N/A",
+                production_kg:
+                  operator.production_kg || operator.production || "N/A",
               };
             });
 
@@ -906,13 +916,14 @@ const Inventory = () => {
     setCurrentItem(record);
     setIsViewMode(true);
 
-    // Fetch fresh farmer details
-    if (record && record.farmer_id) {
-      // Always fetch fresh data when viewing a farmer
+    // If we have a farmer_id but not complete data, fetch in the background
+    if (record && record.farmer_id && !record.crops) {
+      // Fetch fresh farmer details in the background
       farmerAPI
         .getFarmerById(record.farmer_id, { forceRefresh: true })
-        .then((data) => {
-          console.log("Successfully fetched fresh farmer details for viewing");
+        .then((freshData) => {
+          // Update the current item with fresh data
+          setCurrentItem(freshData);
         })
         .catch((err) => {
           console.error("Error fetching farmer details for viewing:", err);
@@ -920,34 +931,27 @@ const Inventory = () => {
     }
   }, []);
 
+  // Modify the handleEdit function to match the handleView pattern
   const handleEdit = useCallback((record) => {
-    // Fetch fresh data before editing
-    if (record && record.farmer_id) {
-      // Set loading state to indicate data is being refreshed
-      setLoading(true);
+    // Set the current item first and immediately transition to edit mode
+    setCurrentItem(record);
+    setIsEditMode(true);
 
+    // If we have a farmer_id but not complete data, fetch in the background
+    if (record && record.farmer_id && !record.crops) {
+      // Fetch fresh farmer details in the background without blocking UI
       farmerAPI
         .getFarmerById(record.farmer_id, { forceRefresh: true })
         .then((freshData) => {
-          // Set the updated data as current item
+          // Update the current item with fresh data
           setCurrentItem(freshData);
-          setIsEditMode(true);
-          setLoading(false);
         })
         .catch((err) => {
           console.error(
             "Error fetching fresh farmer details for editing:",
             err
           );
-          // Fall back to existing data if refresh fails
-          setCurrentItem(record);
-          setIsEditMode(true);
-          setLoading(false);
         });
-    } else {
-      // For non-farmer records, use the existing data
-      setCurrentItem(record);
-      setIsEditMode(true);
     }
   }, []);
 
@@ -1017,195 +1021,46 @@ const Inventory = () => {
     setCurrentPage(1);
   }, []);
 
-  // Export to Excel function - memoized with useCallback
-  const exportToExcel = useCallback(() => {
+  // Export to Excel function using the separated utility
+  const handleExportToExcel = useCallback(async () => {
     if (selectedDataType === "farmers") return; // Skip export for farmers
 
     // Show loading state
     setLoading(true);
 
     try {
-      // Create a workbook with a worksheet
-      const workbook = new window.ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet(selectedDataType);
-
-      // Define columns based on data type
-      let columns = [];
-
-      switch (selectedDataType) {
-        case "crops":
-          columns = [
-            { header: "Crop Type", key: "crop_type" },
-            { header: "Crop", key: "crop_value" },
-            { header: "Area (ha)", key: "area_hectare" },
-            { header: "Quantity", key: "quantity" },
-            { header: "Farmer", key: "farmer_name" },
-            { header: "Barangay", key: "barangay" },
-            { header: "Date Recorded", key: "created_at" },
-          ];
-          break;
-
-        case "highValueCrops":
-          columns = [
-            { header: "Crop", key: "crop_value" },
-            { header: "Variety/Clone", key: "variety_clone" },
-            { header: "Month", key: "month" },
-            { header: "Area (ha)", key: "area_hectare" },
-            { header: "Quantity", key: "quantity" },
-            { header: "Farmer", key: "farmer_name" },
-            { header: "Barangay", key: "barangay" },
-            { header: "Date Recorded", key: "created_at" },
-          ];
-          break;
-
-        case "rice":
-          columns = [
-            { header: "Area Type", key: "area_type" },
-            { header: "Seed Type", key: "seed_type" },
-            { header: "Area (ha)", key: "area_harvested" },
-            { header: "Production", key: "production" },
-            { header: "Farmer", key: "farmer_name" },
-            { header: "Barangay", key: "barangay" },
-            { header: "Date Recorded", key: "created_at" },
-          ];
-          break;
-
-        case "livestock":
-          columns = [
-            { header: "Animal Type", key: "animal_type" },
-            { header: "Subcategory", key: "subcategory" },
-            { header: "Quantity", key: "quantity" },
-            { header: "Farmer", key: "farmer_name" },
-            { header: "Barangay", key: "barangay" },
-            { header: "Date Recorded", key: "created_at" },
-          ];
-          break;
-
-        case "operators":
-          columns = [
-            { header: "Location", key: "fishpond_location" },
-            { header: "Species", key: "cultured_species" },
-            { header: "Area (sqm)", key: "productive_area_sqm" },
-            { header: "Production (kg)", key: "production_kg" },
-            { header: "Status", key: "operational_status" },
-            { header: "Farmer", key: "farmer_name" },
-            { header: "Barangay", key: "barangay" },
-            { header: "Date Recorded", key: "created_at" },
-          ];
-          break;
-
-        default:
-          break;
-      }
-
-      // Set the columns
-      worksheet.columns = columns;
-
-      // Process data for export
-      const dataToExport = allData.map((item) => {
-        // Create a new object with processed values
-        const processedItem = { ...item };
-
-        // Format date fields
-        if (processedItem.created_at) {
-          processedItem.created_at = new Date(
-            processedItem.created_at
-          ).toLocaleDateString();
-        }
-
-        // Process production_data for crops and highValueCrops
-        if (
-          (selectedDataType === "crops" ||
-            selectedDataType === "highValueCrops") &&
-          processedItem.production_data
-        ) {
-          const productionData = parseProductionData(processedItem);
-          processedItem.crop_value =
-            productionData.crop || processedItem.crop_value || "";
-          processedItem.quantity =
-            productionData.quantity || processedItem.quantity || "";
-
-          if (selectedDataType === "highValueCrops") {
-            processedItem.month =
-              productionData.month || processedItem.month || "";
-          }
-        }
-
-        // Format numeric fields
-        if (processedItem.area_hectare) {
-          processedItem.area_hectare = Number.parseFloat(
-            processedItem.area_hectare
-          ).toFixed(2);
-        }
-
-        if (processedItem.area_harvested) {
-          processedItem.area_harvested = Number.parseFloat(
-            processedItem.area_harvested
-          ).toFixed(2);
-        }
-
-        if (processedItem.production) {
-          processedItem.production = Number.parseFloat(
-            processedItem.production
-          ).toFixed(2);
-        }
-
-        return processedItem;
-      });
-
-      // Add rows to the worksheet
-      worksheet.addRows(dataToExport);
-
-      // Style the header row
-      worksheet.getRow(1).font = { bold: true };
-      worksheet.getRow(1).fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FFE6F5E4" },
-      };
-
-      // Auto-size columns
-      worksheet.columns.forEach((column) => {
-        let maxLength = 0;
-        column.eachCell({ includeEmpty: true }, (cell) => {
-          const columnLength = cell.value ? cell.value.toString().length : 10;
-          if (columnLength > maxLength) {
-            maxLength = columnLength;
-          }
-        });
-        column.width = Math.min(maxLength + 2, 30);
-      });
-
-      // Generate Excel file
-      workbook.xlsx.writeBuffer().then((buffer) => {
-        // Create a blob from the buffer
-        const blob = new Blob([buffer], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-
-        // Create a download link
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${selectedDataType}_${
-          new Date().toISOString().split("T")[0]
-        }.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-
-        // Clean up
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-
-        showToast(`${selectedDataType} data exported successfully`, "success");
-      });
-    } catch (error) {
-      console.error("Error exporting to Excel:", error);
-      showToast(`Failed to export data: ${error.message}`, "error");
+      await exportDataToExcel(
+        selectedDataType,
+        allData,
+        barangayFilter,
+        monthFilter,
+        yearFilter,
+        monthOptions,
+        showToast
+      );
     } finally {
       setLoading(false);
     }
-  }, [allData, parseProductionData, selectedDataType, showToast]);
+  }, [
+    allData,
+    selectedDataType,
+    barangayFilter,
+    monthFilter,
+    yearFilter,
+    monthOptions,
+    showToast,
+  ]);
+
+  // Function to determine the export button text
+  const getExportButtonText = useCallback(() => {
+    if (loading) {
+      return "Exporting...";
+    } else if (allData.length === 0) {
+      return "No Data to Export";
+    } else {
+      return "Export to Excel";
+    }
+  }, [loading, allData.length]);
 
   // Render table columns based on selected data type - memoized with useCallback
   const renderTableColumns = useCallback(() => {
@@ -1358,7 +1213,7 @@ const Inventory = () => {
               Production (kg)
             </th>
             <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
-              Status
+              Remarks
             </th>
             <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Farmer
@@ -1729,7 +1584,8 @@ const Inventory = () => {
             <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <span
                 className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-md ${
-                  operator.operational_status === "Active"
+                  operator.operational_status === "Active" ||
+                  operator.operational_status === "operational"
                     ? "bg-green-100 text-green-800"
                     : "bg-gray-100 text-gray-800"
                 }`}
@@ -1984,12 +1840,12 @@ const Inventory = () => {
 
               {selectedDataType !== "farmers" && (
                 <button
-                  onClick={exportToExcel}
+                  onClick={handleExportToExcel}
                   disabled={loading || allData.length === 0}
                   className="inline-flex items-center px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium bg-[#5A8C79] text-white hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <FileDown className="w-3.5 h-3.5 mr-1" />
-                  Export to Excel
+                  {getExportButtonText()}
                 </button>
               )}
             </div>
@@ -1999,7 +1855,7 @@ const Inventory = () => {
           {showFilters && (
             <div className="p-2 mb-3 bg-white border border-gray-200 rounded-md shadow-sm">
               <div className="grid grid-cols-1 gap-1 sm:grid-cols-3">
-                {/* Barangay Filter */}
+                {/* Barangay Filter - Always shown */}
                 <div className="space-y-1">
                   <label className="block text-xs font-medium text-gray-700">
                     Barangay
@@ -2025,57 +1881,61 @@ const Inventory = () => {
                   </div>
                 </div>
 
-                {/* Month Filter */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-medium text-gray-700">
-                    Month
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={monthFilter}
-                      onChange={(e) =>
-                        handleFilterChange("month", e.target.value)
-                      }
-                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89] appearance-none bg-white pr-6"
-                    >
-                      <option value="">All</option>
-                      {monthOptions.map((month) => (
-                        <option key={month.value} value={month.value}>
-                          {month.label}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-1 pointer-events-none">
-                      <ChevronDownIcon className="w-3.5 h-3.5 text-gray-500" />
+                {/* Month Filter - Only shown for non-farmer data types */}
+                {selectedDataType !== "farmers" && (
+                  <div className="space-y-1">
+                    <label className="block text-xs font-medium text-gray-700">
+                      Month
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={monthFilter}
+                        onChange={(e) =>
+                          handleFilterChange("month", e.target.value)
+                        }
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89] appearance-none bg-white pr-6"
+                      >
+                        <option value="">All</option>
+                        {monthOptions.map((month) => (
+                          <option key={month.value} value={month.value}>
+                            {month.label}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-1 pointer-events-none">
+                        <ChevronDownIcon className="w-3.5 h-3.5 text-gray-500" />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
-                {/* Year Filter */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-medium text-gray-700">
-                    Year
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={yearFilter}
-                      onChange={(e) =>
-                        handleFilterChange("year", e.target.value)
-                      }
-                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89] appearance-none bg-white pr-6"
-                    >
-                      <option value="">All</option>
-                      {yearOptions.map((year) => (
-                        <option key={year} value={year.toString()}>
-                          {year}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-1 pointer-events-none">
-                      <ChevronDownIcon className="w-3.5 h-3.5 text-gray-500" />
+                {/* Year Filter - Only shown for non-farmer data types */}
+                {selectedDataType !== "farmers" && (
+                  <div className="space-y-1">
+                    <label className="block text-xs font-medium text-gray-700">
+                      Year
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={yearFilter}
+                        onChange={(e) =>
+                          handleFilterChange("year", e.target.value)
+                        }
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89] appearance-none bg-white pr-6"
+                      >
+                        <option value="">All</option>
+                        {yearOptions.map((year) => (
+                          <option key={year} value={year.toString()}>
+                            {year}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-1 pointer-events-none">
+                        <ChevronDownIcon className="w-3.5 h-3.5 text-gray-500" />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Active Filters Display */}
@@ -2092,7 +1952,7 @@ const Inventory = () => {
                       </button>
                     </span>
                   )}
-                  {monthFilter && (
+                  {monthFilter && selectedDataType !== "farmers" && (
                     <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[#E6F5E4] text-[#6A9C89] rounded-md">
                       {monthOptions.find((m) => m.value === monthFilter)?.label}
                       <button
@@ -2103,7 +1963,7 @@ const Inventory = () => {
                       </button>
                     </span>
                   )}
-                  {yearFilter && (
+                  {yearFilter && selectedDataType !== "farmers" && (
                     <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[#E6F5E4] text-[#6A9C89] rounded-md">
                       {yearFilter}
                       <button

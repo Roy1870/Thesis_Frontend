@@ -38,9 +38,28 @@ import {
   Bar,
 } from "recharts";
 
+// At the top of the file, import or create a shared state management solution
+import { create } from "zustand";
+
+// Create a store to manage shared state across components
+const useRefreshStore = create((set) => ({
+  isRefreshing: false,
+  lastRefresh: new Date(),
+  setRefreshing: (isRefreshing) => set({ isRefreshing }),
+  setLastRefresh: (lastRefresh) => set({ lastRefresh }),
+}));
+
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
-  const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
+  // REPLACE these lines:
+  // const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
+  // const [lastRefresh, setLastRefresh] = useState(new Date());
+
+  // WITH:
+  const { isRefreshing, lastRefresh, setRefreshing, setLastRefresh } =
+    useRefreshStore();
+  // Use isRefreshing instead of isBackgroundRefreshing in your component
+  // And replace all instances of setIsBackgroundRefreshing with setRefreshing
   const [error, setError] = useState(null);
   const [rawData, setRawData] = useState({
     farmers: [],
@@ -92,7 +111,97 @@ export default function Dashboard() {
       },
     },
   });
-  const [lastRefresh, setLastRefresh] = useState(new Date());
+
+  // Add this state variable near the other state declarations
+  const [selectedDataType, setSelectedDataType] = useState("Total");
+  const [currentBarangayDataIndex, setCurrentBarangayDataIndex] = useState(0);
+
+  // Add this new function to the component to get data by type:
+  const getBarangayDataByType = useCallback(
+    (dataType) => {
+      // If no data is available, return empty array
+      if (!rawData || Object.values(rawData).every((arr) => arr.length === 0)) {
+        return [];
+      }
+
+      const barangayMap = {};
+
+      // Helper function to add data to the barangay map
+      const addToBarangayMap = (item, value, barangay) => {
+        if (isNaN(value) || value <= 0) return;
+
+        barangay = barangay || item.barangay || "Unknown";
+
+        if (!barangayMap[barangay]) {
+          barangayMap[barangay] = 0;
+        }
+
+        barangayMap[barangay] += value;
+      };
+
+      // Process data based on selected type
+      if (dataType === "Total" || dataType === "Livestock") {
+        // Add livestock data
+        rawData.livestock.forEach((livestock) => {
+          const quantity = Number.parseInt(livestock.quantity || 0);
+          if (dataType === "Total" || dataType === "Livestock") {
+            addToBarangayMap(livestock, quantity, livestock.barangay);
+          }
+        });
+      }
+
+      if (dataType === "Total" || dataType === "Rice") {
+        // Add rice data
+        rawData.rice.forEach((rice) => {
+          const production = Number.parseFloat(
+            rice.production || rice.yield_amount || 0
+          );
+          if (dataType === "Total" || dataType === "Rice") {
+            addToBarangayMap(rice, production, rice.barangay);
+          }
+        });
+      }
+
+      if (dataType === "Total" || dataType === "Crops") {
+        // Add crops data (including high value crops)
+        rawData.crops.forEach((crop) => {
+          const production = Number.parseFloat(
+            crop.yield_amount || crop.production || crop.quantity || 0
+          );
+          if (dataType === "Total" || dataType === "Crops") {
+            addToBarangayMap(crop, production, crop.barangay);
+          }
+        });
+
+        // Add high value crops
+        rawData.highValueCrops.forEach((crop) => {
+          const production = Number.parseFloat(
+            crop.yield_amount || crop.production || crop.quantity || 0
+          );
+          if (dataType === "Total" || dataType === "Crops") {
+            addToBarangayMap(crop, production, crop.barangay);
+          }
+        });
+      }
+
+      if (dataType === "Total" || dataType === "Fish") {
+        // Add fish data from operators
+        rawData.operators.forEach((operator) => {
+          const production = Number.parseFloat(operator.production_kg || 0);
+          if (dataType === "Total" || dataType === "Fish") {
+            addToBarangayMap(operator, production, operator.barangay);
+          }
+        });
+      }
+
+      // Convert to array format for chart
+      return Object.entries(barangayMap)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8); // Top 8 barangays
+    },
+    [rawData]
+  );
 
   // Ref for cleanup
   const abortControllerRef = useRef(null);
@@ -188,7 +297,7 @@ export default function Dashboard() {
     // Set up polling interval to check for new data
     const pollInterval = setInterval(() => {
       // Only poll if not already refreshing
-      if (!isBackgroundRefreshing) {
+      if (!isRefreshing) {
         // Create a new AbortController for this request
         if (abortControllerRef.current) {
           abortControllerRef.current.abort();
@@ -197,7 +306,7 @@ export default function Dashboard() {
         const signal = abortControllerRef.current.signal;
 
         // Set background refreshing state
-        setIsBackgroundRefreshing(true);
+        setRefreshing(true);
 
         // Fetch fresh data
         fetchAllData(signal, true)
@@ -212,7 +321,7 @@ export default function Dashboard() {
             }
           })
           .finally(() => {
-            setIsBackgroundRefreshing(false);
+            setRefreshing(false);
           });
       }
     }, 60000); // Poll every 60 seconds
@@ -220,20 +329,22 @@ export default function Dashboard() {
     return () => {
       clearInterval(pollInterval);
     };
-  }, [isBackgroundRefreshing]);
+  }, [isRefreshing, setRefreshing, setLastRefresh]);
 
   // Fetch all data using optimized approach with signal for cancellation
   const fetchAllData = async (signal, forceRefresh = false) => {
     try {
-      // Only show full loading state when there's no data yet
+      // Check if this is an initial load (no data yet)
       const isInitialLoad = Object.values(rawData).every(
         (arr) => arr.length === 0
       );
+
+      // Only show full loading state when there's no data yet
       if (isInitialLoad) {
         setLoading(true);
       } else {
         // For subsequent loads, use background refreshing
-        setIsBackgroundRefreshing(true);
+        setRefreshing(true);
       }
 
       setError(null);
@@ -392,7 +503,7 @@ export default function Dashboard() {
 
       // Always turn off loading states when done
       setLoading(false);
-      setIsBackgroundRefreshing(false);
+      setRefreshing(false);
 
       // Update last refresh timestamp
       setLastRefresh(new Date());
@@ -401,8 +512,18 @@ export default function Dashboard() {
       if (error.name !== "AbortError") {
         console.error("Error fetching data:", error);
         setError(error.message);
-        setLoading(false);
-        setIsBackgroundRefreshing(false);
+
+        // Check if this is an initial load (no data yet)
+        const isInitialLoad = Object.values(rawData).every(
+          (arr) => arr.length === 0
+        );
+
+        // Reset the appropriate loading state
+        if (isInitialLoad) {
+          setLoading(false);
+        } else {
+          setRefreshing(false);
+        }
       }
     }
   };
@@ -410,7 +531,7 @@ export default function Dashboard() {
   // Add a function to handle real-time updates from API changes
   const handleDataChange = useCallback(() => {
     // Only refresh if not already refreshing
-    if (!isBackgroundRefreshing) {
+    if (!isRefreshing) {
       // Create a new AbortController for this request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -419,25 +540,23 @@ export default function Dashboard() {
       const signal = abortControllerRef.current.signal;
 
       // Set background refreshing state
-      setIsBackgroundRefreshing(true);
+      setRefreshing(true);
 
-      // Fetch fresh data
+      // Fetch fresh data with explicit background refresh flag
       fetchAllData(signal, true)
         .then(() => {
-          // Update last refresh timestamp
           setLastRefresh(new Date());
         })
         .catch((err) => {
-          // Only log error if not an abort error
           if (err.name !== "AbortError") {
             console.error("Error during data change refresh:", err);
           }
         })
         .finally(() => {
-          setIsBackgroundRefreshing(false);
+          setRefreshing(false);
         });
     }
-  }, [isBackgroundRefreshing]);
+  }, [isRefreshing, setRefreshing, setLastRefresh]);
 
   // Process all data for dashboard - memoized to prevent unnecessary recalculations
   const processData = useCallback(() => {
@@ -1438,7 +1557,7 @@ export default function Dashboard() {
     return productionData;
   }, []);
 
-  if (loading) {
+  if (loading && Object.values(rawData).every((arr) => arr.length === 0)) {
     return (
       <div className="p-5 bg-[#F5F7F9] min-h-screen overflow-y-auto">
         {/* Dashboard Header Skeleton */}
@@ -1640,7 +1759,7 @@ export default function Dashboard() {
         </div>
 
         {/* Background refresh indicator */}
-        {isBackgroundRefreshing && (
+        {isRefreshing && (
           <div className="inline-flex items-center p-2 mt-2 ml-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-md">
             <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" />
             <span>Updating data...</span>
@@ -2080,14 +2199,82 @@ export default function Dashboard() {
 
       {/* Barangay Production Distribution */}
       <div className="p-6 mb-8 bg-white border border-gray-100 shadow-md rounded-xl">
-        <h4 className="mb-6 text-lg font-semibold text-gray-800">
-          Production by Barangay
-        </h4>
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-lg font-semibold text-gray-800">
+            Production by Barangay
+          </h4>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => {
+                const dataTypes = [
+                  "Total",
+                  "Livestock",
+                  "Rice",
+                  "Crops",
+                  "Fish",
+                ];
+                const currentIndex = dataTypes.indexOf(selectedDataType);
+                const prevIndex =
+                  (currentIndex - 1 + dataTypes.length) % dataTypes.length;
+                setSelectedDataType(dataTypes[prevIndex]);
+              }}
+              className="p-1 text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200"
+              aria-label="Previous data type"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </button>
+            <span className="px-3 py-1 text-sm font-medium text-white bg-[#6A9C89] rounded-full">
+              {selectedDataType} Production
+            </span>
+            <button
+              onClick={() => {
+                const dataTypes = [
+                  "Total",
+                  "Livestock",
+                  "Rice",
+                  "Crops",
+                  "Fish",
+                ];
+                const currentIndex = dataTypes.indexOf(selectedDataType);
+                const nextIndex = (currentIndex + 1) % dataTypes.length;
+                setSelectedDataType(dataTypes[nextIndex]);
+              }}
+              className="p-1 text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200"
+              aria-label="Next data type"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </button>
+          </div>
+        </div>
         {dashboardData.productionByBarangay.length > 0 ? (
           <div className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={dashboardData.productionByBarangay}
+                data={getBarangayDataByType(selectedDataType)}
                 margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
                 barSize={40}
               >
@@ -2110,7 +2297,9 @@ export default function Dashboard() {
                 />
                 <Tooltip
                   formatter={(value) => [
-                    `${formatNumber(value.toFixed(2))} units`,
+                    `${formatNumber(value.toFixed(2))} ${
+                      selectedDataType === "Livestock" ? "heads" : "tons"
+                    }`,
                     "Production",
                   ]}
                   contentStyle={{
@@ -2123,18 +2312,22 @@ export default function Dashboard() {
                 <Legend />
                 <Bar
                   dataKey="value"
-                  name="Production (units)"
+                  name={`${selectedDataType} Production ${
+                    selectedDataType === "Livestock" ? "(heads)" : "(tons)"
+                  }`}
                   fill={colors.primary}
                   radius={[4, 4, 0, 0]}
                 >
-                  {dashboardData.productionByBarangay.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={
-                        index % 2 === 0 ? colors.primary : colors.primaryLight
-                      }
-                    />
-                  ))}
+                  {getBarangayDataByType(selectedDataType).map(
+                    (entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={
+                          index % 2 === 0 ? colors.primary : colors.primaryLight
+                        }
+                      />
+                    )
+                  )}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

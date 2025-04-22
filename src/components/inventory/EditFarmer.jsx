@@ -47,7 +47,14 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
     try {
       setFetchLoading(true);
 
-      const response = await farmerAPI.getFarmerById(farmer.farmer_id);
+      // Use the farmer data passed from inventory instead of fetching it again
+      let response = farmer;
+
+      // If we have a complete farmer object with all details, use it directly
+      if (!farmer.crops && farmer.farmer_id) {
+        // Only fetch if we don't have complete data
+        response = await farmerAPI.getFarmerById(farmer.farmer_id);
+      }
 
       // Process the crops data to extract JSON values
       if (response.crops && response.crops.length > 0) {
@@ -97,13 +104,20 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
       setError(`Failed to fetch farmer details: ${err.message}`);
       setFetchLoading(false);
     }
-  }, [farmer.farmer_id]);
+  }, [farmer]);
 
   const fetchLivestockRecords = useCallback(async () => {
     try {
       // Only show loading on initial fetch, not on refreshes
       if (livestockRecords.length === 0) {
         setLivestockLoading(true);
+      }
+
+      // Check if livestock data is already available in the farmer object
+      if (farmer.livestockRecords && farmer.livestockRecords.length > 0) {
+        setLivestockRecords(farmer.livestockRecords);
+        setLivestockLoading(false);
+        return;
       }
 
       // Get all livestock records
@@ -118,13 +132,20 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
       console.error("Error fetching livestock records:", err);
       setLivestockLoading(false);
     }
-  }, [farmer.farmer_id, livestockRecords.length]);
+  }, [farmer, livestockRecords.length]);
 
   const fetchOperatorData = useCallback(async () => {
     try {
       // Only show loading on initial fetch, not on refreshes
       if (operatorData.length === 0) {
         setOperatorLoading(true);
+      }
+
+      // Check if operator data is already available in the farmer object
+      if (farmer.operatorData && farmer.operatorData.length > 0) {
+        setOperatorData(farmer.operatorData);
+        setOperatorLoading(false);
+        return;
       }
 
       // Get all operators
@@ -141,7 +162,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
       console.error("Error fetching operator data:", err);
       setOperatorLoading(false);
     }
-  }, [farmer.farmer_id, operatorData.length]);
+  }, [farmer, operatorData.length]);
 
   useEffect(() => {
     fetchFarmerDetails();

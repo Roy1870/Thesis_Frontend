@@ -8,11 +8,26 @@ import {
   prefetchRouteData,
 } from "./services/api";
 import { ChevronDown, RefreshCw } from "lucide-react";
+// At the top of the file, import the same store
+import { create } from "zustand";
+
+// Create or import the same store (if in a separate file)
+const useRefreshStore = create((set) => ({
+  isRefreshing: false,
+  lastRefresh: new Date(),
+  setRefreshing: (isRefreshing) => set({ isRefreshing }),
+  setLastRefresh: (lastRefresh) => set({ lastRefresh }),
+}));
 
 function Analytics() {
   const [loading, setLoading] = useState(false);
-  const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
-  const [lastRefreshed, setLastRefreshed] = useState(null);
+  // REPLACE these lines:
+  // const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
+  // const [lastRefreshed, setLastRefreshed] = useState(null);
+
+  // WITH:
+  const { isRefreshing, lastRefresh, setRefreshing, setLastRefresh } =
+    useRefreshStore();
   const [currentCategory, setCurrentCategory] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({
@@ -293,7 +308,7 @@ function Analytics() {
     const isInitialLoad = false;
     try {
       // Always use background refreshing, even on initial load
-      setIsBackgroundRefreshing(true);
+      setRefreshing(true);
 
       // Use Promise.all to fetch data in parallel
       const [farmersResponse, livestockResponse, operatorsResponse] =
@@ -460,10 +475,10 @@ function Analytics() {
 
       // Always turn off loading states when done
       setLoading(false);
-      setIsBackgroundRefreshing(false);
+      setRefreshing(false);
 
       // Update last refreshed timestamp
-      setLastRefreshed(new Date());
+      setLastRefresh(new Date());
     } catch (error) {
       // Only set error if not an abort error (which happens during cleanup)
       if (error.name !== "AbortError") {
@@ -471,29 +486,227 @@ function Analytics() {
         if (isInitialLoad) {
           setLoading(false);
         } else {
-          setIsBackgroundRefreshing(false);
+          setRefreshing(false);
         }
       }
     }
   };
 
-  // Process livestock data - memoized with useCallback
+  // Replace the processLivestockData function with this enhanced version that categorizes animals
+  // Replace the processLivestockData function with this updated version that handles dynamic data better
   const processLivestockData = useCallback(() => {
     const livestock = rawData.livestock || [];
+
+    // Define the exact categories and subcategories from the provided table
+    const categoryStructure = {
+      CATTLE: ["Carabull", "Caracow"],
+      CARABAO: ["Carabull", "Caracow"],
+      GOAT: ["Buck", "Doe"],
+      SHEEP: ["Ram", "Ewe"],
+      SWINE: ["Sow", "Piglet", "Boar", "Fatteners"],
+      CHICKEN: ["Broiler", "Layer", "Game/range", "Finishing fowl", "Cockerel"],
+      DUCK: ["Drake", "Hen"],
+      QUAIL: ["Cock", "Hen"],
+      TURKEY: ["Gobbler", "Hen"],
+      RABBIT: ["Buck", "Doe"],
+    };
+
+    // Initialize the data structure
     const animalTypeMap = {};
 
+    // Process each livestock record
     livestock.forEach((record) => {
       const animalType = record.animal_type || "Unknown";
       const quantity = Number.parseInt(record.quantity) || 0;
 
-      animalTypeMap[animalType] = (animalTypeMap[animalType] || 0) + quantity;
+      // Skip if quantity is zero
+      if (quantity <= 0) return;
+
+      // Try to match the animal type to our categories
+      let matchedCategory = null;
+      let matchedSubcategory = null;
+
+      // First, try direct matching with the animal_type field
+      const animalTypeLower = animalType.toLowerCase();
+
+      // Check for each category
+      for (const [category, subcategories] of Object.entries(
+        categoryStructure
+      )) {
+        // Check if the animal type contains the category name
+        if (animalTypeLower.includes(category.toLowerCase())) {
+          matchedCategory = category;
+
+          // Try to match subcategory
+          for (const subcategory of subcategories) {
+            if (animalTypeLower.includes(subcategory.toLowerCase())) {
+              matchedSubcategory = subcategory;
+              break;
+            }
+          }
+
+          // If no subcategory matched but we have a category, use the first subcategory
+          if (!matchedSubcategory && subcategories.length > 0) {
+            matchedSubcategory = subcategories[0];
+          }
+
+          break;
+        }
+      }
+
+      // If no direct match, try to infer from keywords
+      if (!matchedCategory) {
+        if (
+          animalTypeLower.includes("cow") ||
+          animalTypeLower.includes("bull") ||
+          animalTypeLower.includes("calf")
+        ) {
+          matchedCategory = "CATTLE";
+          matchedSubcategory = animalTypeLower.includes("bull")
+            ? "Carabull"
+            : "Caracow";
+        } else if (
+          animalTypeLower.includes("carabao") ||
+          animalTypeLower.includes("buffalo")
+        ) {
+          matchedCategory = "CARABAO";
+          matchedSubcategory = animalTypeLower.includes("bull")
+            ? "Carabull"
+            : "Caracow";
+        } else if (animalTypeLower.includes("goat")) {
+          matchedCategory = "GOAT";
+          matchedSubcategory =
+            animalTypeLower.includes("buck") || animalTypeLower.includes("male")
+              ? "Buck"
+              : "Doe";
+        } else if (animalTypeLower.includes("sheep")) {
+          matchedCategory = "SHEEP";
+          matchedSubcategory =
+            animalTypeLower.includes("ram") || animalTypeLower.includes("male")
+              ? "Ram"
+              : "Ewe";
+        } else if (
+          animalTypeLower.includes("pig") ||
+          animalTypeLower.includes("hog") ||
+          animalTypeLower.includes("swine")
+        ) {
+          matchedCategory = "SWINE";
+          if (animalTypeLower.includes("sow")) matchedSubcategory = "Sow";
+          else if (animalTypeLower.includes("piglet"))
+            matchedSubcategory = "Piglet";
+          else if (animalTypeLower.includes("boar"))
+            matchedSubcategory = "Boar";
+          else matchedSubcategory = "Fatteners";
+        } else if (
+          animalTypeLower.includes("chicken") ||
+          animalTypeLower.includes("chick")
+        ) {
+          matchedCategory = "CHICKEN";
+          if (animalTypeLower.includes("broiler"))
+            matchedSubcategory = "Broiler";
+          else if (animalTypeLower.includes("layer"))
+            matchedSubcategory = "Layer";
+          else if (
+            animalTypeLower.includes("game") ||
+            animalTypeLower.includes("range")
+          )
+            matchedSubcategory = "Game/range";
+          else if (
+            animalTypeLower.includes("finish") ||
+            animalTypeLower.includes("fowl")
+          )
+            matchedSubcategory = "Finishing fowl";
+          else matchedSubcategory = "Cockerel";
+        } else if (animalTypeLower.includes("duck")) {
+          matchedCategory = "DUCK";
+          matchedSubcategory =
+            animalTypeLower.includes("drake") ||
+            animalTypeLower.includes("male")
+              ? "Drake"
+              : "Hen";
+        } else if (animalTypeLower.includes("quail")) {
+          matchedCategory = "QUAIL";
+          matchedSubcategory =
+            animalTypeLower.includes("cock") || animalTypeLower.includes("male")
+              ? "Cock"
+              : "Hen";
+        } else if (animalTypeLower.includes("turkey")) {
+          matchedCategory = "TURKEY";
+          matchedSubcategory =
+            animalTypeLower.includes("gobbler") ||
+            animalTypeLower.includes("male")
+              ? "Gobbler"
+              : "Hen";
+        } else if (animalTypeLower.includes("rabbit")) {
+          matchedCategory = "RABBIT";
+          matchedSubcategory =
+            animalTypeLower.includes("buck") || animalTypeLower.includes("male")
+              ? "Buck"
+              : "Doe";
+        }
+      }
+
+      // If we still couldn't match, create an "OTHER" category and use the original animal type
+      if (!matchedCategory) {
+        matchedCategory = "OTHER";
+        matchedSubcategory = animalType;
+      }
+
+      // Initialize category if it doesn't exist
+      if (!animalTypeMap[matchedCategory]) {
+        animalTypeMap[matchedCategory] = {
+          total: 0,
+          subtypes: {},
+        };
+      }
+
+      // Add to category total
+      animalTypeMap[matchedCategory].total += quantity;
+
+      // Initialize subtype if it doesn't exist
+      if (!animalTypeMap[matchedCategory].subtypes[matchedSubcategory]) {
+        animalTypeMap[matchedCategory].subtypes[matchedSubcategory] = 0;
+      }
+
+      // Add to subtype
+      animalTypeMap[matchedCategory].subtypes[matchedSubcategory] += quantity;
+
+      // Also store the original record for reference (useful for debugging)
+      if (!animalTypeMap[matchedCategory].records) {
+        animalTypeMap[matchedCategory].records = [];
+      }
+      animalTypeMap[matchedCategory].records.push({
+        ...record,
+        matchedSubcategory,
+      });
     });
 
+    // Convert the nested structure to the format expected by the UI
     const items = Object.entries(animalTypeMap)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
+      .filter(([_, data]) => data.total > 0) // Only include categories with data
+      .map(([category, data]) => {
+        // Convert subtypes to array format
+        const subtypeItems = Object.entries(data.subtypes)
+          .filter(([_, value]) => value > 0) // Only include subcategories with data
+          .map(([name, value]) => ({ name, value }))
+          .sort((a, b) => b.value - a.value);
+
+        return {
+          name: category,
+          value: data.total,
+          subtypes: subtypeItems,
+          // Include original records for debugging if needed
+          records: data.records,
+        };
+      });
+
+    // Sort categories by total value
+    items.sort((a, b) => b.value - a.value);
 
     const total = items.reduce((sum, item) => sum + item.value, 0);
+
+    // Log the processed data for debugging
+    console.log("Processed livestock data:", { total, items });
 
     return {
       total,
@@ -993,7 +1206,7 @@ function Analytics() {
     setDropdownOpen(false);
   }, []);
 
-  // Update the renderCategoryContent function to fix percentage display - memoized with useCallback
+  // Update the renderCategoryContent function to handle the new structure
   const renderCategoryContent = useCallback(() => {
     const category = categories[currentCategory];
     const data = analyticsData[category.id];
@@ -1040,38 +1253,114 @@ function Analytics() {
             </div>
 
             {data.items.length > 0 ? (
-              data.items.map((item, index) => {
-                // Calculate percentage with proper validation
-                const percentage =
-                  data.total > 0 ? (item.value / data.total) * 100 : 0;
+              <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
+                {data.items.map((item, index) => {
+                  // Calculate percentage with proper validation
+                  const percentage =
+                    data.total > 0 ? (item.value / data.total) * 100 : 0;
 
-                return (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between"
-                  >
-                    <div className="flex items-center">
+                  // Check if this is a livestock item with subtypes
+                  if (
+                    category.id === "livestock" &&
+                    item.subtypes &&
+                    item.subtypes.length > 0
+                  ) {
+                    return (
+                      <div key={index} className="space-y-3">
+                        {/* Main animal type header */}
+                        <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+                          <div className="flex items-center">
+                            <div
+                              className="w-4 h-4 mr-2 rounded-full"
+                              style={{
+                                backgroundColor: getColorForIndex(index),
+                              }}
+                            ></div>
+                            <span className="text-lg font-semibold">
+                              {item.name}
+                            </span>
+                          </div>
+                          <div className="flex items-center">
+                            <span className="font-bold">
+                              {item.value.toLocaleString()}
+                            </span>
+                            <span className="ml-1 text-xs text-gray-500">
+                              ({percentage.toFixed(1)}%)
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Subtypes */}
+                        <div className="pl-6 space-y-2">
+                          {item.subtypes.map((subItem, subIndex) => {
+                            const subPercentage =
+                              item.value > 0
+                                ? (subItem.value / item.value) * 100
+                                : 0;
+
+                            return (
+                              <div
+                                key={`${index}-${subIndex}`}
+                                className="flex items-center justify-between"
+                              >
+                                <div className="flex items-center">
+                                  <div
+                                    className="w-2 h-2 mr-2 rounded-full"
+                                    style={{
+                                      backgroundColor: getColorForIndex(
+                                        index + subIndex
+                                      ),
+                                    }}
+                                  ></div>
+                                  <span className="font-medium capitalize">
+                                    {subItem.name}
+                                  </span>
+                                </div>
+                                <div className="flex items-center">
+                                  <span className="font-bold">
+                                    {subItem.value.toLocaleString()}
+                                  </span>
+                                  <span className="ml-1 text-xs text-gray-500">
+                                    ({subPercentage.toFixed(1)}%)
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  } else {
+                    // Regular item display for non-livestock categories or livestock without subtypes
+                    return (
                       <div
-                        className="w-3 h-3 mr-2 rounded-full"
-                        style={{
-                          backgroundColor: getColorForIndex(index),
-                        }}
-                      ></div>
-                      <span className="font-medium capitalize">
-                        {item.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="font-bold">
-                        {item.value.toLocaleString()}
-                      </span>
-                      <span className="ml-1 text-xs text-gray-500">
-                        ({percentage.toFixed(1)}%)
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
+                        key={index}
+                        className="flex items-center justify-between"
+                      >
+                        <div className="flex items-center">
+                          <div
+                            className="w-3 h-3 mr-2 rounded-full"
+                            style={{
+                              backgroundColor: getColorForIndex(index),
+                            }}
+                          ></div>
+                          <span className="font-medium capitalize">
+                            {item.name}
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="font-bold">
+                            {item.value.toLocaleString()}
+                          </span>
+                          <span className="ml-1 text-xs text-gray-500">
+                            ({percentage.toFixed(1)}%)
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+                })}
+              </div>
             ) : (
               <p className="text-center text-gray-500">
                 No breakdown data available
@@ -1094,15 +1383,15 @@ function Analytics() {
 
       {/* Status indicator and refresh button */}
       <div className="flex items-center mb-4 text-sm">
-        {isBackgroundRefreshing ? (
+        {isRefreshing ? (
           <div className="flex items-center text-amber-600">
             <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
             <span>Updating data...</span>
           </div>
         ) : (
-          lastRefreshed && (
+          lastRefresh && (
             <div className="flex items-center text-gray-500">
-              <span>Last updated: {formatRefreshTime(lastRefreshed)}</span>
+              <span>Last updated: {formatRefreshTime(lastRefresh)}</span>
               <button
                 onClick={handleManualRefresh}
                 className="flex items-center ml-4 text-blue-600 hover:text-blue-800"

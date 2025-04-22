@@ -20,12 +20,19 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
   const [viewingRemarks, setViewingRemarks] = useState(null);
   const [cropSubTab, setCropSubTab] = useState("regular"); // "regular" or "highValue"
 
-  // Function to fetch farmer details (declared here to be accessible in handleCloseEdit)
+  // Replace the fetchFarmerDetails function with a version that uses the passed data
   const fetchFarmerDetails = async (farmerId) => {
     try {
       setFetchLoading(true);
 
-      const response = await farmerAPI.getFarmerById(farmerId);
+      // Use the farmer data passed from inventory instead of fetching it again
+      let response = farmer;
+
+      // If we have a complete farmer object with all details, use it directly
+      if (!farmer.crops && farmerId) {
+        // Only fetch if we don't have complete data
+        response = await farmerAPI.getFarmerById(farmerId);
+      }
 
       // Determine the crop data type from the first crop item
       if (response.crops && response.crops.length > 0) {
@@ -78,10 +85,17 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
     }
   };
 
-  // Fetch livestock records separately
+  // Modify the fetchLivestockRecords function to use passed data when available
   const fetchLivestockRecords = async () => {
     try {
       setLivestockLoading(true);
+
+      // Check if livestock data is already available in the farmer object
+      if (farmer.livestockRecords && farmer.livestockRecords.length > 0) {
+        setLivestockRecords(farmer.livestockRecords);
+        setLivestockLoading(false);
+        return;
+      }
 
       // Get all livestock records
       const response = await livestockAPI.getAllLivestockRecords();
@@ -99,20 +113,39 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
     }
   };
 
-  // Fetch operator data separately
+  // Modify the fetchOperatorData function to use passed data when available
   const fetchOperatorData = async () => {
     try {
       setOperatorLoading(true);
 
-      // Get operators for this farmer using getOperatorById
+      // Check if operator data is already available in the farmer object
+      if (farmer.operatorData && farmer.operatorData.length > 0) {
+        setOperatorData(farmer.operatorData);
+        setOperatorLoading(false);
+        return;
+      }
+
+      // Get operators for this farmer
       const response = await operatorAPI.getAllOperators();
 
       // Filter records for this farmer
-      const Operator = response.filter(
-        (Operator) => Operator.farmer_id === farmer.farmer_id
+      const operators = response.filter(
+        (operator) => operator.farmer_id === farmer.farmer_id
       );
 
-      setOperatorData(Operator);
+      // Process operator data to ensure consistent field names
+      const processedOperators = operators.map((operator) => ({
+        ...operator,
+        operational_status:
+          operator.operational_status || operator.remarks || "N/A",
+        fishpond_location: operator.fishpond_location || "N/A",
+        cultured_species: operator.cultured_species || "N/A",
+        productive_area_sqm:
+          operator.productive_area_sqm || operator.area || "N/A",
+        production_kg: operator.production_kg || operator.production || "N/A",
+      }));
+
+      setOperatorData(processedOperators);
       setOperatorLoading(false);
     } catch (err) {
       console.error("Error fetching operator data:", err);
@@ -120,22 +153,18 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
     }
   };
 
-  // Add this inside the ViewFarmer component, after the useEffect hooks
-  // Prefetch edit data when viewing a farmer
+  // Modify the useEffect that calls these functions to check for existing data first
   useEffect(() => {
     // First check if we already have the data in cache before fetching
     const checkCacheAndFetch = async () => {
       try {
-        // Try to get the farmer data directly from the API service
-        // The API service will return cached data if available
-        const farmerResponse = await farmerAPI.getFarmerById(farmer.farmer_id);
-
-        // Process the data as before
-        if (farmerResponse) {
+        // If we have a complete farmer object with all details, use it directly
+        if (farmer.crops) {
+          // Process the data as before
           // Determine the crop data type from the first crop item
-          if (farmerResponse.crops && farmerResponse.crops.length > 0) {
+          if (farmer.crops && farmer.crops.length > 0) {
             try {
-              const firstCrop = farmerResponse.crops[0];
+              const firstCrop = farmer.crops[0];
               if (firstCrop.production_data) {
                 const data = JSON.parse(firstCrop.production_data);
                 if (data.month) {
@@ -150,34 +179,48 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
           }
 
           // Process the crops data to extract JSON values
-          if (farmerResponse.crops && farmerResponse.crops.length > 0) {
-            farmerResponse.crops = farmerResponse.crops.map((crop) => {
-              if (crop.production_data) {
-                try {
-                  const data = JSON.parse(crop.production_data);
-                  return {
-                    ...crop,
-                    crop_value: data.crop || null,
-                    month_value: data.month || null,
-                    quantity_value: data.quantity || null,
-                  };
-                } catch (e) {
-                  return {
-                    ...crop,
-                    crop_value: null,
-                    month_value: null,
-                    quantity_value: null,
-                  };
-                }
+          const processedCrops = farmer.crops.map((crop) => {
+            if (crop.production_data) {
+              try {
+                const data = JSON.parse(crop.production_data);
+                return {
+                  ...crop,
+                  crop_value: data.crop || null,
+                  month_value: data.month || null,
+                  quantity_value: data.quantity || null,
+                };
+              } catch (e) {
+                return {
+                  ...crop,
+                  crop_value: null,
+                  month_value: null,
+                  quantity_value: null,
+                };
               }
-              return crop;
-            });
-          }
+            }
+            return crop;
+          });
 
-          setFarmerData(farmerResponse);
+          setFarmerData({ ...farmer, crops: processedCrops });
           setFetchLoading(false);
 
-          // After setting the main farmer data, fetch related data
+          // Use existing livestock and operator data if available
+          if (farmer.livestockRecords) {
+            setLivestockRecords(farmer.livestockRecords);
+            setLivestockLoading(false);
+          } else {
+            fetchLivestockRecords();
+          }
+
+          if (farmer.operatorData) {
+            setOperatorData(farmer.operatorData);
+            setOperatorLoading(false);
+          } else {
+            fetchOperatorData();
+          }
+        } else {
+          // If we don't have complete data, fetch it
+          await fetchFarmerDetails(farmer.farmer_id);
           fetchLivestockRecords();
           fetchOperatorData();
         }
@@ -331,39 +374,19 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
       key: "production_kg",
     },
     {
-      title: "Status",
-      dataIndex: "operational_status",
-      key: "operational_status",
+      title: "Remarks",
+      dataIndex: "remarks",
+      key: "remarks",
       render: (status) => (
         <span
           className={`px-2 py-1 rounded-full text-xs ${
-            status === "Active"
+            status === "Active" || status === "operational"
               ? "bg-green-100 text-green-800"
               : "bg-gray-100 text-gray-800"
           }`}
         >
-          {status}
+          {status || "N/A"}
         </span>
-      ),
-    },
-    {
-      title: "Remarks",
-      dataIndex: "remarks",
-      key: "remarks",
-      render: (remarks) => (
-        <div className="max-w-xs">
-          {remarks ? (
-            <div
-              className="text-blue-600 truncate cursor-pointer hover:text-blue-800 hover:underline"
-              title="Click to view full remarks"
-              onClick={() => setViewingRemarks(remarks)}
-            >
-              {remarks}
-            </div>
-          ) : (
-            <span className="text-gray-400">-</span>
-          )}
-        </div>
       ),
     },
   ];

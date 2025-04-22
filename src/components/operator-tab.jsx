@@ -12,7 +12,7 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
   const [operatorLoading, setOperatorLoading] = useState(true);
   const [viewingRemarks, setViewingRemarks] = useState(null);
 
-  // Form state
+  // Form state - removed operational_status
   const [formValues, setFormValues] = useState({
     fishpond_location: "",
     cultured_species: "",
@@ -21,7 +21,6 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
     date_of_stocking: "",
     production_kg: "",
     date_of_harvest: "",
-    operational_status: "",
     remarks: "",
     geotagged_photo_url: "",
   });
@@ -67,7 +66,6 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       date_of_stocking: "",
       production_kg: "",
       date_of_harvest: "",
-      operational_status: "",
       remarks: "",
       geotagged_photo_url: "",
     });
@@ -86,7 +84,6 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       date_of_stocking: operator.date_of_stocking || "",
       production_kg: operator.production_kg || "",
       date_of_harvest: operator.date_of_harvest || "",
-      operational_status: operator.operational_status || "",
       remarks: operator.remarks || "",
       geotagged_photo_url: operator.geotagged_photo_url || "",
     });
@@ -104,7 +101,6 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       date_of_stocking: "",
       production_kg: "",
       date_of_harvest: "",
-      operational_status: "",
       remarks: "",
       geotagged_photo_url: "",
     });
@@ -119,7 +115,7 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
   };
 
   const handleOperatorModalSubmit = async () => {
-    // Basic validation
+    // Basic validation - removed operational_status from required fields
     if (
       !formValues.fishpond_location ||
       !formValues.cultured_species ||
@@ -127,7 +123,7 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       !formValues.stocking_density ||
       !formValues.date_of_stocking ||
       !formValues.production_kg ||
-      !formValues.operational_status
+      !formValues.remarks
     ) {
       alert("Please fill in all required fields");
       return;
@@ -153,7 +149,6 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
             date_of_stocking: formValues.date_of_stocking,
             production_kg: formValues.production_kg,
             date_of_harvest: formValues.date_of_harvest,
-            operational_status: formValues.operational_status,
             remarks: formValues.remarks,
             geotagged_photo_url: formValues.geotagged_photo_url,
           },
@@ -199,7 +194,6 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
         date_of_stocking: "",
         production_kg: "",
         date_of_harvest: "",
-        operational_status: "",
         remarks: "",
         geotagged_photo_url: "",
       });
@@ -264,39 +258,19 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       key: "production_kg",
     },
     {
-      title: "Status",
-      dataIndex: "operational_status",
-      key: "operational_status",
-      render: (status) => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs ${
-            status === "Active"
-              ? "bg-green-100 text-green-800"
-              : "bg-gray-100 text-gray-800"
-          }`}
-        >
-          {status}
-        </span>
-      ),
-    },
-    {
       title: "Remarks",
       dataIndex: "remarks",
-      key: "remarks",
+      key: "status",
       render: (remarks) => (
-        <div className="max-w-xs">
-          {remarks ? (
-            <div
-              className="text-blue-600 truncate cursor-pointer hover:text-blue-800 hover:underline"
-              title="Click to view full remarks"
-              onClick={() => setViewingRemarks(remarks)}
-            >
-              {remarks}
-            </div>
-          ) : (
-            <span className="text-gray-400">-</span>
-          )}
-        </div>
+        <span
+          className={`px-2 py-1 rounded-full text-xs ${
+            remarks === "operational"
+              ? "bg-green-100 text-green-800"
+              : "bg-red-100 text-red-800"
+          }`}
+        >
+          {remarks === "operational" ? "Operational" : "Non-operational"}
+        </span>
       ),
     },
     {
@@ -607,20 +581,18 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
                 <div className="mb-3 sm:mb-4">
                   <label className="block mb-1 text-sm font-medium text-gray-700">
-                    Operational Status <span className="text-red-500">*</span>
+                    Remarks <span className="text-red-500">*</span>
                   </label>
                   <select
-                    name="operational_status"
-                    value={formValues.operational_status}
+                    name="remarks"
+                    value={formValues.remarks}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                     required
                   >
                     <option value="">Select Status</option>
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                    <option value="Under Maintenance">Under Maintenance</option>
-                    <option value="Abandoned">Abandoned</option>
+                    <option value="operational">Operational</option>
+                    <option value="non-operational">Non-operational</option>
                   </select>
                 </div>
 
@@ -636,20 +608,6 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                     placeholder="Enter photo URL"
                   />
-                </div>
-
-                <div className="col-span-1 mb-3 md:col-span-2 sm:mb-4">
-                  <label className="block mb-1 text-sm font-medium text-gray-700">
-                    Remarks
-                  </label>
-                  <textarea
-                    name="remarks"
-                    value={formValues.remarks}
-                    onChange={handleInputChange}
-                    rows="3"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-                    placeholder="Enter any additional notes or remarks"
-                  ></textarea>
                 </div>
               </div>
             </div>
@@ -698,52 +656,8 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
           </div>
         </div>
       )}
-      {/* View Full Remarks Modal */}
-      {viewingRemarks && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="w-full max-w-md bg-white rounded-lg shadow-xl sm:max-w-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between p-4 bg-white border-b">
-              <h3 className="text-lg font-medium">Remarks</h3>
-              <button
-                onClick={() => setViewingRemarks(null)}
-                className="text-gray-400 hover:text-gray-500"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="w-6 h-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-            <div className="p-4 sm:p-6 overflow-y-auto max-h-[50vh] sm:max-h-96">
-              <p className="text-sm whitespace-pre-wrap sm:text-base">
-                {viewingRemarks}
-              </p>
-            </div>
-            <div className="sticky bottom-0 z-10 flex justify-end p-4 bg-white border-t">
-              <button
-                onClick={() => setViewingRemarks(null)}
-                className="px-4 py-2 text-sm font-medium text-white rounded-md bg-emerald-700 hover:bg-emerald-800"
-                style={{
-                  backgroundColor: colors.primary,
-                  borderColor: colors.primary,
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
+      {/* View Full Remarks Modal - Removed since remarks is now a dropdown */}
     </>
   );
 };

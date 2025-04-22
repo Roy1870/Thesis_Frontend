@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { farmerAPI, livestockAPI, operatorAPI } from "./services/api";
-import { MapPin } from "lucide-react";
 
 // Dynamically import the map component with no SSR to avoid window is not defined errors
 // const MapComponent = dynamic(() => import("./map-component"), {
@@ -425,7 +424,6 @@ const AddData = () => {
           date_of_stocking: values.date_of_stocking || "",
           production_kg: values.production || "",
           date_of_harvest: values.date_of_harvest || "",
-          operational_status: values.operational_status || "",
           remarks: values.remarks || "",
           geotagged_photo_url: values.geotagged_photo || "",
         };
@@ -1391,35 +1389,18 @@ const AddData = () => {
                   </div>
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
-                      Operational Status
+                      Remarks
                     </label>
                     <select
-                      name="operational_status"
-                      value={formData.operational_status || ""}
+                      name="remarks"
+                      value={formData.remarks || ""}
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                     >
                       <option value="">Select Status</option>
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                      <option value="Under Maintenance">
-                        Under Maintenance
-                      </option>
-                      <option value="Abandoned">Abandoned</option>
+                      <option value="operational">Operational</option>
+                      <option value="non-operational">Non-operational</option>
                     </select>
-                  </div>
-                  <div>
-                    <label className="block mb-1 text-sm font-medium text-gray-700">
-                      Remarks
-                    </label>
-                    <input
-                      type="text"
-                      name="remarks"
-                      value={formData.remarks || ""}
-                      onChange={handleInputChange}
-                      placeholder="Enter Remarks"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                    />
                   </div>
                 </div>
               </div>
