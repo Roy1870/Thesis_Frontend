@@ -1856,7 +1856,7 @@ export default function Dashboard() {
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="p-6 bg-white shadow-md rounded-xl">
               <div className="flex items-center mb-4">
-                <div className="w-10 h-10 p-2 mr-4 bg-gray-200 rounded-lg animate-pulse"></div>
+                <div className="w-10 h-10 p-2 mr-4 bg-gray-200 rounded animate-pulse"></div>
                 <div>
                   <div className="w-32 h-5 mb-2 bg-gray-200 rounded animate-pulse"></div>
                   <div className="w-24 bg-gray-200 rounded h-7 animate-pulse"></div>
@@ -1987,9 +1987,9 @@ export default function Dashboard() {
     <div className="p-5 bg-[#F5F7F9] min-h-screen overflow-y-auto">
       {/* Dashboard Header */}
       <div className="mb-10">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-[#333333]">
+            <h2 className="text-xl sm:text-2xl font-bold text-[#333333]">
               Agricultural Production Dashboard
             </h2>
             <p className="text-[#666666] mt-1">
@@ -2004,7 +2004,7 @@ export default function Dashboard() {
           </div>
 
           {/* Production Trend Indicator */}
-          <div className="inline-flex items-center p-3 mt-4 transition-all duration-200 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md">
+          <div className="inline-flex flex-wrap items-center p-3 mt-4 transition-all duration-200 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md">
             <Activity className="w-5 h-5 mr-2 text-[#6A9C89]" />
             <span className="mr-2 text-sm font-medium">Production Trend:</span>
             <div
@@ -2043,7 +2043,7 @@ export default function Dashboard() {
         </div>
       </div>
       {/* Top Stats Cards */}
-      <div className="grid grid-cols-1 gap-6 mb-8 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 mb-8 xs:grid-cols-2 lg:grid-cols-4">
         <div className="bg-gradient-to-br from-[#6A9C89] to-[#4A7C69] rounded-xl text-white p-6 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] duration-300 border border-[#8DB5A5]/20">
           <div className="flex items-center mb-4">
             <div className="p-2 mr-4 bg-white rounded-lg bg-opacity-20">
@@ -2053,7 +2053,7 @@ export default function Dashboard() {
               <p className="text-sm font-medium text-white opacity-80">
                 Total Production
               </p>
-              <p className="text-2xl font-bold">
+              <p className="text-xl font-bold sm:text-2xl">
                 {formatNumber(dashboardData.totalProduction.toFixed(2))}
               </p>
             </div>
@@ -2072,7 +2072,7 @@ export default function Dashboard() {
               <p className="text-sm font-medium text-white opacity-80">
                 Average Yield
               </p>
-              <p className="text-2xl font-bold">
+              <p className="text-xl font-bold sm:text-2xl">
                 {dashboardData.recentHarvests.length > 0
                   ? (
                       dashboardData.recentHarvests.reduce(
@@ -2105,7 +2105,7 @@ export default function Dashboard() {
               <p className="text-sm font-medium text-white opacity-80">
                 Total Area
               </p>
-              <p className="text-2xl font-bold">
+              <p className="text-xl font-bold sm:text-2xl">
                 {formatNumber(dashboardData.totalArea.toFixed(2))}
               </p>
             </div>
@@ -2130,7 +2130,7 @@ export default function Dashboard() {
                       dashboardData.topPerformingItems[0].category
                     ).replace(" & Poultry", "")}
                   </p>
-                  <p className="text-2xl font-bold">
+                  <p className="text-xl font-bold sm:text-2xl">
                     {dashboardData.topPerformingItems[0].name}
                   </p>
                 </>
@@ -2139,7 +2139,7 @@ export default function Dashboard() {
                   <p className="text-sm font-medium text-white opacity-80">
                     Top Producer
                   </p>
-                  <p className="text-2xl font-bold">None</p>
+                  <p className="text-xl font-bold sm:text-2xl">None</p>
                 </>
               )}
             </div>
@@ -2166,56 +2166,96 @@ export default function Dashboard() {
         </h4>
         {dashboardData.farmerTypeDistribution &&
         dashboardData.farmerTypeDistribution.length > 0 ? (
-          <div className="h-[320px] mt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={dashboardData.farmerTypeDistribution}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={true}
-                  label={({ name, percent }) =>
-                    `${name}: ${(percent * 100).toFixed(0)}%`
-                  }
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {dashboardData.farmerTypeDistribution.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={
-                        entry.name === "Raiser"
-                          ? colors.raiser
-                          : entry.name === "Operator"
-                          ? colors.operator
-                          : colors.grower
-                      }
-                    />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value, name) => [
-                    `${formatNumber(value)} farmers`,
-                    name,
-                  ]}
-                  contentStyle={{
-                    backgroundColor: "rgba(255, 255, 255, 0.9)",
-                    borderRadius: "8px",
-                    border: "1px solid #E0E0E0",
-                    boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-                  }}
-                />
-                <Legend
-                  layout="horizontal"
-                  verticalAlign="bottom"
-                  align="center"
-                />
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="flex flex-col items-center justify-center md:flex-row">
+            <div className="w-full md:w-2/3 h-[280px] sm:h-[320px] mt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={dashboardData.farmerTypeDistribution}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                    label={false} // Remove inline labels for cleaner look
+                  >
+                    {dashboardData.farmerTypeDistribution.map(
+                      (entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={
+                            entry.name === "Raiser"
+                              ? colors.raiser
+                              : entry.name === "Operator"
+                              ? colors.operator
+                              : colors.grower
+                          }
+                        />
+                      )
+                    )}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value, name) => [
+                      `${formatNumber(value)} farmers`,
+                      name,
+                    ]}
+                    contentStyle={{
+                      backgroundColor: "rgba(255, 255, 255, 0.9)",
+                      borderRadius: "8px",
+                      border: "1px solid #E0E0E0",
+                      boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+                    }}
+                  />
+                  <Legend
+                    layout="horizontal"
+                    verticalAlign="bottom"
+                    align="center"
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Add a separate legend/stats section for better readability */}
+            <div className="grid w-full grid-cols-2 gap-2 mt-4 text-sm md:w-1/3 md:mt-0 sm:grid-cols-3 md:grid-cols-1">
+              {dashboardData.farmerTypeDistribution.map((entry, index) => {
+                const totalFarmers =
+                  dashboardData.farmerTypeDistribution.reduce(
+                    (sum, item) => sum + item.value,
+                    0
+                  );
+                const color =
+                  entry.name === "Raiser"
+                    ? colors.raiser
+                    : entry.name === "Operator"
+                    ? colors.operator
+                    : colors.grower;
+
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center p-2 rounded-md hover:bg-gray-50"
+                  >
+                    <div
+                      className="w-3 h-3 mr-2 rounded-sm"
+                      style={{ backgroundColor: color }}
+                    ></div>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{entry.name}</span>
+                      <span className="text-gray-600">
+                        {formatNumber(entry.value)} farmers
+                        <span className="ml-1 text-xs text-gray-500">
+                          ({((entry.value / totalFarmers) * 100).toFixed(1)}%)
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-[320px] text-gray-400">
+          <div className="flex flex-col items-center justify-center h-[280px] sm:h-[320px] text-gray-400">
             <svg
               className="w-16 h-16 mb-4 text-gray-300"
               fill="none"
@@ -2249,7 +2289,7 @@ export default function Dashboard() {
               <User className="w-5 h-5 text-blue-600" />
             </div>
           </div>
-          <p className="text-3xl font-bold text-gray-900">
+          <p className="text-2xl font-bold text-gray-900 sm:text-3xl">
             {formatNumber(dashboardData.totalFarmers)}
           </p>
           <p className="mt-2 text-sm text-gray-500">
@@ -2266,7 +2306,7 @@ export default function Dashboard() {
               <Cow className="w-5 h-5 text-purple-600" />
             </div>
           </div>
-          <p className="text-3xl font-bold text-gray-900">
+          <p className="text-2xl font-bold text-gray-900 sm:text-3xl">
             {formatNumber(dashboardData.categoryData.livestock.total)}
           </p>
           <p className="mt-2 text-sm text-gray-500">
@@ -2283,7 +2323,7 @@ export default function Dashboard() {
               <Fish className="w-5 h-5 text-cyan-600" />
             </div>
           </div>
-          <p className="text-3xl font-bold text-gray-900">
+          <p className="text-2xl font-bold text-gray-900 sm:text-3xl">
             {formatNumber(dashboardData.categoryData.fish.total.toFixed(2))}
           </p>
           <p className="mt-2 text-sm text-gray-500">
@@ -2300,52 +2340,85 @@ export default function Dashboard() {
             Production Distribution
           </h4>
           {dashboardData.cropProduction.length > 0 ? (
-            <div className="h-[320px] mt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={dashboardData.cropProduction}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={true}
-                    label={({ name, percent }) =>
-                      `${name}: ${(percent * 100).toFixed(0)}%`
-                    }
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
+            <div className="flex flex-col items-center justify-center md:flex-row">
+              <div className="w-full md:w-2/3 h-[280px] sm:h-[320px] mt-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={dashboardData.cropProduction}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={false} // Remove inline labels for cleaner look
+                    >
+                      {dashboardData.cropProduction.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value, name) => [
+                        name === "Livestock & Poultry"
+                          ? `${formatNumber(value)} heads`
+                          : `${formatNumber(value.toFixed(2))} tons`,
+                        name,
+                      ]}
+                      contentStyle={{
+                        backgroundColor: "rgba(255, 255, 255, 0.9)",
+                        borderRadius: "8px",
+                        border: "1px solid #E0E0E0",
+                        boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+                      }}
+                    />
+                    <Legend
+                      layout="horizontal"
+                      verticalAlign="bottom"
+                      align="center"
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Add a separate legend/stats section for better readability */}
+              <div className="grid w-full grid-cols-2 gap-2 mt-4 text-sm md:w-1/3 md:mt-0 sm:grid-cols-3 md:grid-cols-1">
+                {dashboardData.cropProduction.map((entry, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center p-2 rounded-md hover:bg-gray-50"
                   >
-                    {dashboardData.cropProduction.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value, name) => [
-                      name === "Livestock & Poultry"
-                        ? `${formatNumber(value)} heads`
-                        : `${formatNumber(value.toFixed(2))} tons`,
-                      name,
-                    ]}
-                    contentStyle={{
-                      backgroundColor: "rgba(255, 255, 255, 0.9)",
-                      borderRadius: "8px",
-                      border: "1px solid #E0E0E0",
-                      boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-                    }}
-                  />
-                  <Legend
-                    layout="horizontal"
-                    verticalAlign="bottom"
-                    align="center"
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+                    <div
+                      className="w-3 h-3 mr-2 rounded-sm"
+                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                    ></div>
+                    <div className="flex flex-col">
+                      <span className="font-medium truncate" title={entry.name}>
+                        {entry.name}
+                      </span>
+                      <span className="text-gray-600">
+                        {entry.name === "Livestock & Poultry"
+                          ? `${formatNumber(entry.value)} heads`
+                          : `${formatNumber(entry.value.toFixed(2))} tons`}
+                        <span className="ml-1 text-xs text-gray-500">
+                          (
+                          {(
+                            (entry.value / dashboardData.totalProduction) *
+                            100
+                          ).toFixed(1)}
+                          %)
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-[320px] text-gray-400">
+            <div className="flex flex-col items-center justify-center h-[280px] sm:h-[320px] text-gray-400">
               <svg
                 className="w-16 h-16 mb-4 text-gray-300"
                 fill="none"
@@ -2372,11 +2445,11 @@ export default function Dashboard() {
 
         {/* Monthly Production Trend */}
         <div className="p-6 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
             <h4 className="text-lg font-semibold text-gray-800">
               Monthly Production Trend
             </h4>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
@@ -2388,80 +2461,82 @@ export default function Dashboard() {
                   </option>
                 ))}
               </select>
-              <button
-                onClick={() => {
-                  const dataTypes = [
-                    "Total",
-                    "Livestock",
-                    "Rice",
-                    "Crops",
-                    "Fish",
-                  ];
-                  const currentIndex = dataTypes.indexOf(
-                    selectedMonthlyDataType
-                  );
-                  const prevIndex =
-                    (currentIndex - 1 + dataTypes.length) % dataTypes.length;
-                  setSelectedMonthlyDataType(dataTypes[prevIndex]);
-                }}
-                className="p-1 text-gray-600 transition-colors duration-150 bg-gray-100 rounded-full hover:bg-gray-200 hover:text-gray-800"
-                aria-label="Previous data type"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+              <div className="flex items-center">
+                <button
+                  onClick={() => {
+                    const dataTypes = [
+                      "Total",
+                      "Livestock",
+                      "Rice",
+                      "Crops",
+                      "Fish",
+                    ];
+                    const currentIndex = dataTypes.indexOf(
+                      selectedMonthlyDataType
+                    );
+                    const prevIndex =
+                      (currentIndex - 1 + dataTypes.length) % dataTypes.length;
+                    setSelectedMonthlyDataType(dataTypes[prevIndex]);
+                  }}
+                  className="flex items-center justify-center text-gray-600 transition-colors duration-150 bg-gray-100 rounded-full w-7 h-7 sm:w-8 sm:h-8 hover:bg-gray-200 hover:text-gray-800"
+                  aria-label="Previous data type"
                 >
-                  <path d="M15 18l-6-6 6-6" />
-                </svg>
-              </button>
-              <span className="px-3 py-1 text-sm font-medium text-white bg-[#6A9C89] rounded-full shadow-sm">
-                {selectedMonthlyDataType} Production
-              </span>
-              <button
-                onClick={() => {
-                  const dataTypes = [
-                    "Total",
-                    "Livestock",
-                    "Rice",
-                    "Crops",
-                    "Fish",
-                  ];
-                  const currentIndex = dataTypes.indexOf(
-                    selectedMonthlyDataType
-                  );
-                  const nextIndex = (currentIndex + 1) % dataTypes.length;
-                  setSelectedMonthlyDataType(dataTypes[nextIndex]);
-                }}
-                className="p-1 text-gray-600 transition-colors duration-150 bg-gray-100 rounded-full hover:bg-gray-200 hover:text-gray-800"
-                aria-label="Next data type"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M15 18l-6-6 6-6" />
+                  </svg>
+                </button>
+                <span className="px-2 sm:px-3 py-1 mx-1 text-xs sm:text-sm font-medium text-white bg-[#6A9C89] rounded-full shadow-sm whitespace-nowrap">
+                  {selectedMonthlyDataType} Production
+                </span>
+                <button
+                  onClick={() => {
+                    const dataTypes = [
+                      "Total",
+                      "Livestock",
+                      "Rice",
+                      "Crops",
+                      "Fish",
+                    ];
+                    const currentIndex = dataTypes.indexOf(
+                      selectedMonthlyDataType
+                    );
+                    const nextIndex = (currentIndex + 1) % dataTypes.length;
+                    setSelectedMonthlyDataType(dataTypes[nextIndex]);
+                  }}
+                  className="flex items-center justify-center text-gray-600 transition-colors duration-150 bg-gray-100 rounded-full w-7 h-7 sm:w-8 sm:h-8 hover:bg-gray-200 hover:text-gray-800"
+                  aria-label="Next data type"
                 >
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
-              </button>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
           {getMonthlyDataByType(selectedMonthlyDataType, selectedYear).some(
             (item) => item.production > 0
           ) ? (
-            <div className="h-[320px] mt-4">
+            <div className="h-[280px] sm:h-[320px] mt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   data={getMonthlyDataByType(
@@ -2539,7 +2614,7 @@ export default function Dashboard() {
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-[320px] text-gray-400">
+            <div className="flex flex-col items-center justify-center h-[280px] sm:h-[320px] text-gray-400">
               <svg
                 className="w-16 h-16 mb-4 text-gray-300"
                 fill="none"
@@ -2566,11 +2641,11 @@ export default function Dashboard() {
       {/* Production by Barangay - Full Width */}
       <div className="mb-8 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
         <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
             <h4 className="text-lg font-semibold text-gray-800">
               Production by Barangay
             </h4>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-1 sm:gap-2">
               <select
                 value={selectedBarangayMonth}
                 onChange={(e) => setSelectedBarangayMonth(e.target.value)}
@@ -2609,74 +2684,76 @@ export default function Dashboard() {
                   </option>
                 ))}
               </select>
-              <button
-                onClick={() => {
-                  const dataTypes = [
-                    "Total",
-                    "Livestock",
-                    "Rice",
-                    "Crops",
-                    "Fish",
-                  ];
-                  const currentIndex = dataTypes.indexOf(selectedDataType);
-                  const prevIndex =
-                    (currentIndex - 1 + dataTypes.length) % dataTypes.length;
-                  setSelectedDataType(dataTypes[prevIndex]);
-                }}
-                className="flex items-center justify-center w-8 h-8 text-gray-600 transition-colors duration-150 bg-gray-100 rounded-full hover:bg-gray-200 hover:text-gray-800"
-                aria-label="Previous data type"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+              <div className="flex items-center">
+                <button
+                  onClick={() => {
+                    const dataTypes = [
+                      "Total",
+                      "Livestock",
+                      "Rice",
+                      "Crops",
+                      "Fish",
+                    ];
+                    const currentIndex = dataTypes.indexOf(selectedDataType);
+                    const prevIndex =
+                      (currentIndex - 1 + dataTypes.length) % dataTypes.length;
+                    setSelectedDataType(dataTypes[prevIndex]);
+                  }}
+                  className="flex items-center justify-center text-gray-600 transition-colors duration-150 bg-gray-100 rounded-full w-7 h-7 sm:w-8 sm:h-8 hover:bg-gray-200 hover:text-gray-800"
+                  aria-label="Previous data type"
                 >
-                  <path d="M15 18l-6-6 6-6" />
-                </svg>
-              </button>
-              <span className="px-4 py-2 text-sm font-medium text-white bg-[#6A9C89] rounded-full shadow-sm">
-                {selectedDataType} Production
-              </span>
-              <button
-                onClick={() => {
-                  const dataTypes = [
-                    "Total",
-                    "Livestock",
-                    "Rice",
-                    "Crops",
-                    "Fish",
-                  ];
-                  const currentIndex = dataTypes.indexOf(selectedDataType);
-                  const nextIndex = (currentIndex + 1) % dataTypes.length;
-                  setSelectedDataType(dataTypes[nextIndex]);
-                }}
-                className="flex items-center justify-center w-8 h-8 text-gray-600 transition-colors duration-150 bg-gray-100 rounded-full hover:bg-gray-200 hover:text-gray-800"
-                aria-label="Next data type"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M15 18l-6-6 6-6" />
+                  </svg>
+                </button>
+                <span className="px-2 sm:px-4 py-1 sm:py-2 mx-1 text-xs sm:text-sm font-medium text-white bg-[#6A9C89] rounded-full shadow-sm whitespace-nowrap">
+                  {selectedDataType} Production
+                </span>
+                <button
+                  onClick={() => {
+                    const dataTypes = [
+                      "Total",
+                      "Livestock",
+                      "Rice",
+                      "Crops",
+                      "Fish",
+                    ];
+                    const currentIndex = dataTypes.indexOf(selectedDataType);
+                    const nextIndex = (currentIndex + 1) % dataTypes.length;
+                    setSelectedDataType(dataTypes[nextIndex]);
+                  }}
+                  className="flex items-center justify-center text-gray-600 transition-colors duration-150 bg-gray-100 rounded-full w-7 h-7 sm:w-8 sm:h-8 hover:bg-gray-200 hover:text-gray-800"
+                  aria-label="Next data type"
                 >
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
-              </button>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
           {dashboardData.productionByBarangay.length > 0 ? (
-            <div className="h-[400px] mt-4">
+            <div className="h-[300px] sm:h-[400px] mt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={getBarangayDataByType(
@@ -2743,7 +2820,7 @@ export default function Dashboard() {
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-[400px] text-gray-400">
+            <div className="flex flex-col items-center justify-center h-[300px] sm:h-[400px] text-gray-400">
               <svg
                 className="w-16 h-16 mb-4 text-gray-300"
                 fill="none"
@@ -2782,7 +2859,7 @@ export default function Dashboard() {
           </div>
 
           {dashboardData.topPerformingItems.length > 0 ? (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-5">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
               {dashboardData.topPerformingItems.map((item, index) => (
                 <div
                   key={index}
@@ -2872,90 +2949,92 @@ export default function Dashboard() {
           </div>
 
           {dashboardData.recentHarvests.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                      Farmer
-                    </th>
-                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                      Type
-                    </th>
-                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                      Product
-                    </th>
-                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                      Yield
-                    </th>
-                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                      Area (ha)
-                    </th>
-                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                      Yield/ha
-                    </th>
-                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                      Harvest Date
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {dashboardData.recentHarvests.map((harvest, index) => (
-                    <tr
-                      key={harvest.id}
-                      className="transition-colors duration-150 hover:bg-gray-50"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 text-green-600 bg-green-100 rounded-full">
-                            {harvest.farmer_name.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">
-                              {harvest.farmer_name}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {harvest.barangay}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-3 py-1 text-sm font-medium text-green-700 bg-green-100 rounded-full">
-                          {harvest.type}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-3 py-1 text-sm font-medium text-green-700 bg-green-100 rounded-full">
-                          {harvest.crop_type}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                        {harvest.yield_amount.toFixed(2)}{" "}
-                        {harvest.type === "Raiser" ? "heads" : "tons"}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
-                        {harvest.area.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`text-sm font-medium ${
-                            harvest.yield_per_hectare !== "N/A" &&
-                            Number(harvest.yield_per_hectare) > 5
-                              ? "text-green-600"
-                              : "text-gray-600"
-                          }`}
-                        >
-                          {harvest.yield_per_hectare}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
-                        {harvest.harvest_date.toLocaleDateString()}
-                      </td>
+            <div className="-mx-6 overflow-x-auto">
+              <div className="inline-block min-w-full px-6 align-middle">
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                        Farmer
+                      </th>
+                      <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                        Type
+                      </th>
+                      <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                        Product
+                      </th>
+                      <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                        Yield
+                      </th>
+                      <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                        Area (ha)
+                      </th>
+                      <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                        Yield/ha
+                      </th>
+                      <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                        Harvest Date
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {dashboardData.recentHarvests.map((harvest, index) => (
+                      <tr
+                        key={harvest.id}
+                        className="transition-colors duration-150 hover:bg-gray-50"
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 text-green-600 bg-green-100 rounded-full">
+                              {harvest.farmer_name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">
+                                {harvest.farmer_name}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {harvest.barangay}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="px-3 py-1 text-sm font-medium text-green-700 bg-green-100 rounded-full">
+                            {harvest.type}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="px-3 py-1 text-sm font-medium text-green-700 bg-green-100 rounded-full">
+                            {harvest.crop_type}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
+                          {harvest.yield_amount.toFixed(2)}{" "}
+                          {harvest.type === "Raiser" ? "heads" : "tons"}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                          {harvest.area.toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`text-sm font-medium ${
+                              harvest.yield_per_hectare !== "N/A" &&
+                              Number(harvest.yield_per_hectare) > 5
+                                ? "text-green-600"
+                                : "text-gray-600"
+                            }`}
+                          >
+                            {harvest.yield_per_hectare}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                          {harvest.harvest_date.toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-gray-400">
