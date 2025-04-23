@@ -604,7 +604,10 @@ function Analytics() {
   // Process rice data - memoized with useCallback
   const processRiceData = useCallback(() => {
     const riceData = rawData.rice || [];
-    const varietyMap = {};
+
+    // Create separate maps for irrigated and rainfed rice
+    const irrigatedMap = {};
+    const rainfedMap = {};
 
     riceData.forEach((rice) => {
       // Normalize variety names to prevent duplicates with slight differences
@@ -644,21 +647,61 @@ function Analytics() {
         }
       }
 
-      // If we have a valid variety and production value, add it to the map
+      // Determine if rice is irrigated or rainfed
+      const isIrrigated =
+        (rice.area_type &&
+          rice.area_type.toLowerCase().includes("irrigated")) ||
+        (rice.ecosystem &&
+          rice.ecosystem.toLowerCase().includes("irrigated")) ||
+        (rice.irrigation_type &&
+          rice.irrigation_type.toLowerCase() !== "rainfed");
+
+      // If we have a valid variety and production value, add it to the appropriate map
       if (variety && production > 0) {
-        varietyMap[variety] = (varietyMap[variety] || 0) + production;
+        if (isIrrigated) {
+          irrigatedMap[variety] = (irrigatedMap[variety] || 0) + production;
+        } else {
+          rainfedMap[variety] = (rainfedMap[variety] || 0) + production;
+        }
       }
     });
 
-    const items = Object.entries(varietyMap)
-      .map(([name, value]) => ({ name, value }))
+    // Convert maps to arrays of items
+    const irrigatedItems = Object.entries(irrigatedMap)
+      .map(([name, value]) => ({
+        name: `${name} (Irrigated)`,
+        value,
+        type: "irrigated",
+      }))
       .sort((a, b) => b.value - a.value);
 
+    const rainfedItems = Object.entries(rainfedMap)
+      .map(([name, value]) => ({
+        name: `${name} (Rainfed)`,
+        value,
+        type: "rainfed",
+      }))
+      .sort((a, b) => b.value - a.value);
+
+    // Combine both arrays
+    const items = [...irrigatedItems, ...rainfedItems];
+
+    // Calculate total production
     const total = items.reduce((sum, item) => sum + item.value, 0);
+    const irrigatedTotal = irrigatedItems.reduce(
+      (sum, item) => sum + item.value,
+      0
+    );
+    const rainfedTotal = rainfedItems.reduce(
+      (sum, item) => sum + item.value,
+      0
+    );
 
     return {
       total,
       items,
+      irrigatedTotal,
+      rainfedTotal,
     };
   }, [rawData.rice]);
 
@@ -1111,128 +1154,101 @@ function Analytics() {
       <div className="space-y-6">
         {/* Total Card */}
         <div className="p-6 bg-white rounded-lg shadow">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="flex items-center text-2xl font-bold">
-                <span className="mr-2">{category.icon}</span>
-                {category.name}
-              </h3>
-              <p className="text-sm text-gray-500">Total production data</p>
+          {/* Fixed header section */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="flex items-center text-2xl font-bold">
+                  <span className="mr-2">{category.icon}</span>
+                  {category.name}
+                </h3>
+                <p className="text-sm text-gray-500">Total production data</p>
+              </div>
+              <div className="text-3xl font-bold text-green-600">
+                {data.total.toLocaleString()}{" "}
+                <span className="text-base font-normal text-gray-500">
+                  {category.unit}
+                </span>
+              </div>
             </div>
-            <div className="text-3xl font-bold text-green-600">
-              {data.total.toLocaleString()}{" "}
-              <span className="text-base font-normal text-gray-500">
-                {category.unit}
-              </span>
+
+            {category.id === "rice" && (
+              <div className="flex justify-between p-3 mb-4 rounded-lg bg-gray-50">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 mr-2 rounded-full bg-[#3498db]"></div>
+                  <span className="font-medium">Irrigated:</span>
+                  <span className="ml-2 font-bold">
+                    {data.irrigatedTotal?.toLocaleString() || 0} {category.unit}
+                  </span>
+                  <span className="ml-1 text-xs text-gray-500">
+                    (
+                    {data.total > 0
+                      ? (
+                          ((data.irrigatedTotal || 0) / data.total) *
+                          100
+                        ).toFixed(1)
+                      : 0}
+                    %)
+                  </span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 mr-2 rounded-full bg-[#e67e22]"></div>
+                  <span className="font-medium">Rainfed:</span>
+                  <span className="ml-2 font-bold">
+                    {data.rainfedTotal?.toLocaleString() || 0} {category.unit}
+                  </span>
+                  <span className="ml-1 text-xs text-gray-500">
+                    (
+                    {data.total > 0
+                      ? (((data.rainfedTotal || 0) / data.total) * 100).toFixed(
+                          1
+                        )
+                      : 0}
+                    %)
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="w-full h-2 mb-4 bg-gray-100 rounded-full">
+              <div
+                className="h-2 bg-green-600 rounded-full"
+                style={{ width: "100%" }}
+              ></div>
             </div>
-          </div>
 
-          <div className="w-full h-2 mb-6 bg-gray-100 rounded-full">
-            <div
-              className="h-2 bg-green-600 rounded-full"
-              style={{ width: "100%" }}
-            ></div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex justify-between text-sm font-medium text-gray-500">
+            <div className="flex justify-between mb-2 text-sm font-medium text-gray-500">
               <span>Type/Variety</span>
               <span>Amount ({category.unit})</span>
             </div>
+          </div>
 
-            {data.items.length > 0 ? (
-              <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
-                {data.items.map((item, index) => {
-                  // Calculate percentage with proper validation
-                  const percentage =
-                    data.total > 0 ? (item.value / data.total) * 100 : 0;
+          {/* Scrollable data section */}
+          {data.items.length > 0 ? (
+            <div className="max-h-[50vh] overflow-y-auto pr-2">
+              {data.items.map((item, index) => {
+                // Calculate percentage with proper validation
+                const percentage =
+                  data.total > 0 ? (item.value / data.total) * 100 : 0;
 
-                  // Check if this is a livestock item with subtypes
-                  if (
-                    category.id === "livestock" &&
-                    item.subtypes &&
-                    item.subtypes.length > 0
-                  ) {
-                    return (
-                      <div key={index} className="space-y-3">
-                        {/* Main animal type header */}
-                        <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-                          <div className="flex items-center">
-                            <div
-                              className="w-4 h-4 mr-2 rounded-full"
-                              style={{
-                                backgroundColor: getColorForIndex(index),
-                              }}
-                            ></div>
-                            <span className="text-lg font-semibold">
-                              {item.name}
-                            </span>
-                          </div>
-                          <div className="flex items-center">
-                            <span className="font-bold">
-                              {item.value.toLocaleString()}
-                            </span>
-                            <span className="ml-1 text-xs text-gray-500">
-                              ({percentage.toFixed(1)}%)
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Subtypes */}
-                        <div className="pl-6 space-y-2">
-                          {item.subtypes.map((subItem, subIndex) => {
-                            const subPercentage =
-                              item.value > 0
-                                ? (subItem.value / item.value) * 100
-                                : 0;
-
-                            return (
-                              <div
-                                key={`${index}-${subIndex}`}
-                                className="flex items-center justify-between"
-                              >
-                                <div className="flex items-center">
-                                  <div
-                                    className="w-2 h-2 mr-2 rounded-full"
-                                    style={{
-                                      backgroundColor: getColorForIndex(
-                                        index + subIndex
-                                      ),
-                                    }}
-                                  ></div>
-                                  <span className="font-medium capitalize">
-                                    {subItem.name}
-                                  </span>
-                                </div>
-                                <div className="flex items-center">
-                                  <span className="font-bold">
-                                    {subItem.value.toLocaleString()}
-                                  </span>
-                                  <span className="ml-1 text-xs text-gray-500">
-                                    ({subPercentage.toFixed(1)}%)
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  } else {
-                    // Regular item display for non-livestock categories or livestock without subtypes
-                    return (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between"
-                      >
+                // Check if this is a livestock item with subtypes
+                if (
+                  category.id === "livestock" &&
+                  item.subtypes &&
+                  item.subtypes.length > 0
+                ) {
+                  return (
+                    <div key={index} className="mb-6 space-y-3">
+                      {/* Main animal type header */}
+                      <div className="flex items-center justify-between pb-2 border-b border-gray-200">
                         <div className="flex items-center">
                           <div
-                            className="w-3 h-3 mr-2 rounded-full"
+                            className="w-4 h-4 mr-2 rounded-full"
                             style={{
                               backgroundColor: getColorForIndex(index),
                             }}
                           ></div>
-                          <span className="font-medium capitalize">
+                          <span className="text-lg font-semibold">
                             {item.name}
                           </span>
                         </div>
@@ -1245,23 +1261,95 @@ function Analytics() {
                           </span>
                         </div>
                       </div>
-                    );
-                  }
-                })}
-              </div>
-            ) : (
-              <p className="text-center text-gray-500">
-                No breakdown data available
-              </p>
-            )}
-          </div>
+
+                      {/* Subtypes */}
+                      <div className="pl-6 space-y-2">
+                        {item.subtypes.map((subItem, subIndex) => {
+                          const subPercentage =
+                            item.value > 0
+                              ? (subItem.value / item.value) * 100
+                              : 0;
+
+                          return (
+                            <div
+                              key={`${index}-${subIndex}`}
+                              className="flex items-center justify-between"
+                            >
+                              <div className="flex items-center">
+                                <div
+                                  className="w-2 h-2 mr-2 rounded-full"
+                                  style={{
+                                    backgroundColor: getColorForIndex(
+                                      index + subIndex
+                                    ),
+                                  }}
+                                ></div>
+                                <span className="font-medium capitalize">
+                                  {subItem.name}
+                                </span>
+                              </div>
+                              <div className="flex items-center">
+                                <span className="font-bold">
+                                  {subItem.value.toLocaleString()}
+                                </span>
+                                <span className="ml-1 text-xs text-gray-500">
+                                  ({subPercentage.toFixed(1)}%)
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                } else {
+                  // Regular item display for non-livestock categories or livestock without subtypes
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between mb-4"
+                    >
+                      <div className="flex items-center">
+                        <div
+                          className="w-3 h-3 mr-2 rounded-full"
+                          style={{
+                            backgroundColor:
+                              category.id === "rice" && item.type
+                                ? item.type === "irrigated"
+                                  ? "#3498db" // Blue for irrigated
+                                  : "#e67e22" // Orange for rainfed
+                                : getColorForIndex(index),
+                          }}
+                        ></div>
+                        <span className="font-medium capitalize">
+                          {item.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="font-bold">
+                          {item.value.toLocaleString()}
+                        </span>
+                        <span className="ml-1 text-xs text-gray-500">
+                          ({percentage.toFixed(1)}%)
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+              })}
+            </div>
+          ) : (
+            <p className="text-center text-gray-500">
+              No breakdown data available
+            </p>
+          )}
         </div>
       </div>
     );
   }, [analyticsData, categories, currentCategory, getColorForIndex]);
 
   return (
-    <div className="container p-4 mx-auto overflow-auto">
+    <div className="container flex flex-col h-screen p-4 mx-auto overflow-hidden">
       <div className="flex flex-col mb-4 space-y-2">
         <h1 className="text-3xl font-bold">Agricultural Production Data</h1>
         <p className="text-gray-600">
@@ -1347,7 +1435,9 @@ function Analytics() {
       </div>
 
       {/* Content section with scrollable overflow */}
-      <div className="mt-4 overflow-auto">{renderCategoryContent()}</div>
+      <div className="flex-grow mt-4 overflow-hidden">
+        {renderCategoryContent()}
+      </div>
     </div>
   );
 }
