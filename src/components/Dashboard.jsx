@@ -38,16 +38,8 @@ import {
   Bar,
 } from "recharts";
 
-// At the top of the file, import or create a shared state management solution
-import { create } from "zustand";
-
-// Create a store to manage shared state across components
-const useRefreshStore = create((set) => ({
-  isRefreshing: false,
-  lastRefresh: new Date(),
-  setRefreshing: (isRefreshing) => set({ isRefreshing }),
-  setLastRefresh: (lastRefresh) => set({ lastRefresh }),
-}));
+// At the top of the file, import the shared store
+import { useRefreshStore } from "./shared-store";
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
@@ -56,8 +48,14 @@ export default function Dashboard() {
   // const [lastRefresh, setLastRefresh] = useState(new Date());
 
   // WITH:
-  const { isRefreshing, lastRefresh, setRefreshing, setLastRefresh } =
-    useRefreshStore();
+  const {
+    isRefreshing,
+    lastRefresh,
+    setRefreshing,
+    setLastRefresh,
+    dataCache,
+    updateDataCache,
+  } = useRefreshStore();
   // Use isRefreshing instead of isBackgroundRefreshing in your component
   // And replace all instances of setIsBackgroundRefreshing with setRefreshing
   const [error, setError] = useState(null);
@@ -114,11 +112,19 @@ export default function Dashboard() {
 
   // Add this state variable near the other state declarations
   const [selectedDataType, setSelectedDataType] = useState("Total");
+  const [selectedMonthlyDataType, setSelectedMonthlyDataType] =
+    useState("Total");
+  // Add these state variables near the other state declarations (after the selectedMonthlyDataType state)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedBarangayMonth, setSelectedBarangayMonth] = useState("All");
+  const [selectedBarangayYear, setSelectedBarangayYear] = useState(
+    new Date().getFullYear()
+  );
   const [currentBarangayDataIndex, setCurrentBarangayDataIndex] = useState(0);
 
   // Add this new function to the component to get data by type:
   const getBarangayDataByType = useCallback(
-    (dataType) => {
+    (dataType, month = selectedBarangayMonth, year = selectedBarangayYear) => {
       // If no data is available, return empty array
       if (!rawData || Object.values(rawData).every((arr) => arr.length === 0)) {
         return [];
@@ -127,8 +133,22 @@ export default function Dashboard() {
       const barangayMap = {};
 
       // Helper function to add data to the barangay map
-      const addToBarangayMap = (item, value, barangay) => {
+      const addToBarangayMap = (item, value, barangay, date) => {
         if (isNaN(value) || value <= 0) return;
+
+        // Skip if date is not provided
+        if (!date) return;
+
+        // Filter by month and year
+        const itemDate = new Date(date);
+        const itemYear = itemDate.getFullYear();
+        const itemMonth = itemDate.toLocaleString("en-US", { month: "short" });
+
+        // Skip if year doesn't match
+        if (year !== itemYear) return;
+
+        // Skip if month doesn't match (unless "All" is selected)
+        if (month !== "All" && month !== itemMonth) return;
 
         barangay = barangay || item.barangay || "Unknown";
 
@@ -145,7 +165,12 @@ export default function Dashboard() {
         rawData.livestock.forEach((livestock) => {
           const quantity = Number.parseInt(livestock.quantity || 0);
           if (dataType === "Total" || dataType === "Livestock") {
-            addToBarangayMap(livestock, quantity, livestock.barangay);
+            addToBarangayMap(
+              livestock,
+              quantity,
+              livestock.barangay,
+              livestock.created_at
+            );
           }
         });
       }
@@ -157,7 +182,12 @@ export default function Dashboard() {
             rice.production || rice.yield_amount || 0
           );
           if (dataType === "Total" || dataType === "Rice") {
-            addToBarangayMap(rice, production, rice.barangay);
+            addToBarangayMap(
+              rice,
+              production,
+              rice.barangay,
+              rice.harvest_date
+            );
           }
         });
       }
@@ -169,7 +199,12 @@ export default function Dashboard() {
             crop.yield_amount || crop.production || crop.quantity || 0
           );
           if (dataType === "Total" || dataType === "Crops") {
-            addToBarangayMap(crop, production, crop.barangay);
+            addToBarangayMap(
+              crop,
+              production,
+              crop.barangay,
+              crop.harvest_date
+            );
           }
         });
 
@@ -179,7 +214,12 @@ export default function Dashboard() {
             crop.yield_amount || crop.production || crop.quantity || 0
           );
           if (dataType === "Total" || dataType === "Crops") {
-            addToBarangayMap(crop, production, crop.barangay);
+            addToBarangayMap(
+              crop,
+              production,
+              crop.barangay,
+              crop.harvest_date
+            );
           }
         });
       }
@@ -189,7 +229,12 @@ export default function Dashboard() {
         rawData.operators.forEach((operator) => {
           const production = Number.parseFloat(operator.production_kg || 0);
           if (dataType === "Total" || dataType === "Fish") {
-            addToBarangayMap(operator, production, operator.barangay);
+            addToBarangayMap(
+              operator,
+              production,
+              operator.barangay,
+              operator.date_of_harvest
+            );
           }
         });
       }
@@ -200,8 +245,213 @@ export default function Dashboard() {
         .sort((a, b) => b.value - a.value)
         .slice(0, 8); // Top 8 barangays
     },
-    [rawData]
+    [rawData, selectedBarangayMonth, selectedBarangayYear]
   );
+
+  // Add this function near the getBarangayDataByType function
+  const getMonthlyDataByType = useCallback(
+    (dataType, year = selectedYear) => {
+      // If no data is available, return empty array
+      if (!rawData || Object.values(rawData).every((arr) => arr.length === 0)) {
+        return [];
+      }
+
+      const monthlyProductionMap = {
+        Jan: 0,
+        Feb: 0,
+        Mar: 0,
+        Apr: 0,
+        May: 0,
+        Jun: 0,
+        Jul: 0,
+        Aug: 0,
+        Sep: 0,
+        Oct: 0,
+        Nov: 0,
+        Dec: 0,
+      };
+
+      // Process data based on selected type
+      if (dataType === "Total" || dataType === "Rice") {
+        // Add rice production to monthly data
+        rawData.rice.forEach((rice) => {
+          if (rice.harvest_date) {
+            const harvestDate = new Date(rice.harvest_date);
+            // Filter by year
+            if (harvestDate.getFullYear() === year) {
+              const month = harvestDate.toLocaleString("en-US", {
+                month: "short",
+              });
+              const production = Number.parseFloat(
+                rice.production || rice.yield_amount || 0
+              );
+              if (!isNaN(production) && production > 0) {
+                monthlyProductionMap[month] =
+                  (monthlyProductionMap[month] || 0) + production;
+              }
+            }
+          }
+        });
+      }
+
+      if (dataType === "Total" || dataType === "Crops") {
+        // Add crop production to monthly data
+        rawData.crops.forEach((crop) => {
+          if (crop.harvest_date) {
+            const harvestDate = new Date(crop.harvest_date);
+            // Filter by year
+            if (harvestDate.getFullYear() === year) {
+              const month = harvestDate.toLocaleString("en-US", {
+                month: "short",
+              });
+              const production = Number.parseFloat(
+                crop.yield_amount || crop.production || crop.quantity || 0
+              );
+              if (!isNaN(production) && production > 0) {
+                monthlyProductionMap[month] =
+                  (monthlyProductionMap[month] || 0) + production;
+              }
+            }
+          }
+        });
+
+        // Add high value crops to monthly data
+        rawData.highValueCrops.forEach((crop) => {
+          if (crop.harvest_date) {
+            const harvestDate = new Date(crop.harvest_date);
+            // Filter by year
+            if (harvestDate.getFullYear() === year) {
+              const month = harvestDate.toLocaleString("en-US", {
+                month: "short",
+              });
+              const production = Number.parseFloat(
+                crop.yield_amount || crop.production || crop.quantity || 0
+              );
+              if (!isNaN(production) && production > 0) {
+                monthlyProductionMap[month] =
+                  (monthlyProductionMap[month] || 0) + production;
+              }
+            }
+          }
+        });
+      }
+
+      if (dataType === "Total" || dataType === "Fish") {
+        // Add fish production to monthly data
+        rawData.operators.forEach((operator) => {
+          if (operator.date_of_harvest) {
+            const harvestDate = new Date(operator.date_of_harvest);
+            // Filter by year
+            if (harvestDate.getFullYear() === year) {
+              const month = harvestDate.toLocaleString("en-US", {
+                month: "short",
+              });
+              const production = Number.parseFloat(operator.production_kg || 0);
+              if (!isNaN(production) && production > 0) {
+                monthlyProductionMap[month] =
+                  (monthlyProductionMap[month] || 0) + production;
+              }
+            }
+          }
+        });
+      }
+
+      // In the getMonthlyDataByType function, replace the livestock section with this:
+      if (dataType === "Total" || dataType === "Livestock") {
+        // Add livestock data to monthly data
+        rawData.livestock.forEach((livestock) => {
+          if (livestock.created_at) {
+            const addedDate = new Date(livestock.created_at);
+            // Filter by year
+            if (addedDate.getFullYear() === year) {
+              const month = addedDate.toLocaleString("en-US", {
+                month: "short",
+              });
+              const quantity = Number.parseInt(livestock.quantity || 0);
+              if (!isNaN(quantity) && quantity > 0) {
+                monthlyProductionMap[month] =
+                  (monthlyProductionMap[month] || 0) + quantity;
+              }
+            }
+          }
+        });
+      }
+
+      // Convert monthly production to array for chart
+      const monthOrder = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+      return monthOrder.map((month) => ({
+        name: month,
+        production: monthlyProductionMap[month] || 0,
+      }));
+    },
+    [rawData, selectedYear]
+  );
+
+  // Add this function to get available years from the data
+  const getAvailableYears = useCallback(() => {
+    const years = new Set();
+    const currentYear = new Date().getFullYear();
+
+    // Add current and previous year as defaults
+    years.add(currentYear);
+    years.add(currentYear - 1);
+
+    // Extract years from rice data
+    rawData.rice.forEach((rice) => {
+      if (rice.harvest_date) {
+        const year = new Date(rice.harvest_date).getFullYear();
+        years.add(year);
+      }
+    });
+
+    // Extract years from crops data
+    rawData.crops.forEach((crop) => {
+      if (crop.harvest_date) {
+        const year = new Date(crop.harvest_date).getFullYear();
+        years.add(year);
+      }
+    });
+
+    // Extract years from high value crops data
+    rawData.highValueCrops.forEach((crop) => {
+      if (crop.harvest_date) {
+        const year = new Date(crop.harvest_date).getFullYear();
+        years.add(year);
+      }
+    });
+
+    // Extract years from operators data
+    rawData.operators.forEach((operator) => {
+      if (operator.date_of_harvest) {
+        const year = new Date(operator.date_of_harvest).getFullYear();
+        years.add(year);
+      }
+    });
+
+    // Extract years from livestock data
+    rawData.livestock.forEach((livestock) => {
+      if (livestock.created_at) {
+        const year = new Date(livestock.created_at).getFullYear();
+        years.add(year);
+      }
+    });
+
+    // Convert Set to sorted array
+    return Array.from(years).sort((a, b) => b - a);
+  }, [rawData]);
 
   // Ref for cleanup
   const abortControllerRef = useRef(null);
@@ -258,8 +508,18 @@ export default function Dashboard() {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }, []);
 
-  // Fetch all data with AbortController for cleanup
+  // In the Dashboard component, update the useEffect that fetches data to check the cache first
+  // Find the useEffect with fetchAllData and add this code before fetchAllData:
+
+  // Fetch data with AbortController for cleanup
   useEffect(() => {
+    // Check if we have data in the cache first
+    if (Object.values(dataCache).some((arr) => arr.length > 0)) {
+      console.log("Dashboard: Using cached data from store");
+      setRawData(dataCache);
+      setLoading(false);
+    }
+
     const controller = new AbortController();
     const signal = controller.signal;
 
@@ -493,6 +753,17 @@ export default function Dashboard() {
 
       // Store all the fetched and processed data
       setRawData({
+        farmers,
+        livestock: enrichedLivestock,
+        operators: enrichedOperators,
+        crops,
+        rice,
+        highValueCrops,
+      });
+
+      // Add this line after setting rawData:
+      // Add this line to update the shared store
+      updateDataCache({
         farmers,
         livestock: enrichedLivestock,
         operators: enrichedOperators,
@@ -1715,8 +1986,8 @@ export default function Dashboard() {
   return (
     <div className="p-5 bg-[#F5F7F9] min-h-screen overflow-y-auto">
       {/* Dashboard Header */}
-      <div className="mb-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+      <div className="mb-10">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-[#333333]">
               Agricultural Production Dashboard
@@ -1731,50 +2002,49 @@ export default function Dashboard() {
               <span className="text-sm font-medium">{formattedDate}</span>
             </div>
           </div>
-        </div>
 
-        {/* Production Trend Indicator */}
-        <div className="inline-flex items-center p-3 mt-4 bg-white border border-gray-100 rounded-lg shadow-sm">
-          <Activity className="w-5 h-5 mr-2 text-[#6A9C89]" />
-          <span className="mr-2 text-sm font-medium">Production Trend:</span>
-          <div
-            className={`flex items-center ${
-              dashboardData.productionTrend >= 0
-                ? "text-green-600"
-                : "text-red-600"
-            }`}
-          >
-            {dashboardData.productionTrend >= 0 ? (
-              <ArrowUp className="w-4 h-4 mr-1" />
-            ) : (
-              <ArrowDown className="w-4 h-4 mr-1" />
-            )}
-            <span className="font-semibold">
-              {Math.abs(dashboardData.productionTrend).toFixed(1)}%
-            </span>
-            <span className="ml-1 text-sm text-gray-600">
-              from previous year
-            </span>
+          {/* Production Trend Indicator */}
+          <div className="inline-flex items-center p-3 mt-4 transition-all duration-200 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md">
+            <Activity className="w-5 h-5 mr-2 text-[#6A9C89]" />
+            <span className="mr-2 text-sm font-medium">Production Trend:</span>
+            <div
+              className={`flex items-center ${
+                dashboardData.productionTrend >= 0
+                  ? "text-green-600"
+                  : "text-red-600"
+              }`}
+            >
+              {dashboardData.productionTrend >= 0 ? (
+                <ArrowUp className="w-4 h-4 mr-1" />
+              ) : (
+                <ArrowDown className="w-4 h-4 mr-1" />
+              )}
+              <span className="font-semibold">
+                {Math.abs(dashboardData.productionTrend).toFixed(1)}%
+              </span>
+              <span className="ml-1 text-sm text-gray-600">
+                from previous year
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* Background refresh indicator */}
-        {isRefreshing && (
+          {/* Background refresh indicator */}
+          {isRefreshing && (
+            <div className="inline-flex items-center p-2 mt-2 ml-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-md shadow-sm">
+              <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" />
+              <span>Updating data...</span>
+            </div>
+          )}
+
+          {/* Last refresh time indicator */}
           <div className="inline-flex items-center p-2 mt-2 ml-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-md">
-            <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" />
-            <span>Updating data...</span>
+            <span>Last updated: {lastRefresh.toLocaleTimeString()}</span>
           </div>
-        )}
-
-        {/* Last refresh time indicator */}
-        <div className="inline-flex items-center p-2 mt-2 ml-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-md">
-          <span>Last updated: {lastRefresh.toLocaleTimeString()}</span>
         </div>
       </div>
-
       {/* Top Stats Cards */}
       <div className="grid grid-cols-1 gap-6 mb-8 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-gradient-to-br from-[#6A9C89] to-[#4A7C69] rounded-xl text-white p-6 shadow-md transition-transform hover:scale-[1.02] duration-300">
+        <div className="bg-gradient-to-br from-[#6A9C89] to-[#4A7C69] rounded-xl text-white p-6 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] duration-300 border border-[#8DB5A5]/20">
           <div className="flex items-center mb-4">
             <div className="p-2 mr-4 bg-white rounded-lg bg-opacity-20">
               <BarChart2 className="w-6 h-6" />
@@ -1793,7 +2063,7 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <div className="bg-gradient-to-br from-[#4F6F7D] to-[#3A5A68] rounded-xl text-white p-6 shadow-md transition-transform hover:scale-[1.02] duration-300">
+        <div className="bg-gradient-to-br from-[#4F6F7D] to-[#3A5A68] rounded-xl text-white p-6 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] duration-300 border border-[#6F8F9D]/20">
           <div className="flex items-center mb-4">
             <div className="p-2 mr-4 bg-white rounded-lg bg-opacity-20">
               <TrendingUp className="w-6 h-6" />
@@ -1826,7 +2096,7 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <div className="bg-gradient-to-br from-[#388E3C] to-[#2E7D32] rounded-xl text-white p-6 shadow-md transition-transform hover:scale-[1.02] duration-300">
+        <div className="bg-gradient-to-br from-[#388E3C] to-[#2E7D32] rounded-xl text-white p-6 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] duration-300 border border-[#4CAF50]/20">
           <div className="flex items-center mb-4">
             <div className="p-2 mr-4 bg-white rounded-lg bg-opacity-20">
               <Sprout className="w-6 h-6" />
@@ -1845,7 +2115,7 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <div className="bg-gradient-to-br from-[#0288D1] to-[#0277BD] rounded-xl text-white p-6 shadow-md transition-transform hover:scale-[1.02] duration-300">
+        <div className="bg-gradient-to-br from-[#0288D1] to-[#0277BD] rounded-xl text-white p-6 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] duration-300 border border-[#29B6F6]/20">
           <div className="flex items-center mb-4">
             <div className="p-2 mr-4 bg-white rounded-lg bg-opacity-20">
               <Award className="w-6 h-6" />
@@ -1890,13 +2160,13 @@ export default function Dashboard() {
       </div>
 
       {/* Farmer Type Distribution */}
-      <div className="p-6 mb-8 bg-white border border-gray-100 shadow-md rounded-xl">
+      <div className="p-6 mb-8 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
         <h4 className="mb-6 text-lg font-semibold text-gray-800">
           Farmer Type Distribution
         </h4>
         {dashboardData.farmerTypeDistribution &&
         dashboardData.farmerTypeDistribution.length > 0 ? (
-          <div className="h-[320px]">
+          <div className="h-[320px] mt-4">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -1970,7 +2240,7 @@ export default function Dashboard() {
 
       {/* Secondary Stats Row */}
       <div className="grid grid-cols-1 gap-6 mb-8 sm:grid-cols-3">
-        <div className="p-6 bg-white border border-gray-100 shadow-md rounded-xl">
+        <div className="p-6 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-800">
               Registered Farmers
@@ -1987,7 +2257,7 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <div className="p-6 bg-white border border-gray-100 shadow-md rounded-xl">
+        <div className="p-6 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-800">
               Livestock Count
@@ -2004,7 +2274,7 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <div className="p-6 bg-white border border-gray-100 shadow-md rounded-xl">
+        <div className="p-6 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-800">
               Aquaculture Production
@@ -2023,13 +2293,14 @@ export default function Dashboard() {
       </div>
 
       {/* Charts Row */}
+      {/* Charts Row - Other charts */}
       <div className="grid grid-cols-1 gap-6 mb-8 lg:grid-cols-2">
-        <div className="p-6 bg-white border border-gray-100 shadow-md rounded-xl">
+        <div className="p-6 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
           <h4 className="mb-6 text-lg font-semibold text-gray-800">
             Production Distribution
           </h4>
           {dashboardData.cropProduction.length > 0 ? (
-            <div className="h-[320px]">
+            <div className="h-[320px] mt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -2099,17 +2370,104 @@ export default function Dashboard() {
           )}
         </div>
 
-        <div className="p-6 bg-white border border-gray-100 shadow-md rounded-xl">
-          <h4 className="mb-6 text-lg font-semibold text-gray-800">
-            Monthly Production Trend
-          </h4>
-          {dashboardData.monthlyProduction.some(
+        {/* Monthly Production Trend */}
+        <div className="p-6 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-lg font-semibold text-gray-800">
+              Monthly Production Trend
+            </h4>
+            <div className="flex items-center space-x-2">
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {getAvailableYears().map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => {
+                  const dataTypes = [
+                    "Total",
+                    "Livestock",
+                    "Rice",
+                    "Crops",
+                    "Fish",
+                  ];
+                  const currentIndex = dataTypes.indexOf(
+                    selectedMonthlyDataType
+                  );
+                  const prevIndex =
+                    (currentIndex - 1 + dataTypes.length) % dataTypes.length;
+                  setSelectedMonthlyDataType(dataTypes[prevIndex]);
+                }}
+                className="p-1 text-gray-600 transition-colors duration-150 bg-gray-100 rounded-full hover:bg-gray-200 hover:text-gray-800"
+                aria-label="Previous data type"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
+              <span className="px-3 py-1 text-sm font-medium text-white bg-[#6A9C89] rounded-full shadow-sm">
+                {selectedMonthlyDataType} Production
+              </span>
+              <button
+                onClick={() => {
+                  const dataTypes = [
+                    "Total",
+                    "Livestock",
+                    "Rice",
+                    "Crops",
+                    "Fish",
+                  ];
+                  const currentIndex = dataTypes.indexOf(
+                    selectedMonthlyDataType
+                  );
+                  const nextIndex = (currentIndex + 1) % dataTypes.length;
+                  setSelectedMonthlyDataType(dataTypes[nextIndex]);
+                }}
+                className="p-1 text-gray-600 transition-colors duration-150 bg-gray-100 rounded-full hover:bg-gray-200 hover:text-gray-800"
+                aria-label="Next data type"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          {getMonthlyDataByType(selectedMonthlyDataType, selectedYear).some(
             (item) => item.production > 0
           ) ? (
-            <div className="h-[320px]">
+            <div className="h-[320px] mt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
-                  data={dashboardData.monthlyProduction}
+                  data={getMonthlyDataByType(
+                    selectedMonthlyDataType,
+                    selectedYear
+                  )}
                   margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                 >
                   <defs>
@@ -2144,7 +2502,11 @@ export default function Dashboard() {
                   />
                   <Tooltip
                     formatter={(value) => [
-                      `${formatNumber(value.toFixed(2))} tons`,
+                      `${formatNumber(value.toFixed(2))} ${
+                        selectedMonthlyDataType === "Livestock"
+                          ? "heads"
+                          : "tons"
+                      }`,
                       "Production",
                     ]}
                     contentStyle={{
@@ -2158,7 +2520,11 @@ export default function Dashboard() {
                   <Area
                     type="monotone"
                     dataKey="production"
-                    name="Production (tons)"
+                    name={`${selectedMonthlyDataType} Production ${
+                      selectedMonthlyDataType === "Livestock"
+                        ? "(heads)"
+                        : "(tons)"
+                    }`}
                     stroke={colors.primary}
                     fillOpacity={1}
                     fill="url(#colorProduction)"
@@ -2197,401 +2563,423 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Barangay Production Distribution */}
-      <div className="p-6 mb-8 bg-white border border-gray-100 shadow-md rounded-xl">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-semibold text-gray-800">
-            Production by Barangay
-          </h4>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => {
-                const dataTypes = [
-                  "Total",
-                  "Livestock",
-                  "Rice",
-                  "Crops",
-                  "Fish",
-                ];
-                const currentIndex = dataTypes.indexOf(selectedDataType);
-                const prevIndex =
-                  (currentIndex - 1 + dataTypes.length) % dataTypes.length;
-                setSelectedDataType(dataTypes[prevIndex]);
-              }}
-              className="p-1 text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200"
-              aria-label="Previous data type"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+      {/* Production by Barangay - Full Width */}
+      <div className="mb-8 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h4 className="text-lg font-semibold text-gray-800">
+              Production by Barangay
+            </h4>
+            <div className="flex items-center space-x-2">
+              <select
+                value={selectedBarangayMonth}
+                onChange={(e) => setSelectedBarangayMonth(e.target.value)}
+                className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
-            </button>
-            <span className="px-3 py-1 text-sm font-medium text-white bg-[#6A9C89] rounded-full">
-              {selectedDataType} Production
-            </span>
-            <button
-              onClick={() => {
-                const dataTypes = [
-                  "Total",
-                  "Livestock",
-                  "Rice",
-                  "Crops",
-                  "Fish",
-                ];
-                const currentIndex = dataTypes.indexOf(selectedDataType);
-                const nextIndex = (currentIndex + 1) % dataTypes.length;
-                setSelectedDataType(dataTypes[nextIndex]);
-              }}
-              className="p-1 text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200"
-              aria-label="Next data type"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                <option value="All">All Months</option>
+                {[
+                  "Jan",
+                  "Feb",
+                  "Mar",
+                  "Apr",
+                  "May",
+                  "Jun",
+                  "Jul",
+                  "Aug",
+                  "Sep",
+                  "Oct",
+                  "Nov",
+                  "Dec",
+                ].map((month) => (
+                  <option key={month} value={month}>
+                    {month}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedBarangayYear}
+                onChange={(e) =>
+                  setSelectedBarangayYear(Number(e.target.value))
+                }
+                className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <path d="M9 18l6-6-6-6" />
-              </svg>
-            </button>
-          </div>
-        </div>
-        {dashboardData.productionByBarangay.length > 0 ? (
-          <div className="h-[400px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={getBarangayDataByType(selectedDataType)}
-                margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                barSize={40}
+                {getAvailableYears().map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => {
+                  const dataTypes = [
+                    "Total",
+                    "Livestock",
+                    "Rice",
+                    "Crops",
+                    "Fish",
+                  ];
+                  const currentIndex = dataTypes.indexOf(selectedDataType);
+                  const prevIndex =
+                    (currentIndex - 1 + dataTypes.length) % dataTypes.length;
+                  setSelectedDataType(dataTypes[prevIndex]);
+                }}
+                className="flex items-center justify-center w-8 h-8 text-gray-600 transition-colors duration-150 bg-gray-100 rounded-full hover:bg-gray-200 hover:text-gray-800"
+                aria-label="Previous data type"
               >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="#E0E0E0"
-                />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fill: colors.textLight }}
-                  axisLine={{ stroke: colors.border }}
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis
-                  tick={{ fill: colors.textLight }}
-                  axisLine={{ stroke: colors.border }}
-                />
-                <Tooltip
-                  formatter={(value) => [
-                    `${formatNumber(value.toFixed(2))} ${
-                      selectedDataType === "Livestock" ? "heads" : "tons"
-                    }`,
-                    "Production",
-                  ]}
-                  contentStyle={{
-                    backgroundColor: "rgba(255, 255, 255, 0.9)",
-                    borderRadius: "8px",
-                    border: "1px solid #E0E0E0",
-                    boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-                  }}
-                />
-                <Legend />
-                <Bar
-                  dataKey="value"
-                  name={`${selectedDataType} Production ${
-                    selectedDataType === "Livestock" ? "(heads)" : "(tons)"
-                  }`}
-                  fill={colors.primary}
-                  radius={[4, 4, 0, 0]}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  {getBarangayDataByType(selectedDataType).map(
-                    (entry, index) => (
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
+              <span className="px-4 py-2 text-sm font-medium text-white bg-[#6A9C89] rounded-full shadow-sm">
+                {selectedDataType} Production
+              </span>
+              <button
+                onClick={() => {
+                  const dataTypes = [
+                    "Total",
+                    "Livestock",
+                    "Rice",
+                    "Crops",
+                    "Fish",
+                  ];
+                  const currentIndex = dataTypes.indexOf(selectedDataType);
+                  const nextIndex = (currentIndex + 1) % dataTypes.length;
+                  setSelectedDataType(dataTypes[nextIndex]);
+                }}
+                className="flex items-center justify-center w-8 h-8 text-gray-600 transition-colors duration-150 bg-gray-100 rounded-full hover:bg-gray-200 hover:text-gray-800"
+                aria-label="Next data type"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          {dashboardData.productionByBarangay.length > 0 ? (
+            <div className="h-[400px] mt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={getBarangayDataByType(
+                    selectedDataType,
+                    selectedBarangayMonth,
+                    selectedBarangayYear
+                  )}
+                  margin={{ top: 20, right: 30, left: 60, bottom: 60 }}
+                  barSize={40}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    horizontal={true}
+                    vertical={false}
+                    stroke="#E0E0E0"
+                  />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fill: colors.textLight }}
+                    axisLine={{ stroke: colors.border }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis
+                    tick={{ fill: colors.textLight }}
+                    axisLine={{ stroke: colors.border }}
+                    tickFormatter={(value) => `${value}`}
+                  />
+                  <Tooltip
+                    formatter={(value) => [
+                      `${formatNumber(value.toFixed(2))} ${
+                        selectedDataType === "Livestock" ? "heads" : "tons"
+                      }`,
+                      `${selectedDataType} Production`,
+                    ]}
+                    contentStyle={{
+                      backgroundColor: "rgba(255, 255, 255, 0.9)",
+                      borderRadius: "8px",
+                      border: "1px solid #E0E0E0",
+                      boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+                    }}
+                  />
+                  <Bar
+                    dataKey="value"
+                    name={`${selectedDataType} Production ${
+                      selectedDataType === "Livestock" ? "(heads)" : "(tons)"
+                    }`}
+                    fill="#6A9C89"
+                    radius={[4, 4, 0, 0]}
+                  >
+                    {getBarangayDataByType(
+                      selectedDataType,
+                      selectedBarangayMonth,
+                      selectedBarangayYear
+                    ).map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
-                        fill={
-                          index % 2 === 0 ? colors.primary : colors.primaryLight
-                        }
+                        fill={index % 2 === 0 ? "#6A9C89" : "#8DB5A5"}
                       />
-                    )
-                  )}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-[400px] text-gray-400">
-            <svg
-              className="w-16 h-16 mb-4 text-gray-300"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              ></path>
-            </svg>
-            <p className="text-lg font-medium">
-              No barangay production data available
-            </p>
-            <p className="mt-2 text-sm text-gray-400">
-              Add barangay information to see distribution
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Top Performing Items */}
-      <div className="p-6 mb-8 bg-white border border-gray-100 shadow-md rounded-xl">
-        <div className="flex items-center justify-between mb-6">
-          <h4 className="text-lg font-semibold text-gray-800">
-            Top Performing Items
-          </h4>
-          <span className="px-3 py-1 text-xs font-medium text-green-800 bg-green-100 rounded-full">
-            By Production Volume
-          </span>
-        </div>
-
-        {dashboardData.topPerformingItems.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-            {dashboardData.topPerformingItems.map((item, index) => (
-              <div
-                key={index}
-                className="p-4 transition-all border border-gray-100 rounded-lg bg-gray-50 hover:shadow-md"
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-[400px] text-gray-400">
+              <svg
+                className="w-16 h-16 mb-4 text-gray-300"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
               >
-                <div className="flex items-center mb-2">
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center mr-2 ${
-                      index === 0
-                        ? "bg-yellow-100 text-yellow-700"
-                        : index === 1
-                        ? "bg-gray-200 text-gray-700"
-                        : index === 2
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-blue-50 text-blue-700"
-                    }`}
-                  >
-                    {index + 1}
-                  </div>
-                  <h5
-                    className="font-medium text-gray-800 truncate"
-                    title={item.name}
-                  >
-                    {item.name}
-                  </h5>
-                </div>
-                <div className="mt-2">
-                  <div className="text-lg font-bold text-gray-900">
-                    {formatNumber(item.value.toFixed(2))}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {item.category === "livestock" ? "heads" : "metric tons"}
-                  </div>
-                </div>
-                <div className="w-full h-2 mt-3 bg-gray-200 rounded-full">
-                  <div
-                    className="h-2 bg-green-600 rounded-full"
-                    style={{
-                      width: `${
-                        (item.value /
-                          dashboardData.topPerformingItems[0].value) *
-                        100
-                      }%`,
-                    }}
-                  ></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-[200px] text-gray-400">
-            <svg
-              className="w-12 h-12 mb-3 text-gray-300"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              ></path>
-            </svg>
-            <p>No production data available</p>
-          </div>
-        )}
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                ></path>
+              </svg>
+              <p className="text-lg font-medium">
+                No barangay production data available
+              </p>
+              <p className="mt-2 text-sm text-gray-400">
+                Add barangay information to see distribution
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Recent Harvests */}
-      <div className="p-6 bg-white border border-gray-100 shadow-md rounded-xl">
-        <div className="flex items-center justify-between mb-6">
-          <h4 className="text-lg font-semibold text-gray-800">
-            Recent Harvests
-          </h4>
-          <a
-            href="/inventory"
-            className="text-sm font-medium text-[#6A9C89] hover:underline"
-          >
-            View All Records →
-          </a>
-        </div>
+      {/* Top Performing Items - Full Width */}
+      <div className="mb-8 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h4 className="text-lg font-semibold text-gray-800">
+              Top Performing Items
+            </h4>
+            <span className="px-4 py-2 text-sm font-medium text-green-800 bg-green-100 rounded-full">
+              By Production Volume
+            </span>
+          </div>
 
-        {dashboardData.recentHarvests.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead>
-                <tr>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase rounded-tl-lg bg-gray-50"
-                  >
-                    Farmer
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase bg-gray-50"
-                  >
-                    Type
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase bg-gray-50"
-                  >
-                    Product
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase bg-gray-50"
-                  >
-                    Yield
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase bg-gray-50"
-                  >
-                    Area (ha)
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase bg-gray-50"
-                  >
-                    Yield/ha
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase rounded-tr-lg bg-gray-50"
-                  >
-                    Harvest Date
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {dashboardData.recentHarvests.map((harvest, index) => (
-                  <tr
-                    key={harvest.id}
-                    className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-8 w-8 bg-[#E6F5E4] text-[#6A9C89] rounded-full flex items-center justify-center">
-                          {harvest.farmer_name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="ml-3">
-                          <div className="text-sm font-medium text-gray-900">
-                            {harvest.farmer_name}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {harvest.barangay}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-1 text-xs rounded-full ${
-                          harvest.type === "Raiser"
-                            ? "bg-purple-100 text-purple-700"
-                            : harvest.type === "Operator"
-                            ? "bg-cyan-100 text-cyan-700"
-                            : "bg-[#E6F5E4] text-[#6A9C89]"
-                        } font-medium`}
-                      >
-                        {harvest.type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-xs rounded-full bg-[#E6F5E4] text-[#6A9C89] font-medium">
-                        {harvest.crop_type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                      {harvest.yield_amount.toFixed(2)}
-                      {harvest.type === "Raiser" ? " heads" : " tons"}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
-                      {harvest.area.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`text-sm font-medium ${
-                          harvest.yield_per_hectare !== "N/A" &&
-                          Number(harvest.yield_per_hectare) > 5
-                            ? "text-green-600"
-                            : "text-gray-600"
-                        }`}
-                      >
-                        {harvest.yield_per_hectare}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
-                      {harvest.harvest_date.toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-            <svg
-              className="w-16 h-16 mb-4 text-gray-300"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
+          {dashboardData.topPerformingItems.length > 0 ? (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-5">
+              {dashboardData.topPerformingItems.map((item, index) => (
+                <div
+                  key={index}
+                  className="p-6 transition-all duration-200 border border-gray-100 rounded-lg bg-gray-50 hover:shadow-md hover:bg-white"
+                >
+                  <div className="flex items-center mb-4">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${
+                        index === 0
+                          ? "bg-yellow-100 text-yellow-700"
+                          : index === 1
+                          ? "bg-gray-200 text-gray-700"
+                          : index === 2
+                          ? "bg-amber-100 text-amber-700"
+                          : index === 3
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-green-100 text-green-700"
+                      }`}
+                    >
+                      {index + 1}
+                    </div>
+                    <h5
+                      className="text-base font-medium text-gray-800"
+                      title={item.name}
+                    >
+                      {item.name}
+                    </h5>
+                  </div>
+                  <div className="mt-2">
+                    <div className="text-2xl font-bold text-gray-900">
+                      {formatNumber(item.value.toFixed(2))}
+                    </div>
+                    <div className="mb-3 text-sm text-gray-500">
+                      {item.category === "livestock" ? "heads" : "metric tons"}
+                    </div>
+                  </div>
+                  <div className="w-full h-2 overflow-hidden bg-gray-200 rounded-full">
+                    <div
+                      className="h-2 bg-green-600 rounded-full"
+                      style={{
+                        width: `${
+                          (item.value /
+                            dashboardData.topPerformingItems[0].value) *
+                          100
+                        }%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-[200px] text-gray-400">
+              <svg
+                className="w-12 h-12 mb-3 text-gray-300"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                ></path>
+              </svg>
+              <p>No production data available</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Recent Harvests - Full Width */}
+      <div className="mb-8 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h4 className="text-lg font-semibold text-gray-800">
+              Recent Harvests
+            </h4>
+            <a
+              href="/inventory"
+              className="text-sm font-medium text-[#6A9C89] hover:underline"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              ></path>
-            </svg>
-            <p className="text-lg font-medium">No recent harvests</p>
-            <p className="mt-2 text-sm text-gray-400">
-              Add harvest data to see recent activity
-            </p>
+              View All Records →
+            </a>
           </div>
-        )}
+
+          {dashboardData.recentHarvests.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                      Farmer
+                    </th>
+                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                      Type
+                    </th>
+                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                      Product
+                    </th>
+                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                      Yield
+                    </th>
+                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                      Area (ha)
+                    </th>
+                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                      Yield/ha
+                    </th>
+                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                      Harvest Date
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {dashboardData.recentHarvests.map((harvest, index) => (
+                    <tr
+                      key={harvest.id}
+                      className="transition-colors duration-150 hover:bg-gray-50"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 text-green-600 bg-green-100 rounded-full">
+                            {harvest.farmer_name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {harvest.farmer_name}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {harvest.barangay}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-3 py-1 text-sm font-medium text-green-700 bg-green-100 rounded-full">
+                          {harvest.type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-3 py-1 text-sm font-medium text-green-700 bg-green-100 rounded-full">
+                          {harvest.crop_type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
+                        {harvest.yield_amount.toFixed(2)}{" "}
+                        {harvest.type === "Raiser" ? "heads" : "tons"}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                        {harvest.area.toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`text-sm font-medium ${
+                            harvest.yield_per_hectare !== "N/A" &&
+                            Number(harvest.yield_per_hectare) > 5
+                              ? "text-green-600"
+                              : "text-gray-600"
+                          }`}
+                        >
+                          {harvest.yield_per_hectare}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                        {harvest.harvest_date.toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+              <svg
+                className="w-16 h-16 mb-4 text-gray-300"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                ></path>
+              </svg>
+              <p className="text-lg font-medium">No recent harvests</p>
+              <p className="mt-2 text-sm text-gray-400">
+                Add harvest data to see recent activity
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

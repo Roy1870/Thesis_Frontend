@@ -8,16 +8,26 @@ import {
   prefetchRouteData,
 } from "./services/api";
 import { ChevronDown, RefreshCw } from "lucide-react";
-// At the top of the file, import the same store
-import { create } from "zustand";
+// At the top of the file, import the shared store
+import { useRefreshStore } from "./shared-store";
 
-// Create or import the same store (if in a separate file)
-const useRefreshStore = create((set) => ({
-  isRefreshing: false,
-  lastRefresh: new Date(),
-  setRefreshing: (isRefreshing) => set({ isRefreshing }),
-  setLastRefresh: (lastRefresh) => set({ lastRefresh }),
-}));
+// Replace the existing store creation with import
+// Remove this code:
+// const useRefreshStore = create((set) => ({
+//   isRefreshing: false,
+//   lastRefresh: new Date(),
+//   setRefreshing: (isRefreshing) => set({ isRefreshing }),
+//   setLastRefresh: (lastRefresh) => set({ lastRefresh }),
+//   dataCache: {
+//     farmers: [],
+//     livestock: [],
+//     operators: [],
+//     crops: [],
+//     rice: [],
+//     highValueCrops: [],
+//   },
+//   updateDataCache: (newData) => set({ dataCache: newData }),
+// }))
 
 function Analytics() {
   const [loading, setLoading] = useState(false);
@@ -26,8 +36,14 @@ function Analytics() {
   // const [lastRefreshed, setLastRefreshed] = useState(null);
 
   // WITH:
-  const { isRefreshing, lastRefresh, setRefreshing, setLastRefresh } =
-    useRefreshStore();
+  const {
+    isRefreshing,
+    lastRefresh,
+    setRefreshing,
+    setLastRefresh,
+    dataCache,
+    updateDataCache,
+  } = useRefreshStore();
   const [currentCategory, setCurrentCategory] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({
@@ -200,6 +216,13 @@ function Analytics() {
     const controller = new AbortController();
     const signal = controller.signal;
 
+    // Check if we have data in the cache first
+    if (Object.values(dataCache).some((arr) => arr.length > 0)) {
+      console.log("Analytics: Using cached data from store");
+      setRawData(dataCache);
+      setLoading(false);
+    }
+
     fetchAllData(signal);
 
     return () => {
@@ -223,7 +246,7 @@ function Analytics() {
       clearInterval(pollingInterval);
       controller.abort();
     };
-  }, [loading]);
+  }, [loading, setRefreshing, setLastRefresh]);
 
   // Function to handle data change notifications from other components
   const handleDataChange = useCallback(() => {
@@ -301,7 +324,7 @@ function Analytics() {
     return () => {
       controller.abort();
     };
-  }, []);
+  }, [setRefreshing, setLastRefresh]);
 
   // Fetch all data using optimized approach with signal for cancellation
   const fetchAllData = async (signal, isBackgroundRefresh = false) => {
@@ -473,6 +496,16 @@ function Analytics() {
         highValueCrops,
       });
 
+      // Add this line to update the shared store
+      updateDataCache({
+        farmers,
+        livestock: enrichedLivestock,
+        operators,
+        crops,
+        rice,
+        highValueCrops,
+      });
+
       // Always turn off loading states when done
       setLoading(false);
       setRefreshing(false);
@@ -492,193 +525,47 @@ function Analytics() {
     }
   };
 
-  // Replace the processLivestockData function with this enhanced version that categorizes animals
-  // Replace the processLivestockData function with this updated version that handles dynamic data better
+  // Updated processLivestockData function to use the subcategory field directly from the data
   const processLivestockData = useCallback(() => {
     const livestock = rawData.livestock || [];
-
-    // Define the exact categories and subcategories from the provided table
-    const categoryStructure = {
-      CATTLE: ["Carabull", "Caracow"],
-      CARABAO: ["Carabull", "Caracow"],
-      GOAT: ["Buck", "Doe"],
-      SHEEP: ["Ram", "Ewe"],
-      SWINE: ["Sow", "Piglet", "Boar", "Fatteners"],
-      CHICKEN: ["Broiler", "Layer", "Game/range", "Finishing fowl", "Cockerel"],
-      DUCK: ["Drake", "Hen"],
-      QUAIL: ["Cock", "Hen"],
-      TURKEY: ["Gobbler", "Hen"],
-      RABBIT: ["Buck", "Doe"],
-    };
 
     // Initialize the data structure
     const animalTypeMap = {};
 
     // Process each livestock record
     livestock.forEach((record) => {
+      // Get the animal type, subcategory, and quantity
       const animalType = record.animal_type || "Unknown";
+      const subcategory = record.subcategory || "Unknown"; // Use the subcategory directly from the data
       const quantity = Number.parseInt(record.quantity) || 0;
 
       // Skip if quantity is zero
       if (quantity <= 0) return;
 
-      // Try to match the animal type to our categories
-      let matchedCategory = null;
-      let matchedSubcategory = null;
-
-      // First, try direct matching with the animal_type field
-      const animalTypeLower = animalType.toLowerCase();
-
-      // Check for each category
-      for (const [category, subcategories] of Object.entries(
-        categoryStructure
-      )) {
-        // Check if the animal type contains the category name
-        if (animalTypeLower.includes(category.toLowerCase())) {
-          matchedCategory = category;
-
-          // Try to match subcategory
-          for (const subcategory of subcategories) {
-            if (animalTypeLower.includes(subcategory.toLowerCase())) {
-              matchedSubcategory = subcategory;
-              break;
-            }
-          }
-
-          // If no subcategory matched but we have a category, use the first subcategory
-          if (!matchedSubcategory && subcategories.length > 0) {
-            matchedSubcategory = subcategories[0];
-          }
-
-          break;
-        }
-      }
-
-      // If no direct match, try to infer from keywords
-      if (!matchedCategory) {
-        if (
-          animalTypeLower.includes("cow") ||
-          animalTypeLower.includes("bull") ||
-          animalTypeLower.includes("calf")
-        ) {
-          matchedCategory = "CATTLE";
-          matchedSubcategory = animalTypeLower.includes("bull")
-            ? "Carabull"
-            : "Caracow";
-        } else if (
-          animalTypeLower.includes("carabao") ||
-          animalTypeLower.includes("buffalo")
-        ) {
-          matchedCategory = "CARABAO";
-          matchedSubcategory = animalTypeLower.includes("bull")
-            ? "Carabull"
-            : "Caracow";
-        } else if (animalTypeLower.includes("goat")) {
-          matchedCategory = "GOAT";
-          matchedSubcategory =
-            animalTypeLower.includes("buck") || animalTypeLower.includes("male")
-              ? "Buck"
-              : "Doe";
-        } else if (animalTypeLower.includes("sheep")) {
-          matchedCategory = "SHEEP";
-          matchedSubcategory =
-            animalTypeLower.includes("ram") || animalTypeLower.includes("male")
-              ? "Ram"
-              : "Ewe";
-        } else if (
-          animalTypeLower.includes("pig") ||
-          animalTypeLower.includes("hog") ||
-          animalTypeLower.includes("swine")
-        ) {
-          matchedCategory = "SWINE";
-          if (animalTypeLower.includes("sow")) matchedSubcategory = "Sow";
-          else if (animalTypeLower.includes("piglet"))
-            matchedSubcategory = "Piglet";
-          else if (animalTypeLower.includes("boar"))
-            matchedSubcategory = "Boar";
-          else matchedSubcategory = "Fatteners";
-        } else if (
-          animalTypeLower.includes("chicken") ||
-          animalTypeLower.includes("chick")
-        ) {
-          matchedCategory = "CHICKEN";
-          if (animalTypeLower.includes("broiler"))
-            matchedSubcategory = "Broiler";
-          else if (animalTypeLower.includes("layer"))
-            matchedSubcategory = "Layer";
-          else if (
-            animalTypeLower.includes("game") ||
-            animalTypeLower.includes("range")
-          )
-            matchedSubcategory = "Game/range";
-          else if (
-            animalTypeLower.includes("finish") ||
-            animalTypeLower.includes("fowl")
-          )
-            matchedSubcategory = "Finishing fowl";
-          else matchedSubcategory = "Cockerel";
-        } else if (animalTypeLower.includes("duck")) {
-          matchedCategory = "DUCK";
-          matchedSubcategory =
-            animalTypeLower.includes("drake") ||
-            animalTypeLower.includes("male")
-              ? "Drake"
-              : "Hen";
-        } else if (animalTypeLower.includes("quail")) {
-          matchedCategory = "QUAIL";
-          matchedSubcategory =
-            animalTypeLower.includes("cock") || animalTypeLower.includes("male")
-              ? "Cock"
-              : "Hen";
-        } else if (animalTypeLower.includes("turkey")) {
-          matchedCategory = "TURKEY";
-          matchedSubcategory =
-            animalTypeLower.includes("gobbler") ||
-            animalTypeLower.includes("male")
-              ? "Gobbler"
-              : "Hen";
-        } else if (animalTypeLower.includes("rabbit")) {
-          matchedCategory = "RABBIT";
-          matchedSubcategory =
-            animalTypeLower.includes("buck") || animalTypeLower.includes("male")
-              ? "Buck"
-              : "Doe";
-        }
-      }
-
-      // If we still couldn't match, create an "OTHER" category and use the original animal type
-      if (!matchedCategory) {
-        matchedCategory = "OTHER";
-        matchedSubcategory = animalType;
-      }
-
       // Initialize category if it doesn't exist
-      if (!animalTypeMap[matchedCategory]) {
-        animalTypeMap[matchedCategory] = {
+      if (!animalTypeMap[animalType]) {
+        animalTypeMap[animalType] = {
           total: 0,
           subtypes: {},
         };
       }
 
       // Add to category total
-      animalTypeMap[matchedCategory].total += quantity;
+      animalTypeMap[animalType].total += quantity;
 
       // Initialize subtype if it doesn't exist
-      if (!animalTypeMap[matchedCategory].subtypes[matchedSubcategory]) {
-        animalTypeMap[matchedCategory].subtypes[matchedSubcategory] = 0;
+      if (!animalTypeMap[animalType].subtypes[subcategory]) {
+        animalTypeMap[animalType].subtypes[subcategory] = 0;
       }
 
       // Add to subtype
-      animalTypeMap[matchedCategory].subtypes[matchedSubcategory] += quantity;
+      animalTypeMap[animalType].subtypes[subcategory] += quantity;
 
       // Also store the original record for reference (useful for debugging)
-      if (!animalTypeMap[matchedCategory].records) {
-        animalTypeMap[matchedCategory].records = [];
+      if (!animalTypeMap[animalType].records) {
+        animalTypeMap[animalType].records = [];
       }
-      animalTypeMap[matchedCategory].records.push({
-        ...record,
-        matchedSubcategory,
-      });
+      animalTypeMap[animalType].records.push(record);
     });
 
     // Convert the nested structure to the format expected by the UI
@@ -1129,6 +1016,7 @@ function Analytics() {
 
     highValueCrops.forEach((crop) => {
       // Get crop type from crop_value or from parsed production_data
+
       let cropType = crop.crop_value || "Unknown HVC";
 
       // Try to parse production_data if it's a string

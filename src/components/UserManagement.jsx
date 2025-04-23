@@ -2,8 +2,19 @@
 
 import { useState, useEffect, useRef } from "react";
 import { userAPI } from "./services/api"; // Update this path to match your project structure
+import { useRefreshStore } from "./shared-store"; // Import the shared store
 
 const UserManagement = () => {
+  // Use the shared store for refreshing state and data cache
+  const {
+    isRefreshing,
+    setRefreshing,
+    lastRefresh,
+    setLastRefresh,
+    dataCache,
+    updateDataCache,
+  } = useRefreshStore();
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -22,162 +33,191 @@ const UserManagement = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [isCurrentUserAdmin, setIsCurrentUserAdmin] = useState(false);
-  const [dataFetched, setDataFetched] = useState(false);
-  const prefetchTimeoutRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
-  const prefetchUsersData = async () => {
+  // Fetch users data and update the cache
+  const fetchUsersData = async (showFullLoading = false) => {
     try {
       const authToken = localStorage.getItem("authToken");
-      if (!authToken) return;
-
-      console.log("Prefetching users data...");
-      const response = await userAPI.getAllUsers();
-
-      // Store the prefetched data
-      setUsers(response);
-      setDataFetched(true);
-      console.log("Users data prefetched successfully");
-    } catch (err) {
-      console.error("Error prefetching users data:", err);
-    }
-  };
-
-  useEffect(() => {
-    const fetchUsers = async () => {
-      // If data has already been prefetched, skip fetching
-      if (dataFetched) {
-        console.log("Using prefetched users data");
+      if (!authToken) {
+        setError("Authorization token not found.");
         setLoading(false);
         return;
       }
 
+      // If this is an initial load, show full loading state
+      // Otherwise, use background refreshing
+      if (showFullLoading) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+
+      // First, get the current user info
+      let currentUserData = null;
       try {
-        const authToken = localStorage.getItem("authToken");
-        if (!authToken) {
-          setError("Authorization token not found.");
-          setLoading(false);
-          return;
+        const userResponse = await userAPI.getCurrentUser();
+
+        console.log("Current user API response:", userResponse);
+        if (userResponse && userResponse.user) {
+          // Extract the user object from the response
+          currentUserData = userResponse.user;
+          console.log("Extracted user data:", currentUserData);
         }
+      } catch (userErr) {
+        console.error("Error fetching current user:", userErr);
+        // Continue with the users list even if we can't get the current user directly
+      }
 
-        // First, get the current user info
-        let currentUserData = null;
-        try {
-          const userResponse = await userAPI.getCurrentUser();
+      // Fetch users data
+      const response = await userAPI.getAllUsers();
 
-          console.log("Current user API response:", userResponse);
-          if (userResponse && userResponse.user) {
-            // Extract the user object from the response
-            currentUserData = userResponse.user;
-            console.log("Extracted user data:", currentUserData);
-          }
-        } catch (userErr) {
-          console.error("Error fetching current user:", userErr);
-          // Continue with the users list even if we can't get the current user directly
-        }
+      console.log("Raw API response:", response);
 
-        // Fetch users data
-        const response = await userAPI.getAllUsers();
+      // The backend returns users with role in the response directly
+      const processedUsers = response;
 
-        console.log("Raw API response:", response);
+      // If we couldn't get the current user directly, try to find it in the users list
+      if (!currentUserData) {
+        // Find the current user by comparing with stored email or ID
+        const userEmail = localStorage.getItem("userEmail");
+        const userId = localStorage.getItem("userId");
 
-        // The backend returns users with role in the response directly
-        const processedUsers = response;
-
-        // If we couldn't get the current user directly, try to find it in the users list
-        if (!currentUserData) {
-          // Find the current user by comparing with stored email or ID
-          const userEmail = localStorage.getItem("userEmail");
-          const userId = localStorage.getItem("userId");
-
-          console.log(
-            "Looking for current user with email:",
-            userEmail,
-            "or ID:",
-            userId
-          );
-
-          // Debug all users to see their emails and IDs
-          processedUsers.forEach((user) => {
-            console.log(
-              `User in response: ID=${user.id}, Email=${user.email}, Role=${user.role}`
-            );
-          });
-
-          if (userEmail) {
-            currentUserData = processedUsers.find(
-              (user) => user.email === userEmail
-            );
-            console.log("Found user by email:", currentUserData);
-          }
-
-          if (!currentUserData && userId) {
-            const parsedUserId = Number.parseInt(userId);
-            console.log("Trying to find user by ID:", parsedUserId);
-            currentUserData = processedUsers.find(
-              (user) => user.id === parsedUserId
-            );
-            console.log("Found user by ID:", currentUserData);
-          }
-
-          // If we still don't have a current user, try to get it from the auth token
-          if (!currentUserData) {
-            console.log("No user found by email or ID, trying to decode token");
-
-            // IMPORTANT: As a fallback, let's assume the first admin user is the current user
-            // This is just for testing - in production you should use a proper method
-            const adminUser = processedUsers.find(
-              (user) => user.role === "admin"
-            );
-            if (adminUser) {
-              console.log("Using first admin user as current user:", adminUser);
-              currentUserData = adminUser;
-
-              // Store the user info in localStorage for future use
-              localStorage.setItem("userEmail", adminUser.email);
-              localStorage.setItem("userId", adminUser.id.toString());
-            }
-          }
-        }
-
-        // Determine if current user is admin based on the fetched data
-        const isAdmin = currentUserData?.role === "admin";
-        console.log("Current user data:", currentUserData);
         console.log(
-          "Is admin check:",
-          currentUserData?.role,
-          "===",
-          "admin",
-          "Result:",
-          isAdmin
+          "Looking for current user with email:",
+          userEmail,
+          "or ID:",
+          userId
         );
 
-        setIsCurrentUserAdmin(isAdmin);
-        setCurrentUser(currentUserData);
-        setUsers(processedUsers);
-        setLoading(false);
-      } catch (err) {
-        console.error("Error fetching users:", err);
-        setError("Failed to fetch data.");
-        setLoading(false);
-      }
-    };
+        // Debug all users to see their emails and IDs
+        processedUsers.forEach((user) => {
+          console.log(
+            `User in response: ID=${user.id}, Email=${user.email}, Role=${user.role}`
+          );
+        });
 
-    fetchUsers();
+        if (userEmail) {
+          currentUserData = processedUsers.find(
+            (user) => user.email === userEmail
+          );
+          console.log("Found user by email:", currentUserData);
+        }
+
+        if (!currentUserData && userId) {
+          const parsedUserId = Number.parseInt(userId);
+          console.log("Trying to find user by ID:", parsedUserId);
+          currentUserData = processedUsers.find(
+            (user) => user.id === parsedUserId
+          );
+          console.log("Found user by ID:", currentUserData);
+        }
+
+        // If we still don't have a current user, try to get it from the auth token
+        if (!currentUserData) {
+          console.log("No user found by email or ID, trying to decode token");
+
+          // IMPORTANT: As a fallback, let's assume the first admin user is the current user
+          // This is just for testing - in production you should use a proper method
+          const adminUser = processedUsers.find(
+            (user) => user.role === "admin"
+          );
+          if (adminUser) {
+            console.log("Using first admin user as current user:", adminUser);
+            currentUserData = adminUser;
+
+            // Store the user info in localStorage for future use
+            localStorage.setItem("userEmail", adminUser.email);
+            localStorage.setItem("userId", adminUser.id.toString());
+          }
+        }
+      }
+
+      // Determine if current user is admin based on the fetched data
+      const isAdmin = currentUserData?.role === "admin";
+      console.log("Current user data:", currentUserData);
+      console.log(
+        "Is admin check:",
+        currentUserData?.role,
+        "===",
+        "admin",
+        "Result:",
+        isAdmin
+      );
+
+      // Update the shared store with the users data
+      updateDataCache({ users: processedUsers });
+
+      setIsCurrentUserAdmin(isAdmin);
+      setCurrentUser(currentUserData);
+      setUsers(processedUsers);
+
+      // Turn off loading states
+      setLoading(false);
+      setRefreshing(false);
+
+      // Update last refresh timestamp
+      setLastRefresh(new Date());
+
+      return processedUsers;
+    } catch (err) {
+      console.error("Error fetching users:", err);
+      setError("Failed to fetch data.");
+      setLoading(false);
+      setRefreshing(false);
+      return null;
+    }
+  };
+
+  // Initial data load
+  useEffect(() => {
+    // Check if we have data in the cache first
+    if (dataCache.users && dataCache.users.length > 0) {
+      console.log("UserManagement: Using cached users data");
+      setUsers(dataCache.users);
+      setLoading(false);
+
+      // Still fetch fresh data in the background
+      fetchUsersData(false);
+    } else {
+      // No cached data, do a full load with loading state
+      fetchUsersData(true);
+    }
   }, []);
 
+  // Set up polling for background refreshes
   useEffect(() => {
-    // Start prefetching data after a short delay
-    prefetchTimeoutRef.current = setTimeout(() => {
-      prefetchUsersData();
-    }, 1000); // 1 second delay
+    // Set up polling interval to check for new data
+    const pollInterval = setInterval(() => {
+      // Only poll if not already refreshing
+      if (!isRefreshing) {
+        // Create a new AbortController for this request
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+        abortControllerRef.current = new AbortController();
+
+        // Set background refreshing state
+        setRefreshing(true);
+
+        // Fetch fresh data
+        fetchUsersData(false).catch((err) => {
+          // Only log error if not an abort error
+          if (err.name !== "AbortError") {
+            console.error("Error during auto-refresh:", err);
+          }
+        });
+      }
+    }, 60000); // Poll every 60 seconds
 
     return () => {
-      // Clean up the timeout if component unmounts
-      if (prefetchTimeoutRef.current) {
-        clearTimeout(prefetchTimeoutRef.current);
+      clearInterval(pollInterval);
+      // Abort any in-flight requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
     };
-  }, []);
+  }, [isRefreshing, setRefreshing, setLastRefresh]);
 
   // Delete user function
   const deleteUser = async (userId) => {
@@ -197,8 +237,14 @@ const UserManagement = () => {
       await userAPI.deleteUser(userId);
 
       showToast("User deleted successfully.", "success");
-      // Refresh the user data
-      setUsers(users.filter((user) => user.id !== userId));
+
+      // Update local state
+      const updatedUsers = users.filter((user) => user.id !== userId);
+      setUsers(updatedUsers);
+
+      // Update the cache
+      updateDataCache({ users: updatedUsers });
+
       setDeleteConfirmId(null);
     } catch (err) {
       showToast("Failed to delete user.", "error");
@@ -238,11 +284,15 @@ const UserManagement = () => {
       showToast("User role updated successfully.", "success");
 
       // Update the local state to reflect the change
-      setUsers(
-        users.map((user) =>
-          user.id === userId ? { ...user, role: newRole } : user
-        )
+      const updatedUsers = users.map((user) =>
+        user.id === userId ? { ...user, role: newRole } : user
       );
+
+      setUsers(updatedUsers);
+
+      // Update the cache
+      updateDataCache({ users: updatedUsers });
+
       setEditingUserId(null); // Exit editing mode after update
     } catch (err) {
       console.error("Error updating role:", err);
@@ -334,8 +384,8 @@ const UserManagement = () => {
         return;
       }
 
-      // Show loading state
-      setLoading(true);
+      // Show background refreshing state
+      setRefreshing(true);
 
       // Include role in the request
       const userData = {
@@ -355,14 +405,18 @@ const UserManagement = () => {
       });
 
       // Refresh the user list
-      const usersResponse = await userAPI.getAllUsers();
-      setUsers(usersResponse);
+      const updatedUsers = await fetchUsersData(false);
+      if (updatedUsers) {
+        setUsers(updatedUsers);
+        // Update the cache
+        updateDataCache({ users: updatedUsers });
+      }
     } catch (err) {
       console.error("Error adding user:", err);
       const errorMessage = err.message || "Failed to add user.";
       showToast(errorMessage, "error");
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -399,14 +453,40 @@ const UserManagement = () => {
     <div className="p-4">
       {/* Header with title and search */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold">
-          User Management
-          {isCurrentUserAdmin && (
-            <span className="px-2 py-1 ml-2 text-xs font-semibold text-red-800 bg-red-100 rounded-full">
-              Admin Access
-            </span>
+        <div className="flex items-center">
+          <h2 className="text-xl font-bold">
+            User Management
+            {isCurrentUserAdmin && (
+              <span className="px-2 py-1 ml-2 text-xs font-semibold text-red-800 bg-red-100 rounded-full">
+                Admin Access
+              </span>
+            )}
+          </h2>
+          {/* Background refresh indicator */}
+          {isRefreshing && (
+            <div className="inline-flex items-center p-2 ml-4 text-xs font-medium text-gray-600 bg-gray-100 rounded-md shadow-sm">
+              <svg
+                className="w-3.5 h-3.5 mr-1 animate-spin"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                ></path>
+              </svg>
+              <span>Updating data...</span>
+            </div>
           )}
-        </h2>
+          {/* Last refresh time indicator */}
+          <div className="inline-flex items-center p-2 ml-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-md">
+            <span>Last updated: {lastRefresh.toLocaleTimeString()}</span>
+          </div>
+        </div>
         <div className="relative">
           <input
             type="text"
@@ -479,7 +559,7 @@ const UserManagement = () => {
       </div>
 
       {/* Loading and Error States */}
-      {loading && (
+      {loading && users.length === 0 && (
         <div className="p-4">
           {/* Header skeleton */}
           <div className="flex items-center justify-between mb-4">
@@ -539,7 +619,7 @@ const UserManagement = () => {
       )}
 
       {/* Users Table */}
-      {!loading && !error && (
+      {(!loading || users.length > 0) && !error && (
         <div className="overflow-x-auto rounded-lg shadow-md">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="text-white bg-green-600">
