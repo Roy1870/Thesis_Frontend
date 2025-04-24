@@ -2237,7 +2237,7 @@ const Inventory = () => {
           </div>
         </div>
       )}
-      // Update the ExportModal component usage to pass the required props
+      {/* Update the ExportModal component usage to pass the required props*/}
       {showExportModal && (
         <ExportModal
           isOpen={showExportModal}
