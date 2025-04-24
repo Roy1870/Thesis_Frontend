@@ -33,19 +33,6 @@ export default function CropFilters({
 
   return (
     <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center px-2.5 py-1.5 text-xs font-medium text-white bg-[#6A9C89] rounded-md sm:text-sm hover:bg-opacity-90 transition-colors"
-      >
-        <Filter className="w-3.5 h-3.5 mr-1" />
-        <span>Crop Filters</span>
-        <ChevronDown
-          className={`w-3.5 h-3.5 ml-2 transition-transform ${
-            isOpen ? "rotate-180" : ""
-          }`}
-        />
-      </button>
-
       {isOpen && (
         <div className="absolute right-0 z-10 w-64 p-3 mt-1 bg-white border border-gray-200 rounded-md shadow-lg">
           <div className="space-y-3">

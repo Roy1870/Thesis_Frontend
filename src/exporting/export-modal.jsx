@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { X } from "lucide-react";
 
 export default function ExportModal({
@@ -11,38 +11,435 @@ export default function ExportModal({
   filters,
   barangayOptions,
   cropTypeOptions,
+  allData,
 }) {
-  const [exportFormat, setExportFormat] = useState("excel");
+  // State for filter selections
   const [includeFilters, setIncludeFilters] = useState(true);
-  const [selectedBarangay, setSelectedBarangay] = useState(
-    filters.barangay || ""
-  );
-  const [selectedCropType, setSelectedCropType] = useState(
-    filters.cropType || ""
+  const [selectedBarangay, setSelectedBarangay] = useState("");
+  const [selectedCropType, setSelectedCropType] = useState("");
+  const [startMonth, setStartMonth] = useState("");
+  const [selectedYear, setSelectedYear] = useState(
+    new Date().getFullYear().toString()
   );
 
-  // Update local state when filters prop changes
+  // Add a new state for high value crop type selection
+  const [selectedHighValueCropType, setSelectedHighValueCropType] =
+    useState("");
+
+  // Add endMonth state and update the getDateRangeText function
+  // Add this after the other state declarations:
+
+  const [endMonth, setEndMonth] = useState("");
+
+  // Reset filters when modal opens or filters prop changes
   useEffect(() => {
-    setSelectedBarangay(filters.barangay || "");
-    setSelectedCropType(filters.cropType || "");
-  }, [filters]);
+    if (isOpen) {
+      // Only set these values if they're not already set
+      // This prevents resetting selections when other filters change
+      if (!selectedBarangay) setSelectedBarangay(filters.barangay || "");
+      if (!selectedCropType) setSelectedCropType(filters.cropType || "");
+      if (!startMonth) setStartMonth(filters.month || "");
+      if (!selectedYear)
+        setSelectedYear(filters.year || new Date().getFullYear().toString());
 
-  if (!isOpen) return null;
+      // Always set includeFilters to true when opening
+      setIncludeFilters(true);
+    }
+  }, [isOpen, filters]);
+
+  // Add a separate effect to handle modal closing
+  useEffect(() => {
+    if (!isOpen) {
+      // Reset all filters when the modal closes
+      // This ensures a fresh start next time it opens
+      setSelectedBarangay("");
+      setSelectedCropType("");
+      setStartMonth("");
+      setEndMonth(""); // Reset end month too
+      setSelectedYear(new Date().getFullYear().toString());
+      setSelectedHighValueCropType(""); // Reset high value crop type too
+    }
+  }, [isOpen]);
+
+  // Dynamically compute available years based on data
+  const availableYears = useMemo(() => {
+    if (!allData || allData.length === 0) {
+      const currentYear = new Date().getFullYear();
+      return [currentYear.toString()];
+    }
+
+    // Extract unique years from data
+    const years = [
+      ...new Set(
+        allData
+          .map((item) =>
+            item.created_at ? new Date(item.created_at).getFullYear() : null
+          )
+          .filter(Boolean)
+      ),
+    ].sort((a, b) => b - a); // Sort descending (newest first)
+
+    // If no years found, use current year
+    if (years.length === 0) {
+      const currentYear = new Date().getFullYear();
+      return [currentYear.toString()];
+    }
+
+    return years.map((year) => year.toString());
+  }, [allData]);
+
+  // Dynamically compute available barangays based on filtered data
+  const availableBarangays = useMemo(() => {
+    if (!allData || allData.length === 0) {
+      return barangayOptions;
+    }
+
+    let filteredData = [...allData];
+
+    // Apply crop type filter if selected
+    if (selectedCropType && dataType === "crops") {
+      filteredData = filteredData.filter(
+        (item) => item.crop_type === selectedCropType
+      );
+    }
+
+    // Apply year filter if selected
+    if (selectedYear) {
+      filteredData = filteredData.filter((item) => {
+        if (!item.created_at) return false;
+        const itemYear = new Date(item.created_at).getFullYear().toString();
+        return itemYear === selectedYear;
+      });
+    }
+
+    // Extract unique barangays from filtered data
+    return [
+      ...new Set(filteredData.map((item) => item.barangay).filter(Boolean)),
+    ].sort();
+  }, [allData, selectedCropType, selectedYear, barangayOptions, dataType]);
+
+  // Helper function to get the last day of a month
+  const getLastDayOfMonth = (year, month) => {
+    // month is 1-indexed in our UI but Date expects 0-indexed month
+    return new Date(year, month, 0).getDate();
+  };
+
+  // Get record count for selected filters
+  const filteredRecordCount = useMemo(() => {
+    if (!allData || allData.length === 0) {
+      return 0;
+    }
+
+    if (!includeFilters) {
+      return allData.length;
+    }
+
+    let filtered = [...allData];
+
+    // Apply crop type filter
+    if (selectedCropType && dataType === "crops") {
+      filtered = filtered.filter((item) => item.crop_type === selectedCropType);
+    }
+
+    // Apply barangay filter
+    if (selectedBarangay) {
+      filtered = filtered.filter((item) => item.barangay === selectedBarangay);
+    }
+
+    // Apply year filter
+    if (selectedYear) {
+      filtered = filtered.filter((item) => {
+        if (!item.created_at) return false;
+        const itemYear = new Date(item.created_at).getFullYear().toString();
+        return itemYear === selectedYear;
+      });
+    }
+
+    // Apply month filter based on data type
+    if (dataType === "highValueCrops") {
+      // For high value crops, use January as start month and the selected month as end month
+      if (startMonth) {
+        filtered = filtered.filter((item) => {
+          if (!item.created_at) return false;
+          const itemMonth = (
+            new Date(item.created_at).getMonth() + 1
+          ).toString();
+          const month = Number.parseInt(itemMonth);
+          // Include data from January (1) up to and including the selected month
+          return month >= 1 && month <= Number.parseInt(startMonth);
+        });
+      }
+    } else {
+      // For regular crops, use start/end month range
+      if (startMonth && endMonth) {
+        filtered = filtered.filter((item) => {
+          if (!item.created_at) return false;
+          const itemMonth = (
+            new Date(item.created_at).getMonth() + 1
+          ).toString();
+          const month = Number.parseInt(itemMonth);
+          // Include data within the month range
+          return (
+            month >= Number.parseInt(startMonth) &&
+            month <= Number.parseInt(endMonth)
+          );
+        });
+      } else if (startMonth) {
+        filtered = filtered.filter((item) => {
+          if (!item.created_at) return false;
+          const itemMonth = (
+            new Date(item.created_at).getMonth() + 1
+          ).toString();
+          return itemMonth === startMonth;
+        });
+      } else if (endMonth) {
+        filtered = filtered.filter((item) => {
+          if (!item.created_at) return false;
+          const itemMonth = (
+            new Date(item.created_at).getMonth() + 1
+          ).toString();
+          const month = Number.parseInt(itemMonth);
+          // Include all data up to and including the end month
+          return month <= Number.parseInt(endMonth);
+        });
+      }
+    }
+
+    return filtered.length;
+  }, [
+    allData,
+    includeFilters,
+    selectedCropType,
+    selectedBarangay,
+    selectedYear,
+    startMonth,
+    endMonth,
+    dataType,
+  ]);
+
+  // Format month for display
+  const getMonthName = (monthNum) => {
+    if (!monthNum) return "";
+    const months = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+    const index = Number.parseInt(monthNum) - 1;
+    return index >= 0 && index < 12 ? months[index] : "";
+  };
+
+  // Generate date range text
+  const getDateRangeText = () => {
+    if (!startMonth && !endMonth) return "";
+
+    if (dataType === "highValueCrops") {
+      return `As of ${getMonthName(startMonth)} ${selectedYear}`;
+    }
+
+    if (startMonth && endMonth) {
+      return `${getMonthName(startMonth)} - ${getMonthName(
+        endMonth
+      )} ${selectedYear}`;
+    } else if (startMonth) {
+      return `From ${getMonthName(startMonth)} ${selectedYear}`;
+    } else if (endMonth) {
+      return `Until ${getMonthName(endMonth)} ${selectedYear}`;
+    }
+
+    return "";
+  };
 
   const handleExport = () => {
-    // Create a new filters object with the selected values
-    const exportFilters = includeFilters
-      ? {
-          barangay: selectedBarangay,
-          cropType: selectedCropType,
-          month: filters.month,
-          year: filters.year,
-        }
-      : { barangay: "", cropType: "", month: "", year: "" };
+    // Take a snapshot of the data at export time
+    console.log("Exporting data:", allData.length, "records");
 
-    onExport(exportFormat, includeFilters, exportFilters);
+    // Get the filtered data based on current selections
+    let dataToExport = [...allData];
+
+    if (includeFilters) {
+      // Apply crop type filter
+      if (selectedCropType && dataType === "crops") {
+        dataToExport = dataToExport.filter(
+          (item) => item.crop_type === selectedCropType
+        );
+      }
+
+      // Apply barangay filter
+      if (selectedBarangay) {
+        dataToExport = dataToExport.filter(
+          (item) => item.barangay === selectedBarangay
+        );
+      }
+
+      // Apply year filter
+      if (selectedYear) {
+        dataToExport = dataToExport.filter((item) => {
+          if (!item.created_at) return false;
+          const itemYear = new Date(item.created_at).getFullYear().toString();
+          return itemYear === selectedYear;
+        });
+      }
+
+      // Apply month filter based on data type
+      if (dataType === "highValueCrops") {
+        // For high value crops, use January as start month and the selected month as end month
+        if (startMonth) {
+          dataToExport = dataToExport.filter((item) => {
+            if (!item.created_at) return false;
+            const itemMonth = (
+              new Date(item.created_at).getMonth() + 1
+            ).toString();
+            const month = Number.parseInt(itemMonth);
+            // Include data from January (1) up to and including the selected month
+            return month >= 1 && month <= Number.parseInt(startMonth);
+          });
+          console.log(
+            "High value crops - filtering from January to month:",
+            startMonth,
+            getMonthName(startMonth)
+          );
+        }
+      } else {
+        // For regular crops, use start/end month range
+        if (startMonth && endMonth) {
+          dataToExport = dataToExport.filter((item) => {
+            if (!item.created_at) return false;
+            const itemMonth = (
+              new Date(item.created_at).getMonth() + 1
+            ).toString();
+            const month = Number.parseInt(itemMonth);
+            // Include data within the month range
+            return (
+              month >= Number.parseInt(startMonth) &&
+              month <= Number.parseInt(endMonth)
+            );
+          });
+        } else if (startMonth) {
+          dataToExport = dataToExport.filter((item) => {
+            if (!item.created_at) return false;
+            const itemMonth = (
+              new Date(item.created_at).getMonth() + 1
+            ).toString();
+            return itemMonth === startMonth;
+          });
+        } else if (endMonth) {
+          dataToExport = dataToExport.filter((item) => {
+            if (!item.created_at) return false;
+            const itemMonth = (
+              new Date(item.created_at).getMonth() + 1
+            ).toString();
+            const month = Number.parseInt(itemMonth);
+            // Include all data up to and including the end month
+            return month <= Number.parseInt(endMonth);
+          });
+        }
+      }
+    }
+
+    // Calculate start and end dates for the export
+    let startDate = null;
+    let endDate = null;
+
+    if (selectedYear) {
+      const year = Number.parseInt(selectedYear);
+
+      if (dataType === "highValueCrops") {
+        // For high value crops, start date is January 1st
+        startDate = new Date(year, 0, 1); // January 1st (month is 0-indexed in Date)
+
+        if (startMonth) {
+          // End date is the last day of the selected month
+          const month = Number.parseInt(startMonth);
+          const lastDay = getLastDayOfMonth(year, month);
+          endDate = new Date(year, month - 1, lastDay); // month is 0-indexed in Date
+        } else {
+          // If no month selected, use December 31st
+          endDate = new Date(year, 11, 31); // December 31st
+        }
+      } else {
+        // For regular crops
+        if (startMonth) {
+          const startMonthNum = Number.parseInt(startMonth);
+          startDate = new Date(year, startMonthNum - 1, 1); // First day of start month
+        }
+
+        if (endMonth) {
+          const endMonthNum = Number.parseInt(endMonth);
+          const lastDay = getLastDayOfMonth(year, endMonthNum);
+          endDate = new Date(year, endMonthNum - 1, lastDay); // Last day of end month
+        } else if (startMonth) {
+          // If only start month is provided, end date is the last day of that month
+          const startMonthNum = Number.parseInt(startMonth);
+          const lastDay = getLastDayOfMonth(year, startMonthNum);
+          endDate = new Date(year, startMonthNum - 1, lastDay);
+        }
+      }
+    }
+
+    // Format dates for logging
+    const formatDate = (date) => {
+      if (!date) return "not set";
+      return date.toISOString().split("T")[0]; // YYYY-MM-DD format
+    };
+
+    console.log("Date range for export:", {
+      startDate: formatDate(startDate),
+      endDate: formatDate(endDate),
+    });
+
+    // Create a new filters object with the selected values
+    const exportFilters = {
+      barangay: includeFilters ? selectedBarangay : "",
+      cropType: includeFilters ? selectedCropType : "",
+      startMonth: includeFilters
+        ? dataType === "highValueCrops"
+          ? "1"
+          : startMonth
+        : "", // For high value crops, always use January as start month
+      endMonth: includeFilters
+        ? dataType === "highValueCrops"
+          ? startMonth
+          : endMonth
+        : "", // For high value crops, use the selected month as end month
+      month: includeFilters ? startMonth : "", // Keep for backward compatibility
+      year: includeFilters ? selectedYear : "",
+      isHighValueCrop: dataType === "highValueCrops",
+      highValueCropType:
+        includeFilters && dataType === "highValueCrops"
+          ? selectedHighValueCropType
+          : "",
+      // Add the month name for high value crops
+      monthName:
+        includeFilters && dataType === "highValueCrops" && startMonth
+          ? getMonthName(startMonth)
+          : "",
+      // Add formatted dates with proper end dates (last day of month)
+      startDate: startDate ? startDate.toISOString() : null,
+      endDate: endDate ? endDate.toISOString() : null,
+      // Add day information to ensure we're using the last day of the month
+      startDay: startDate ? 1 : null, // Always first day of month
+      endDay: endDate ? endDate.getDate() : null, // Last day of the month
+    };
+
+    console.log("Export filters:", exportFilters);
+    console.log("Exporting data count:", dataToExport.length);
+
+    // Pass the filtered data directly to the export function
+    onExport("excel", includeFilters, exportFilters, dataToExport);
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
@@ -52,6 +449,7 @@ export default function ExportModal({
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
@@ -59,36 +457,8 @@ export default function ExportModal({
 
         <div className="mb-4">
           <p className="mb-2 text-sm text-gray-600">
-            Export your {dataType} data in the selected format.
+            Export your {dataType} data to Excel.
           </p>
-
-          <div className="p-3 mb-4 border border-gray-200 rounded-md bg-gray-50">
-            <h4 className="mb-2 text-sm font-medium">Export Format</h4>
-            <div className="space-y-2">
-              <label className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  name="exportFormat"
-                  value="excel"
-                  checked={exportFormat === "excel"}
-                  onChange={() => setExportFormat("excel")}
-                  className="w-4 h-4 text-[#6A9C89] border-gray-300 focus:ring-[#6A9C89]"
-                />
-                <span className="text-sm">Excel (.xlsx)</span>
-              </label>
-              <label className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  name="exportFormat"
-                  value="csv"
-                  checked={exportFormat === "csv"}
-                  onChange={() => setExportFormat("csv")}
-                  className="w-4 h-4 text-[#6A9C89] border-gray-300 focus:ring-[#6A9C89]"
-                />
-                <span className="text-sm">CSV (.csv)</span>
-              </label>
-            </div>
-          </div>
 
           <div className="p-3 mb-4 border border-gray-200 rounded-md bg-gray-50">
             <div className="flex items-center justify-between mb-2">
@@ -99,6 +469,7 @@ export default function ExportModal({
                   checked={includeFilters}
                   onChange={() => setIncludeFilters(!includeFilters)}
                   className="w-4 h-4 text-[#6A9C89] border-gray-300 rounded focus:ring-[#6A9C89]"
+                  id="include-filters"
                 />
                 <span className="text-sm">Include filters</span>
               </label>
@@ -107,53 +478,229 @@ export default function ExportModal({
             {includeFilters && (
               <div className="mt-3 space-y-3">
                 {dataType === "crops" && (
-                  <>
-                    <div>
-                      <label className="block mb-1 text-xs font-medium text-gray-700">
-                        Barangay
-                      </label>
-                      <select
-                        value={selectedBarangay}
-                        onChange={(e) => setSelectedBarangay(e.target.value)}
-                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
-                      >
-                        <option value="">Select Barangay</option>
-                        {barangayOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
+                  <div>
+                    <label
+                      htmlFor="crop-type"
+                      className="block mb-1 text-xs font-medium text-gray-700"
+                    >
+                      Crop Type
+                    </label>
+                    <select
+                      id="crop-type"
+                      value={selectedCropType}
+                      onChange={(e) => {
+                        const newCropType = e.target.value;
+                        console.log("Crop type changed to:", newCropType);
+                        setSelectedCropType(newCropType);
+                      }}
+                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
+                    >
+                      <option value="">Select Crop Type</option>
+                      {cropTypeOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {dataType === "highValueCrops" && (
+                  <div>
+                    <label
+                      htmlFor="high-value-crop-type"
+                      className="block mb-1 text-xs font-medium text-gray-700"
+                    >
+                      High Value Crop Type
+                    </label>
+                    <select
+                      id="high-value-crop-type"
+                      value={selectedHighValueCropType}
+                      onChange={(e) =>
+                        setSelectedHighValueCropType(e.target.value)
+                      }
+                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
+                    >
+                      <option value="">Default (High Value Crop)</option>
+                      <option value="CACAO">Cacao</option>
+                      <option value="COFFEE">Coffee</option>
+                      <option value="MANGO">Mango</option>
+                      <option value="RUBBER">Rubber</option>
+                      <option value="OIL PALM">Oil Palm</option>
+                      <option value="DURIAN">Durian</option>
+                      <option value="COCONUT">Coconut</option>
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label
+                    htmlFor="year"
+                    className="block mb-1 text-xs font-medium text-gray-700"
+                  >
+                    Year
+                  </label>
+                  <select
+                    id="year"
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(e.target.value)}
+                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
+                  >
+                    {availableYears.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="barangay"
+                    className="block mb-1 text-xs font-medium text-gray-700"
+                  >
+                    Barangay
+                  </label>
+                  <select
+                    id="barangay"
+                    value={selectedBarangay}
+                    onChange={(e) => setSelectedBarangay(e.target.value)}
+                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
+                  >
+                    <option value="">Select Barangay</option>
+                    {availableBarangays.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {dataType === "highValueCrops" ? (
+                  <div>
+                    <label
+                      htmlFor="as-of-month"
+                      className="block mb-1 text-xs font-medium text-gray-700"
+                    >
+                      Month (As of)
+                    </label>
+                    <select
+                      id="as-of-month"
+                      value={startMonth}
+                      onChange={(e) => setStartMonth(e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
+                    >
+                      <option value="">Select Month</option>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map(
+                        (month) => (
+                          <option key={month} value={month.toString()}>
+                            {getMonthName(month.toString())}
                           </option>
-                        ))}
-                      </select>
+                        )
+                      )}
+                    </select>
+
+                    {startMonth && (
+                      <div className="p-2 mt-2 text-xs text-center text-gray-700 bg-gray-100 rounded">
+                        <span className="font-medium">Export period:</span>{" "}
+                        January 1 - {getMonthName(startMonth)}{" "}
+                        {getLastDayOfMonth(
+                          Number.parseInt(selectedYear),
+                          Number.parseInt(startMonth)
+                        )}
+                        , {selectedYear}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label
+                          htmlFor="start-month"
+                          className="block mb-1 text-xs font-medium text-gray-700"
+                        >
+                          Start Month
+                        </label>
+                        <select
+                          id="start-month"
+                          value={startMonth}
+                          onChange={(e) => setStartMonth(e.target.value)}
+                          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
+                        >
+                          <option value="">Select Month</option>
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map(
+                            (month) => (
+                              <option key={month} value={month.toString()}>
+                                {getMonthName(month.toString())}
+                              </option>
+                            )
+                          )}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="end-month"
+                          className="block mb-1 text-xs font-medium text-gray-700"
+                        >
+                          End Month
+                        </label>
+                        <select
+                          id="end-month"
+                          value={endMonth}
+                          onChange={(e) => setEndMonth(e.target.value)}
+                          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
+                        >
+                          <option value="">Select Month</option>
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map(
+                            (month) => (
+                              <option key={month} value={month.toString()}>
+                                {getMonthName(month.toString())}
+                              </option>
+                            )
+                          )}
+                        </select>
+                      </div>
                     </div>
 
-                    <div>
-                      <label className="block mb-1 text-xs font-medium text-gray-700">
-                        Crop Type
-                      </label>
-                      <select
-                        value={selectedCropType}
-                        onChange={(e) => setSelectedCropType(e.target.value)}
-                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
-                      >
-                        <option value="">Select Crop Type</option>
-                        {cropTypeOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {(startMonth || endMonth) && (
+                      <div className="p-2 mt-2 text-xs text-center text-gray-700 bg-gray-100 rounded">
+                        <span className="font-medium">Export period:</span>{" "}
+                        {startMonth && (
+                          <>
+                            {getMonthName(startMonth)} 1
+                            {endMonth
+                              ? " - "
+                              : ` - ${getMonthName(
+                                  startMonth
+                                )} ${getLastDayOfMonth(
+                                  Number.parseInt(selectedYear),
+                                  Number.parseInt(startMonth)
+                                )}`}
+                          </>
+                        )}
+                        {endMonth && (
+                          <>
+                            {!startMonth && "January 1 - "}
+                            {getMonthName(endMonth)}{" "}
+                            {getLastDayOfMonth(
+                              Number.parseInt(selectedYear),
+                              Number.parseInt(endMonth)
+                            )}
+                          </>
+                        )}
+                        , {selectedYear}
+                      </div>
+                    )}
                   </>
                 )}
 
-                {filters.month && (
-                  <p className="text-xs text-gray-500">
-                    Month: {filters.month}
-                  </p>
-                )}
-                {filters.year && (
-                  <p className="text-xs text-gray-500">Year: {filters.year}</p>
-                )}
+                {/* Record count preview */}
+                <div className="p-2 mt-2 text-xs text-center text-gray-700 bg-gray-100 rounded">
+                  <span className="font-medium">Records to export:</span>{" "}
+                  {filteredRecordCount}
+                </div>
               </div>
             )}
           </div>
@@ -168,9 +715,12 @@ export default function ExportModal({
           </button>
           <button
             onClick={handleExport}
-            className="px-4 py-2 text-sm font-medium text-white bg-[#5A8C79] rounded-md hover:bg-opacity-90"
+            className="px-4 py-2 text-sm font-medium text-white bg-[#5A8C79] rounded-md hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={filteredRecordCount === 0}
           >
-            Export
+            {filteredRecordCount === 0
+              ? "No Data to Export"
+              : "Export to Excel"}
           </button>
         </div>
       </div>

@@ -27,17 +27,37 @@ const safeMergeCells = (worksheet, range) => {
   }
 };
 
+// Helper function to fetch complete farmer data
+const fetchCompleteFarmerData = async (farmerId) => {
+  try {
+    // Try to fetch complete farmer data from the API
+    const response = await fetch(`/api/farmers/${farmerId}`);
+    if (response.ok) {
+      const farmerData = await response.json();
+      console.log(`Fetched complete data for farmer ${farmerId}:`, farmerData);
+      return farmerData;
+    }
+  } catch (error) {
+    console.warn(
+      `Could not fetch complete data for farmer ${farmerId}:`,
+      error
+    );
+  }
+  return null;
+};
+
 // Replace the entire exportDataToExcel function with this updated version
 export const exportDataToExcel = async (
   dataType,
   data,
   barangayFilter,
-  monthFilter,
+  startMonthFilter,
   yearFilter,
   monthOptions,
   showToast,
   cropTypeFilter = "",
-  format = "excel"
+  endMonthFilter = "",
+  filters = {}
 ) => {
   try {
     // Make sure ExcelJS is loaded
@@ -48,6 +68,106 @@ export const exportDataToExcel = async (
 
     // Apply filters to data before export
     let filteredData = [...data];
+
+    // Enrich farmer data if possible
+    if (dataType === "crops" || dataType === "highValueCrops") {
+      console.log("Attempting to enrich farmer data for export...");
+
+      // Create a map of unique farmer IDs
+      const farmerIds = new Set();
+      data.forEach((item) => {
+        if (item.farmer_id) {
+          farmerIds.add(item.farmer_id);
+        }
+      });
+
+      console.log(`Found ${farmerIds.size} unique farmers to enrich`);
+
+      // Try to fetch complete data for each farmer
+      const farmerDataMap = {};
+      for (const farmerId of farmerIds) {
+        const completeData = await fetchCompleteFarmerData(farmerId);
+        if (completeData) {
+          farmerDataMap[farmerId] = completeData;
+        }
+      }
+
+      // Enrich the data with complete farmer information
+      if (Object.keys(farmerDataMap).length > 0) {
+        console.log(
+          `Successfully enriched data for ${
+            Object.keys(farmerDataMap).length
+          } farmers`
+        );
+
+        data = data.map((item) => {
+          if (item.farmer_id && farmerDataMap[item.farmer_id]) {
+            const farmerData = farmerDataMap[item.farmer_id];
+            return {
+              ...item,
+              name:
+                farmerData.name ||
+                `${farmerData.first_name || ""} ${
+                  farmerData.last_name || ""
+                }`.trim() ||
+                item.name ||
+                "",
+              contact_number:
+                farmerData.contact_number ||
+                farmerData.phone ||
+                item.contact_number ||
+                "",
+              facebook_email:
+                farmerData.facebook_email ||
+                farmerData.email ||
+                item.facebook_email ||
+                "",
+              home_address:
+                farmerData.home_address ||
+                farmerData.address ||
+                item.home_address ||
+                "",
+              farm_address: farmerData.farm_address || item.farm_address || "",
+              farm_location_longitude:
+                farmerData.farm_location_longitude ||
+                farmerData.longitude ||
+                item.farm_location_longitude ||
+                "",
+              farm_location_latitude:
+                farmerData.farm_location_latitude ||
+                farmerData.latitude ||
+                item.farm_location_latitude ||
+                "",
+              market_outlet_location:
+                farmerData.market_outlet_location ||
+                item.market_outlet_location ||
+                "",
+              buyer_name: farmerData.buyer_name || item.buyer_name || "",
+              association_organization:
+                farmerData.association_organization ||
+                farmerData.organization ||
+                item.association_organization ||
+                "",
+            };
+          }
+          return item;
+        });
+      }
+    }
+
+    // Debug the data
+    console.log("Excel export - initial data:", {
+      dataType,
+      totalRecords: data.length,
+      sampleRecord: data.length > 0 ? data[0] : null,
+      filters: {
+        barangayFilter,
+        startMonthFilter,
+        endMonthFilter,
+        yearFilter,
+        cropTypeFilter,
+      },
+    });
 
     // Apply barangay filter if selected
     if (barangayFilter) {
@@ -64,7 +184,7 @@ export const exportDataToExcel = async (
     }
 
     // Apply year and month filters if selected
-    if (yearFilter || monthFilter) {
+    if (yearFilter || startMonthFilter) {
       filteredData = filteredData.filter((item) => {
         if (!item.created_at) return false;
 
@@ -72,30 +192,60 @@ export const exportDataToExcel = async (
         const itemYear = date.getFullYear().toString();
         const itemMonth = (date.getMonth() + 1).toString(); // JavaScript months are 0-indexed
 
-        // If both year and month are specified, both must match
-        if (yearFilter && monthFilter) {
-          return itemYear === yearFilter && itemMonth === monthFilter;
+        // If year filter is specified, it must match
+        if (yearFilter && itemYear !== yearFilter) {
+          return false;
         }
-        // If only year is specified
-        else if (yearFilter) {
-          return itemYear === yearFilter;
+
+        // If both start and end month are specified, check if item month is in range
+        if (startMonthFilter && endMonthFilter) {
+          const startMonth = Number.parseInt(startMonthFilter);
+          const endMonth = Number.parseInt(endMonthFilter);
+          const month = Number.parseInt(itemMonth);
+          return month >= startMonth && month <= endMonth;
         }
-        // If only month is specified
-        else if (monthFilter) {
-          return itemMonth === monthFilter;
+        // If only start month is specified
+        else if (startMonthFilter) {
+          return itemMonth === startMonthFilter;
         }
 
         return true;
       });
     }
 
+    // Debug the filtered data
+    console.log("Excel export - filtered data:", {
+      filteredCount: filteredData.length,
+      sampleFilteredRecord: filteredData.length > 0 ? filteredData[0] : null,
+    });
+
     // Create a new workbook
     const workbook = new window.ExcelJS.Workbook();
 
     // Get month name for title
-    const monthName = monthFilter
-      ? monthOptions.find((m) => m.value === monthFilter)?.label || ""
+    const monthName = startMonthFilter
+      ? monthOptions.find((m) => m.value === startMonthFilter)?.label || ""
       : "";
+
+    // Get end month name if specified
+    const endMonthName = endMonthFilter
+      ? monthOptions.find((m) => m.value === endMonthFilter)?.label || ""
+      : "";
+
+    // Create a combined month string based on data type
+    let monthString = "";
+    if (dataType === "highValueCrops") {
+      // For high value crops, use only the "as of" month
+      monthString = monthName;
+    } else {
+      // For other data types, use the range if both are specified
+      monthString =
+        startMonthFilter &&
+        endMonthFilter &&
+        startMonthFilter !== endMonthFilter
+          ? `${monthName} - ${endMonthName}`
+          : monthName;
+    }
 
     // Get year for title
     const year = yearFilter || new Date().getFullYear();
@@ -107,47 +257,140 @@ export const exportDataToExcel = async (
           workbook,
           filteredData,
           barangayFilter,
-          monthName,
+          monthString,
           year
         );
         break;
       case "crops":
-        await createCropsReport(
-          workbook,
-          filteredData,
-          barangayFilter,
-          monthName,
-          year,
-          cropTypeFilter
-        );
-        break;
+        // For crops, check if it's a specific crop type that has a specialized template
+        if (cropTypeFilter && cropTypeFilter.toLowerCase() === "banana") {
+          // Import and use the banana template
+          const { createBananaReport } = await import(
+            "../../exporting/banana-template"
+          );
+          console.log("Using banana template with data:", {
+            recordCount: filteredData.length,
+            sampleRecord: filteredData.length > 0 ? filteredData[0] : null,
+          });
+          await createBananaReport(
+            workbook,
+            filteredData,
+            barangayFilter,
+            monthString,
+            year,
+            safeMergeCells
+          );
+        } else if (
+          cropTypeFilter &&
+          (cropTypeFilter.toLowerCase() === "legume" ||
+            cropTypeFilter.toLowerCase() === "legumes" ||
+            cropTypeFilter.toLowerCase().includes("peanut") ||
+            cropTypeFilter.toLowerCase().includes("mungbean") ||
+            cropTypeFilter.toLowerCase().includes("soybean"))
+        ) {
+          // Import and use the legumes template
+          const { createLegumesReport } = await import(
+            "../../exporting/legumes-template"
+          );
+          console.log("Using legumes template with data:", {
+            recordCount: filteredData.length,
+            sampleRecord: filteredData.length > 0 ? filteredData[0] : null,
+          });
+          await createLegumesReport(
+            workbook,
+            filteredData,
+            barangayFilter,
+            monthString,
+            year,
+            safeMergeCells
+          );
+        } else if (
+          cropTypeFilter &&
+          (cropTypeFilter.toLowerCase() === "spice" ||
+            cropTypeFilter.toLowerCase() === "spices" ||
+            cropTypeFilter.toLowerCase().includes("ginger") ||
+            cropTypeFilter.toLowerCase().includes("onion") ||
+            cropTypeFilter.toLowerCase().includes("pepper") ||
+            cropTypeFilter.toLowerCase().includes("turmeric"))
+        ) {
+          // Import and use the spices template
+          const { createSpicesReport } = await import(
+            "../../exporting/spices-template"
+          );
+          console.log("Using spices template with data:", {
+            recordCount: filteredData.length,
+            sampleRecord: filteredData.length > 0 ? filteredData[0] : null,
+          });
+          await createSpicesReport(
+            workbook,
+            filteredData,
+            barangayFilter,
+            monthString,
+            year,
+            safeMergeCells
+          );
+        } else if (
+          cropTypeFilter &&
+          (cropTypeFilter.toLowerCase() === "vegetable" ||
+            cropTypeFilter.toLowerCase().includes("eggplant") ||
+            cropTypeFilter.toLowerCase().includes("ampalaya") ||
+            cropTypeFilter.toLowerCase().includes("okra") ||
+            cropTypeFilter.toLowerCase().includes("sitao") ||
+            cropTypeFilter.toLowerCase().includes("squash") ||
+            cropTypeFilter.toLowerCase().includes("tomato"))
+        ) {
+          // Import and use the vegetable template
+          const { createVegetableReport } = await import(
+            "../../exporting/vegetable-template"
+          );
+          console.log("Using vegetable template with data:", {
+            recordCount: filteredData.length,
+            sampleRecord: filteredData.length > 0 ? filteredData[0] : null,
+          });
+          await createVegetableReport(
+            workbook,
+            filteredData,
+            barangayFilter,
+            monthString,
+            year,
+            safeMergeCells
+          );
+        }
       case "highValueCrops":
+        // Import and use the high value crops template
+        const { createHighValueCropsReport } = await import(
+          "../../exporting/high-value-crops-template"
+        );
+
+        // Get the high value crop type from the filters
+        const highValueCropType = filters?.highValueCropType || "";
+
+        console.log("Using high value crops template with data:", {
+          recordCount: filteredData.length,
+          sampleRecord:
+            filteredData.length > 0
+              ? JSON.stringify(filteredData[0]).substring(0, 500)
+              : null,
+          highValueCropType: highValueCropType,
+          filters: JSON.stringify(filters),
+        });
+
+        // Add highValueCropType to each data item
+        filteredData = filteredData.map((item) => ({
+          ...item,
+          highValueCropType: highValueCropType,
+        }));
+
         await createHighValueCropsReport(
           workbook,
           filteredData,
           barangayFilter,
           monthName,
-          year
+          year,
+          safeMergeCells
         );
         break;
-      case "livestock":
-        await createLivestockReport(
-          workbook,
-          filteredData,
-          barangayFilter,
-          monthName,
-          year
-        );
-        break;
-      case "operators":
-        await createFishpondReport(
-          workbook,
-          filteredData,
-          barangayFilter,
-          monthName,
-          year
-        );
-        break;
+
       default:
         // Default export for other data types
         const worksheet = workbook.addWorksheet("Data");
@@ -169,40 +412,13 @@ export const exportDataToExcel = async (
         break;
     }
 
-    // Generate file based on format
-    if (format === "csv") {
-      // For CSV, we'll need to generate a CSV for each worksheet
-      const worksheets = workbook.worksheets;
-      if (worksheets.length === 1) {
-        // Single worksheet - simple CSV export
-        const csvData = await workbook.csv.writeBuffer();
-        downloadFile(
-          csvData,
-          `${dataType}_export_${new Date().toISOString().split("T")[0]}.csv`,
-          "text/csv"
-        );
-      } else {
-        // Multiple worksheets - create a zip file with multiple CSVs
-        // For simplicity, we'll just export the first worksheet as CSV
-        // In a real implementation, you might want to use JSZip to create a zip with multiple files
-        const csvData = await workbook.csv.writeBuffer({
-          sheetId: workbook.worksheets[0].id,
-        });
-        downloadFile(
-          csvData,
-          `${dataType}_export_${new Date().toISOString().split("T")[0]}.csv`,
-          "text/csv"
-        );
-      }
-    } else {
-      // Excel format (default)
-      const buffer = await workbook.xlsx.writeBuffer();
-      downloadFile(
-        buffer,
-        `${dataType}_export_${new Date().toISOString().split("T")[0]}.xlsx`,
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      );
-    }
+    // Generate Excel file
+    const buffer = await workbook.xlsx.writeBuffer();
+    downloadFile(
+      buffer,
+      `${dataType}_export_${new Date().toISOString().split("T")[0]}.xlsx`,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
 
     showToast("Export completed successfully", "success");
   } catch (error) {
@@ -785,1065 +1001,5 @@ const createRiceWorksheet = async (
   rowIndex += 1;
   worksheet.getCell(`A${rowIndex}`).value = "AT";
   worksheet.getCell(`F${rowIndex}`).value = "Rice Program Coordinator";
-  worksheet.getCell(`K${rowIndex}`).value = "City Agriculturist";
-};
-
-// Helper function to create Fishpond Report
-const createFishpondReport = async (
-  workbook,
-  data,
-  barangayFilter,
-  monthName,
-  year
-) => {
-  const worksheet = workbook.addWorksheet("Fishpond Areas");
-
-  // Set column widths
-  worksheet.columns = [
-    { width: 5 }, // NO.
-    { width: 20 }, // NAME OF OPERATOR
-    { width: 20 }, // FISHPOND LOCATION
-    { width: 15 }, // CULTURED SPECIES
-    { width: 15 }, // PRODUCTIVE AREA
-    { width: 15 }, // STOCKING DENSITY
-    { width: 15 }, // DATE OF STOCKING
-    { width: 15 }, // PRODUCTION
-    { width: 15 }, // DATE OF HARVEST
-    { width: 20 }, // REMARKS
-  ];
-
-  // Add header with logo and title
-  safeMergeCells(worksheet, "A1:J3");
-  worksheet.getCell("A1").value = "FRESHWATER FISHPOND AREAS";
-  worksheet.getCell("A1").alignment = {
-    horizontal: "center",
-    vertical: "middle",
-  };
-  worksheet.getCell("A1").font = { bold: true, size: 14 };
-
-  // Add barangay header
-  safeMergeCells(worksheet, "A5:B5");
-  worksheet.getCell("A5").value = "Barangay:";
-  worksheet.getCell("A5").font = { bold: true };
-  if (barangayFilter) {
-    worksheet.getCell("C5").value = barangayFilter;
-  }
-
-  // Add table headers
-  const headerRow = 7;
-  worksheet.getCell(`A${headerRow}`).value = "NO.";
-  worksheet.getCell(`B${headerRow}`).value = "NAME OF OPERATOR";
-  worksheet.getCell(`C${headerRow}`).value =
-    "FISHPOND LOCATION\n(w/ geotagged photo)";
-  worksheet.getCell(`D${headerRow}`).value =
-    "CULTURED SPECIES\n(TILAPIA, HITO)";
-  worksheet.getCell(`E${headerRow}`).value = "PRODUCTIVE AREA (sq.m.)";
-  worksheet.getCell(`F${headerRow}`).value = "STOCKING DENSITY (pcs.)";
-  worksheet.getCell(`G${headerRow}`).value = "DATE OF STOCKING\n(dd-mm-yyyy)";
-  worksheet.getCell(`H${headerRow}`).value = "PRODUCTION (kg.)";
-  worksheet.getCell(`I${headerRow}`).value = "Date of Harvest\n(dd-mm-yyyy)";
-  worksheet.getCell(`J${headerRow}`).value =
-    "REMARKS\n(Operation or Non-operational)";
-
-  // Style header row
-  for (let col = 1; col <= 10; col++) {
-    const cell = worksheet.getCell(headerRow, col);
-    cell.font = { bold: true };
-    cell.alignment = {
-      horizontal: "center",
-      vertical: "middle",
-      wrapText: true,
-    };
-    cell.border = {
-      top: { style: "thin" },
-      left: { style: "thin" },
-      bottom: { style: "thin" },
-      right: { style: "thin" },
-    };
-    cell.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "D3E0F0" }, // Light blue background
-    };
-  }
-
-  // Add data rows
-  let rowIndex = headerRow + 1;
-  let counter = 1;
-
-  // Filter data by barangay if specified
-  const filteredData = barangayFilter
-    ? data.filter((item) => item.barangay === barangayFilter)
-    : data;
-
-  // Add data rows
-  filteredData.forEach((item) => {
-    worksheet.getCell(`A${rowIndex}`).value = counter;
-    worksheet.getCell(`B${rowIndex}`).value = item.farmer_name || "";
-    worksheet.getCell(`C${rowIndex}`).value = item.fishpond_location || "";
-    worksheet.getCell(`D${rowIndex}`).value = item.cultured_species || "";
-    worksheet.getCell(`E${rowIndex}`).value = item.productive_area_sqm || "";
-    worksheet.getCell(`F${rowIndex}`).value = item.stocking_density || "";
-    worksheet.getCell(`G${rowIndex}`).value = item.date_of_stocking || "";
-    worksheet.getCell(`H${rowIndex}`).value = item.production_kg || "";
-    worksheet.getCell(`I${rowIndex}`).value = item.date_of_harvest || "";
-    worksheet.getCell(`J${rowIndex}`).value = item.operational_status || "";
-
-    // Add borders to all cells in the row
-    for (let col = 1; col <= 10; col++) {
-      const cell = worksheet.getCell(rowIndex, col);
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-      cell.alignment = { vertical: "middle" };
-    }
-
-    rowIndex++;
-    counter++;
-  });
-
-  // Add empty rows to reach 15 rows
-  while (counter <= 15) {
-    worksheet.getCell(`A${rowIndex}`).value = counter;
-
-    // Add borders to all cells in the row
-    for (let col = 1; col <= 10; col++) {
-      const cell = worksheet.getCell(rowIndex, col);
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-    }
-
-    rowIndex++;
-    counter++;
-  }
-
-  // Add signature section
-  rowIndex += 3;
-  worksheet.getCell(`A${rowIndex}`).value = "Validated by:";
-
-  rowIndex += 3;
-  worksheet.getCell(`A${rowIndex}`).value = "____________________________";
-
-  rowIndex += 1;
-  worksheet.getCell(`A${rowIndex}`).value = "Agricultural Technician";
-};
-
-// Helper function to create Livestock Report
-const createLivestockReport = async (
-  workbook,
-  data,
-  barangayFilter,
-  monthName,
-  year
-) => {
-  const worksheet = workbook.addWorksheet("Livestock");
-
-  // Set column widths
-  worksheet.columns = [
-    { width: 5 }, // No.
-    { width: 20 }, // RAISER/FARMER
-    { width: 10 }, // Purok
-    { width: 8 }, // Carabull
-    { width: 8 }, // Caraheif
-    { width: 8 }, // Carabull
-    { width: 8 }, // Caraheif
-    { width: 8 }, // Buck
-    { width: 8 }, // Doe
-    { width: 8 }, // Ram
-    { width: 8 }, // Ewe
-    { width: 8 }, // Sow
-    { width: 8 }, // Piglet
-    { width: 8 }, // Boar
-    { width: 8 }, // Fatteners
-    { width: 8 }, // Broiler
-    { width: 8 }, // Layer
-    { width: 8 }, // Free-range
-    { width: 8 }, // Game-fowl
-    { width: 8 }, // Fighting Cocks
-    { width: 8 }, // Drake
-    { width: 8 }, // Hen
-    { width: 8 }, // Cock
-    { width: 8 }, // Hen
-    { width: 8 }, // Gobbler
-    { width: 8 }, // Hen
-    { width: 8 }, // Buck
-    { width: 8 }, // Doe
-    { width: 10 }, // Updated By
-    { width: 15 }, // Remarks
-  ];
-
-  // Add header with logo and title
-  safeMergeCells(worksheet, "A1:AD3");
-  worksheet.getCell("A1").value = "CITY AGRICULTURE AND VETERINARY DEPARTMENT";
-  worksheet.getCell("A1").alignment = {
-    horizontal: "center",
-    vertical: "middle",
-  };
-  worksheet.getCell("A1").font = { bold: true, size: 14 };
-
-  // Add barangay and other info
-  safeMergeCells(worksheet, "A5:B5");
-  worksheet.getCell("A5").value = "Barangay:";
-  if (barangayFilter) {
-    worksheet.getCell("C5").value = barangayFilter;
-  }
-
-  safeMergeCells(worksheet, "A6:B6");
-  worksheet.getCell("A6").value = "AEW Assigned:";
-
-  safeMergeCells(worksheet, "A7:B7");
-  worksheet.getCell("A7").value = "Date of Monitoring:";
-
-  // Add table headers
-  const headerRow1 = 9;
-  const headerRow2 = 10;
-
-  worksheet.getCell(`A${headerRow1}`).value = "No.";
-  safeMergeCells(`A${headerRow1}:A${headerRow2}`);
-
-  worksheet.getCell(`B${headerRow1}`).value = "RAISER/FARMER";
-  safeMergeCells(`B${headerRow1}:B${headerRow2}`);
-
-  worksheet.getCell(`C${headerRow1}`).value = "Purok";
-  safeMergeCells(`C${headerRow1}:C${headerRow2}`);
-
-  // CATTLE
-  worksheet.getCell(`D${headerRow1}`).value = "CATTLE";
-  safeMergeCells(`D${headerRow1}:E${headerRow1}`);
-  worksheet.getCell(`D${headerRow2}`).value = "Carabull";
-  worksheet.getCell(`E${headerRow2}`).value = "Caraheif";
-
-  // CARABAO
-  worksheet.getCell(`F${headerRow1}`).value = "CARABAO";
-  safeMergeCells(`F${headerRow1}:G${headerRow1}`);
-  worksheet.getCell(`F${headerRow2}`).value = "Carabull";
-  worksheet.getCell(`G${headerRow2}`).value = "Caraheif";
-
-  // GOAT
-  worksheet.getCell(`H${headerRow1}`).value = "GOAT";
-  safeMergeCells(`H${headerRow1}:I${headerRow1}`);
-  worksheet.getCell(`H${headerRow2}`).value = "Buck";
-  worksheet.getCell(`I${headerRow2}`).value = "Doe";
-
-  // SHEEP
-  worksheet.getCell(`J${headerRow1}`).value = "SHEEP";
-  safeMergeCells(`J${headerRow1}:K${headerRow1}`);
-  worksheet.getCell(`J${headerRow2}`).value = "Ram";
-  worksheet.getCell(`K${headerRow2}`).value = "Ewe";
-
-  // SWINE
-  worksheet.getCell(`L${headerRow1}`).value = "SWINE";
-  safeMergeCells(`L${headerRow1}:N${headerRow1}`);
-  worksheet.getCell(`L${headerRow2}`).value = "Sow";
-  worksheet.getCell(`M${headerRow2}`).value = "Piglet";
-  worksheet.getCell(`N${headerRow2}`).value = "Boar";
-
-  // CHICKEN
-  worksheet.getCell(`O${headerRow1}`).value = "CHICKEN";
-  safeMergeCells(`O${headerRow1}:S${headerRow1}`);
-  worksheet.getCell(`O${headerRow2}`).value = "Fatteners";
-  worksheet.getCell(`P${headerRow2}`).value = "Broiler";
-  worksheet.getCell(`Q${headerRow2}`).value = "Layer";
-  worksheet.getCell(`R${headerRow2}`).value = "Free-range";
-  worksheet.getCell(`S${headerRow2}`).value = "Game-fowl";
-
-  // DUCK
-  worksheet.getCell(`T${headerRow1}`).value = "DUCK";
-  safeMergeCells(`T${headerRow1}:U${headerRow1}`);
-  worksheet.getCell(`T${headerRow2}`).value = "Drake";
-  worksheet.getCell(`U${headerRow2}`).value = "Hen";
-
-  // QUAIL
-  worksheet.getCell(`V${headerRow1}`).value = "QUAIL";
-  safeMergeCells(`V${headerRow1}:W${headerRow1}`);
-  worksheet.getCell(`V${headerRow2}`).value = "Cock";
-  worksheet.getCell(`W${headerRow2}`).value = "Hen";
-
-  // TURKEY
-  worksheet.getCell(`X${headerRow1}`).value = "TURKEY";
-  safeMergeCells(`X${headerRow1}:Y${headerRow1}`);
-  worksheet.getCell(`X${headerRow2}`).value = "Gobbler";
-  worksheet.getCell(`Y${headerRow2}`).value = "Hen";
-
-  // RABBIT
-  worksheet.getCell(`Z${headerRow1}`).value = "RABBIT";
-  safeMergeCells(`Z${headerRow1}:AA${headerRow1}`);
-  worksheet.getCell(`Z${headerRow2}`).value = "Buck";
-  worksheet.getCell(`AA${headerRow2}`).value = "Doe";
-
-  // Updated By and Remarks
-  worksheet.getCell(`AB${headerRow1}`).value = "Updated By";
-  safeMergeCells(`AB${headerRow1}:AB${headerRow2}`);
-
-  worksheet.getCell(`AC${headerRow1}`).value = "Remarks";
-  safeMergeCells(`AC${headerRow1}:AC${headerRow2}`);
-
-  // Style header rows
-  for (let row = headerRow1; row <= headerRow2; row++) {
-    for (let col = 1; col <= 29; col++) {
-      const cell = worksheet.getCell(row, col);
-      cell.font = { bold: true };
-      cell.alignment = {
-        horizontal: "center",
-        vertical: "middle",
-        wrapText: true,
-      };
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "D3E0F0" }, // Light blue background
-      };
-    }
-  }
-
-  // Group livestock data by farmer and animal type
-  const livestockByFarmer = {};
-
-  // Filter data by barangay if specified
-  const filteredData = barangayFilter
-    ? data.filter((item) => item.barangay === barangayFilter)
-    : data;
-
-  // Process data
-  filteredData.forEach((item) => {
-    if (!item.farmer_id) return;
-
-    if (!livestockByFarmer[item.farmer_id]) {
-      livestockByFarmer[item.farmer_id] = {
-        farmer_name: item.farmer_name || "Unknown",
-        purok: item.purok || "",
-        animals: {},
-      };
-    }
-
-    const animalType = item.animal_type?.toLowerCase() || "";
-    const subcategory = item.subcategory?.toLowerCase() || "";
-    const quantity = Number.parseInt(item.quantity) || 0;
-
-    if (!livestockByFarmer[item.farmer_id].animals[animalType]) {
-      livestockByFarmer[item.farmer_id].animals[animalType] = {};
-    }
-
-    livestockByFarmer[item.farmer_id].animals[animalType][subcategory] =
-      quantity;
-  });
-
-  // Add data rows
-  let rowIndex = headerRow2 + 1;
-  let counter = 1;
-
-  Object.values(livestockByFarmer).forEach((farmer) => {
-    worksheet.getCell(`A${rowIndex}`).value = counter;
-    worksheet.getCell(`B${rowIndex}`).value = farmer.farmer_name;
-    worksheet.getCell(`C${rowIndex}`).value = farmer.purok;
-
-    // CATTLE
-    worksheet.getCell(`D${rowIndex}`).value =
-      farmer.animals.cattle?.carabull || "";
-    worksheet.getCell(`E${rowIndex}`).value =
-      farmer.animals.cattle?.caraheif || "";
-
-    // CARABAO
-    worksheet.getCell(`F${rowIndex}`).value =
-      farmer.animals.carabao?.carabull || "";
-    worksheet.getCell(`G${rowIndex}`).value =
-      farmer.animals.carabao?.caraheif || "";
-
-    // GOAT
-    worksheet.getCell(`H${rowIndex}`).value = farmer.animals.goat?.buck || "";
-    worksheet.getCell(`I${rowIndex}`).value = farmer.animals.goat?.doe || "";
-
-    // SHEEP
-    worksheet.getCell(`J${rowIndex}`).value = farmer.animals.sheep?.ram || "";
-    worksheet.getCell(`K${rowIndex}`).value = farmer.animals.sheep?.ewe || "";
-
-    // SWINE
-    worksheet.getCell(`L${rowIndex}`).value = farmer.animals.swine?.sow || "";
-    worksheet.getCell(`M${rowIndex}`).value =
-      farmer.animals.swine?.piglet || "";
-    worksheet.getCell(`N${rowIndex}`).value = farmer.animals.swine?.boar || "";
-
-    // CHICKEN
-    worksheet.getCell(`O${rowIndex}`).value =
-      farmer.animals.chicken?.fatteners || "";
-    worksheet.getCell(`P${rowIndex}`).value =
-      farmer.animals.chicken?.broiler || "";
-    worksheet.getCell(`Q${rowIndex}`).value =
-      farmer.animals.chicken?.layer || "";
-    worksheet.getCell(`R${rowIndex}`).value =
-      farmer.animals.chicken?.["free-range"] || "";
-    worksheet.getCell(`S${rowIndex}`).value =
-      farmer.animals.chicken?.["game-fowl"] || "";
-
-    // DUCK
-    worksheet.getCell(`T${rowIndex}`).value = farmer.animals.duck?.drake || "";
-    worksheet.getCell(`U${rowIndex}`).value = farmer.animals.duck?.hen || "";
-
-    // QUAIL
-    worksheet.getCell(`V${rowIndex}`).value = farmer.animals.quail?.cock || "";
-    worksheet.getCell(`W${rowIndex}`).value = farmer.animals.quail?.hen || "";
-
-    // TURKEY
-    worksheet.getCell(`X${rowIndex}`).value =
-      farmer.animals.turkey?.gobbler || "";
-    worksheet.getCell(`Y${rowIndex}`).value = farmer.animals.turkey?.hen || "";
-
-    // RABBIT
-    worksheet.getCell(`Z${rowIndex}`).value = farmer.animals.rabbit?.buck || "";
-    worksheet.getCell(`AA${rowIndex}`).value = farmer.animals.rabbit?.doe || "";
-
-    // Add borders to all cells in the row
-    for (let col = 1; col <= 29; col++) {
-      const cell = worksheet.getCell(rowIndex, col);
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-      cell.alignment = { horizontal: "center", vertical: "middle" };
-    }
-
-    rowIndex++;
-    counter++;
-  });
-
-  // Add empty rows to reach 25 rows
-  while (counter <= 25) {
-    worksheet.getCell(`A${rowIndex}`).value = counter;
-
-    // Add borders to all cells in the row
-    for (let col = 1; col <= 29; col++) {
-      const cell = worksheet.getCell(rowIndex, col);
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-    }
-
-    rowIndex++;
-    counter++;
-  }
-
-  // Add signature section
-  rowIndex += 3;
-  worksheet.getCell(`A${rowIndex}`).value = "Validated by:";
-
-  rowIndex += 3;
-  worksheet.getCell(`A${rowIndex}`).value = "____________________________";
-
-  rowIndex += 1;
-  worksheet.getCell(`A${rowIndex}`).value = "Agricultural Technician";
-};
-
-// Helper function to create High Value Crops Report
-const createHighValueCropsReport = async (
-  workbook,
-  data,
-  barangayFilter,
-  monthName,
-  year
-) => {
-  // Group data by crop type
-  const cropTypes = [...new Set(data.map((item) => item.crop_value))].filter(
-    Boolean
-  );
-
-  // Create separate worksheets for different crop types
-  for (const cropType of cropTypes) {
-    const cropData = data.filter((item) => item.crop_value === cropType);
-    await createCropTypeWorksheet(
-      workbook,
-      cropData,
-      cropType,
-      barangayFilter,
-      monthName,
-      year
-    );
-  }
-
-  // If no specific crop types found, create a general worksheet
-  if (cropTypes.length === 0) {
-    await createCropTypeWorksheet(
-      workbook,
-      data,
-      "High Value Crops",
-      barangayFilter,
-      monthName,
-      year
-    );
-  }
-};
-
-// Helper function to create worksheet for each crop type
-const createCropTypeWorksheet = async (
-  workbook,
-  data,
-  cropType,
-  barangayFilter,
-  monthName,
-  year
-) => {
-  const safeCropName = cropType.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 28);
-  const worksheet = workbook.addWorksheet(safeCropName);
-
-  // Set column widths
-  worksheet.columns = [
-    { width: 5 }, // No.
-    { width: 20 }, // Name of Growers
-    { width: 15 }, // Contact number
-    { width: 20 }, // Facebook/Email Account
-    { width: 20 }, // Home Address
-    { width: 20 }, // Farm Address
-    { width: 12 }, // Farm Location - Longitude
-    { width: 12 }, // Farm Location - Latitude
-    { width: 20 }, // Market Outlet Location
-    { width: 20 }, // Name of Buyer
-    { width: 20 }, // Association/Organization
-    { width: 12 }, // Area (hectare)
-    { width: 12 }, // Production Jan
-    { width: 12 }, // Production Feb
-    { width: 12 }, // Production Mar
-    { width: 12 }, // Production Apr
-    { width: 12 }, // Production May
-    { width: 12 }, // Production Jun
-    { width: 12 }, // Production Jul
-    { width: 12 }, // Production Aug
-    { width: 12 }, // Production Sep
-    { width: 12 }, // Production Oct
-    { width: 12 }, // Production Nov
-    { width: 12 }, // Production Dec
-  ];
-
-  // Add title
-  safeMergeCells(worksheet, "A1:X1");
-  worksheet.getCell(
-    "A1"
-  ).value = `BUTUAN CITY ${cropType.toUpperCase()} PROFILING`;
-  worksheet.getCell("A1").alignment = {
-    horizontal: "center",
-    vertical: "middle",
-  };
-  worksheet.getCell("A1").font = { bold: true, size: 14 };
-
-  safeMergeCells(worksheet, "A2:X2");
-  worksheet.getCell("A2").value = `As of ${
-    monthName ? monthName + " " : ""
-  }${year}`;
-  worksheet.getCell("A2").alignment = {
-    horizontal: "center",
-    vertical: "middle",
-  };
-  worksheet.getCell("A2").font = { bold: true, size: 12 };
-
-  // Add barangay
-  worksheet.getCell("A4").value = "BARANGAY:";
-  worksheet.getCell("A4").font = { bold: true };
-  if (barangayFilter) {
-    worksheet.getCell("B4").value = barangayFilter;
-  }
-
-  // Add section headers
-  safeMergeCells(worksheet, "A6:K6");
-  worksheet.getCell("A6").value = "Growers' Profile";
-  worksheet.getCell("A6").alignment = {
-    horizontal: "center",
-    vertical: "middle",
-  };
-  worksheet.getCell("A6").font = { bold: true };
-  worksheet.getCell("A6").fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FFF2CC" }, // Light yellow background
-  };
-
-  safeMergeCells(worksheet, "L6:X6");
-  worksheet.getCell(
-    "L6"
-  ).value = `Production Record from January to December ${year} (kg)`;
-  worksheet.getCell("L6").alignment = {
-    horizontal: "center",
-    vertical: "middle",
-  };
-  worksheet.getCell("L6").font = { bold: true };
-  worksheet.getCell("L6").fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FFF2CC" }, // Light yellow background
-  };
-
-  // Add table headers
-  const headerRow = 7;
-
-  worksheet.getCell(`A${headerRow}`).value = "No.";
-  worksheet.getCell(`B${headerRow}`).value = "Name of Growers";
-  worksheet.getCell(`C${headerRow}`).value = "Contact number";
-  worksheet.getCell(`D${headerRow}`).value = "Facebook/Email Account";
-  worksheet.getCell(`E${headerRow}`).value = "Home Address";
-  worksheet.getCell(`F${headerRow}`).value = "Farm Address";
-
-  safeMergeCells(`G${headerRow}:H${headerRow - 1}`);
-  worksheet.getCell(`G${headerRow - 1}`).value = "Farm Location Coordinates";
-  worksheet.getCell(`G${headerRow - 1}`).alignment = {
-    horizontal: "center",
-    vertical: "middle",
-  };
-  worksheet.getCell(`G${headerRow}`).value = "Longitude";
-  worksheet.getCell(`H${headerRow}`).value = "Latitude";
-
-  worksheet.getCell(`I${headerRow}`).value = "Market Outlet Location";
-  worksheet.getCell(`J${headerRow}`).value = "Name of Buyer";
-  worksheet.getCell(`K${headerRow}`).value = "Association/Organization";
-  worksheet.getCell(`L${headerRow}`).value = `${cropType} Area (hectare)`;
-
-  // Add monthly production columns
-  const months = [
-    "JAN",
-    "FEB",
-    "MAR",
-    "APR",
-    "MAY",
-    "JUN",
-    "JUL",
-    "AUG",
-    "SEPT",
-    "OCT",
-    "NOV",
-    "DEC",
-  ];
-  for (let i = 0; i < months.length; i++) {
-    worksheet.getCell(`${String.fromCharCode(77 + i)}${headerRow}`).value =
-      months[i];
-  }
-
-  // Style header row
-  for (let col = 1; col <= 24; col++) {
-    const cell = worksheet.getCell(headerRow, col);
-    cell.font = { bold: true };
-    cell.alignment = {
-      horizontal: "center",
-      vertical: "middle",
-      wrapText: true,
-    };
-    cell.border = {
-      top: { style: "thin" },
-      left: { style: "thin" },
-      bottom: { style: "thin" },
-      right: { style: "thin" },
-    };
-    cell.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FFF2CC" }, // Light yellow background
-    };
-  }
-
-  // Add default values for production columns
-  worksheet.getCell(`L${headerRow + 1}`).value = 0;
-  for (let i = 0; i < months.length; i++) {
-    worksheet.getCell(
-      `${String.fromCharCode(77 + i)}${headerRow + 1}`
-    ).value = 0;
-  }
-
-  // Add data rows
-  let rowIndex = headerRow + 1;
-  let counter = 1;
-
-  // Filter data by barangay if specified
-  const filteredData = barangayFilter
-    ? data.filter((item) => item.barangay === barangayFilter)
-    : data;
-
-  // Group data by farmer
-  const farmerGroups = {};
-  filteredData.forEach((item) => {
-    if (!item.farmer_id) return;
-
-    if (!farmerGroups[item.farmer_id]) {
-      farmerGroups[item.farmer_id] = {
-        farmer_name: item.farmer_name || "Unknown",
-        contact_number: item.contact_number || "",
-        facebook_email: item.facebook_email || "",
-        home_address: item.home_address || "",
-        farm_address: item.farm_address || "",
-        longitude: item.longitude || "",
-        latitude: item.latitude || "",
-        market_outlet: item.market_outlet || "",
-        buyer: item.buyer || "",
-        association: item.association || "",
-        area_hectare: 0,
-        monthly_production: Array(12).fill(0),
-      };
-    }
-
-    // Add area
-    farmerGroups[item.farmer_id].area_hectare +=
-      Number.parseFloat(item.area_hectare) || 0;
-
-    // Add production data by month
-    if (item.created_at) {
-      const date = new Date(item.created_at);
-      const month = date.getMonth();
-      farmerGroups[item.farmer_id].monthly_production[month] +=
-        Number.parseFloat(item.quantity) || 0;
-    }
-  });
-
-  // Add farmer rows
-  Object.values(farmerGroups).forEach((farmer) => {
-    worksheet.getCell(`A${rowIndex}`).value = counter;
-    worksheet.getCell(`B${rowIndex}`).value = farmer.farmer_name;
-    worksheet.getCell(`C${rowIndex}`).value = farmer.contact_number;
-    worksheet.getCell(`D${rowIndex}`).value = farmer.facebook_email;
-    worksheet.getCell(`E${rowIndex}`).value = farmer.home_address;
-    worksheet.getCell(`F${rowIndex}`).value = farmer.farm_address;
-    worksheet.getCell(`G${rowIndex}`).value = farmer.longitude;
-    worksheet.getCell(`H${rowIndex}`).value = farmer.latitude;
-    worksheet.getCell(`I${rowIndex}`).value = farmer.market_outlet;
-    worksheet.getCell(`J${rowIndex}`).value = farmer.buyer;
-    worksheet.getCell(`K${rowIndex}`).value = farmer.association;
-    worksheet.getCell(`L${rowIndex}`).value =
-      farmer.area_hectare > 0 ? farmer.area_hectare.toFixed(2) : 0;
-
-    // Add monthly production
-    for (let i = 0; i < 12; i++) {
-      worksheet.getCell(`${String.fromCharCode(77 + i)}${rowIndex}`).value =
-        farmer.monthly_production[i] > 0
-          ? farmer.monthly_production[i].toFixed(2)
-          : 0;
-    }
-
-    // Add borders to all cells in the row
-    for (let col = 1; col <= 24; col++) {
-      const cell = worksheet.getCell(rowIndex, col);
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-      cell.alignment = { vertical: "middle" };
-    }
-
-    rowIndex++;
-    counter++;
-  });
-
-  // Add empty rows to reach 35 rows
-  while (counter <= 35) {
-    worksheet.getCell(`A${rowIndex}`).value = counter;
-
-    // Add borders to all cells in the row
-    for (let col = 1; col <= 24; col++) {
-      const cell = worksheet.getCell(rowIndex, col);
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-    }
-
-    rowIndex++;
-    counter++;
-  }
-
-  // Add signature section
-  rowIndex += 3;
-  worksheet.getCell(`A${rowIndex}`).value = "Prepared by:";
-  worksheet.getCell(`F${rowIndex}`).value = "Reviewed by:";
-  worksheet.getCell(`K${rowIndex}`).value = "Noted:";
-
-  rowIndex += 3;
-  worksheet.getCell(`A${rowIndex}`).value = "CARLA AMOR E. TAYAG";
-  worksheet.getCell(`A${rowIndex}`).font = { bold: true };
-  worksheet.getCell(`F${rowIndex}`).value = "MELANIO M. CATAYAS JR.,";
-  worksheet.getCell(`F${rowIndex}`).font = { bold: true };
-  worksheet.getCell(`K${rowIndex}`).value = "ENGR. PIERRE ANTHONY D. JOVEN";
-  worksheet.getCell(`K${rowIndex}`).font = { bold: true };
-
-  rowIndex += 1;
-  worksheet.getCell(`A${rowIndex}`).value = "AT";
-  worksheet.getCell(`F${rowIndex}`).value = "HVCDP Coordinator";
-  worksheet.getCell(`K${rowIndex}`).value = "City Agriculturist";
-};
-
-// Helper function to create Crops Report
-const createCropsReport = async (
-  workbook,
-  data,
-  barangayFilter,
-  monthName,
-  year,
-  cropTypeFilter = ""
-) => {
-  // For regular crops, we'll create a vegetable profile report
-  const worksheet = workbook.addWorksheet("Vegetable Profile");
-
-  // If a specific crop type is filtered, add it to the title
-  const titleSuffix = cropTypeFilter ? ` - ${cropTypeFilter}` : "";
-
-  // Rest of the function remains the same...
-  // Just update the title to include the crop type filter
-  safeMergeCells(worksheet, "A1:U1");
-  worksheet.getCell("A1").value = `BUTUAN CITY VEGETABLE PROFILE${titleSuffix}`;
-  worksheet.getCell("A1").alignment = {
-    horizontal: "center",
-    vertical: "middle",
-  };
-  worksheet.getCell("A1").font = { bold: true, size: 14 };
-
-  safeMergeCells(worksheet, "A2:U2");
-  worksheet.getCell("A2").value = `As of ${
-    monthName ? monthName + " " : ""
-  }${year}`;
-  worksheet.getCell("A2").alignment = {
-    horizontal: "center",
-    vertical: "middle",
-  };
-  worksheet.getCell("A2").font = { bold: true, size: 12 };
-
-  // Add barangay
-  worksheet.getCell("A4").value = "BARANGAY:";
-  worksheet.getCell("A4").font = { bold: true };
-  if (barangayFilter) {
-    worksheet.getCell("B4").value = barangayFilter;
-  }
-
-  // Add section headers
-  safeMergeCells(worksheet, "A6:K6");
-  worksheet.getCell("A6").value = "Growers' Profile";
-  worksheet.getCell("A6").alignment = {
-    horizontal: "center",
-    vertical: "middle",
-  };
-  worksheet.getCell("A6").font = { bold: true };
-  worksheet.getCell("A6").fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FFF2CC" }, // Light yellow background
-  };
-
-  safeMergeCells(worksheet, "L6:U6");
-  worksheet.getCell("L6").value = `Production Record from January ${year} (kg)`;
-  worksheet.getCell("L6").alignment = {
-    horizontal: "center",
-    vertical: "middle",
-  };
-  worksheet.getCell("L6").font = { bold: true };
-  worksheet.getCell("L6").fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FFF2CC" }, // Light yellow background
-  };
-
-  // Add table headers
-  const headerRow = 7;
-
-  worksheet.getCell(`A${headerRow}`).value = "No.";
-  worksheet.getCell(`B${headerRow}`).value = "Name of Growers";
-  worksheet.getCell(`C${headerRow}`).value = "Contact number";
-  worksheet.getCell(`D${headerRow}`).value = "Facebook/Email Account";
-  worksheet.getCell(`E${headerRow}`).value = "Home Address";
-  worksheet.getCell(`F${headerRow}`).value = "Farm Address";
-
-  safeMergeCells(`G${headerRow}:H${headerRow - 1}`);
-  worksheet.getCell(`G${headerRow - 1}`).value = "Farm Location Coordinates";
-  worksheet.getCell(`G${headerRow - 1}`).alignment = {
-    horizontal: "center",
-    vertical: "middle",
-  };
-  worksheet.getCell(`G${headerRow}`).value = "Longitude";
-  worksheet.getCell(`H${headerRow}`).value = "Latitude";
-
-  worksheet.getCell(`I${headerRow}`).value = "Market Outlet Location";
-  worksheet.getCell(`J${headerRow}`).value = "Name of Buyer";
-  worksheet.getCell(`K${headerRow}`).value = "Association/Organization";
-  worksheet.getCell(`L${headerRow}`).value = "Area (hectare)";
-
-  // Add vegetable columns
-  const vegetables = [
-    "Eggplant",
-    "Ampalaya",
-    "Okra",
-    "Pele Sitao",
-    "Squash",
-    "Tomato",
-    "Other Crop (specify)",
-    "Other Crop (specify)",
-    "Other Crop (specify)",
-    "Other Crop (specify)",
-  ];
-  for (let i = 0; i < vegetables.length; i++) {
-    worksheet.getCell(`${String.fromCharCode(77 + i)}${headerRow}`).value =
-      vegetables[i];
-  }
-
-  // Style header row
-  for (let col = 1; col <= 21; col++) {
-    const cell = worksheet.getCell(headerRow, col);
-    cell.font = { bold: true };
-    cell.alignment = {
-      horizontal: "center",
-      vertical: "middle",
-      wrapText: true,
-    };
-    cell.border = {
-      top: { style: "thin" },
-      left: { style: "thin" },
-      bottom: { style: "thin" },
-      right: { style: "thin" },
-    };
-    cell.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FFF2CC" }, // Light yellow background
-    };
-  }
-
-  // Add default values for production columns
-  worksheet.getCell(`L${headerRow + 1}`).value = 0;
-  for (let i = 0; i < vegetables.length; i++) {
-    worksheet.getCell(
-      `${String.fromCharCode(77 + i)}${headerRow + 1}`
-    ).value = 0;
-  }
-
-  // Add data rows
-  let rowIndex = headerRow + 1;
-  let counter = 1;
-
-  // Filter data by barangay if specified
-  const filteredData = barangayFilter
-    ? data.filter((item) => item.barangay === barangayFilter)
-    : data;
-
-  // Group data by farmer
-  const farmerGroups = {};
-  filteredData.forEach((item) => {
-    if (!item.farmer_id) return;
-
-    if (!farmerGroups[item.farmer_id]) {
-      farmerGroups[item.farmer_id] = {
-        farmer_name: item.farmer_name || "Unknown",
-        contact_number: item.contact_number || "",
-        facebook_email: item.facebook_email || "",
-        home_address: item.home_address || "",
-        farm_address: item.farm_address || "",
-        longitude: item.longitude || "",
-        latitude: item.latitude || "",
-        market_outlet: item.market_outlet || "",
-        buyer: item.buyer || "",
-        association: item.association || "",
-        area_hectare: 0,
-        crops: {},
-      };
-    }
-
-    // Add area
-    farmerGroups[item.farmer_id].area_hectare +=
-      Number.parseFloat(item.area_hectare) || 0;
-
-    // Add crop data
-    const cropValue = item.crop_value?.toLowerCase() || "";
-    if (cropValue) {
-      farmerGroups[item.farmer_id].crops[cropValue] =
-        (Number.parseFloat(item.quantity) || 0) +
-        (farmerGroups[item.farmer_id].crops[cropValue] || 0);
-    }
-  });
-
-  // Add farmer rows
-  Object.values(farmerGroups).forEach((farmer) => {
-    worksheet.getCell(`A${rowIndex}`).value = counter;
-    worksheet.getCell(`B${rowIndex}`).value = farmer.farmer_name;
-    worksheet.getCell(`C${rowIndex}`).value = farmer.contact_number;
-    worksheet.getCell(`D${rowIndex}`).value = farmer.facebook_email;
-    worksheet.getCell(`E${rowIndex}`).value = farmer.home_address;
-    worksheet.getCell(`F${rowIndex}`).value = farmer.farm_address;
-    worksheet.getCell(`G${rowIndex}`).value = farmer.longitude;
-    worksheet.getCell(`H${rowIndex}`).value = farmer.latitude;
-    worksheet.getCell(`I${rowIndex}`).value = farmer.market_outlet;
-    worksheet.getCell(`J${rowIndex}`).value = farmer.buyer;
-    worksheet.getCell(`K${rowIndex}`).value = farmer.association;
-    worksheet.getCell(`L${rowIndex}`).value =
-      farmer.area_hectare > 0 ? farmer.area_hectare.toFixed(2) : 0;
-
-    // Add crop production
-    worksheet.getCell(`M${rowIndex}`).value = farmer.crops.eggplant || 0;
-    worksheet.getCell(`N${rowIndex}`).value = farmer.crops.ampalaya || 0;
-    worksheet.getCell(`O${rowIndex}`).value = farmer.crops.okra || 0;
-    worksheet.getCell(`P${rowIndex}`).value = farmer.crops["pele sitao"] || 0;
-    worksheet.getCell(`Q${rowIndex}`).value = farmer.crops.squash || 0;
-    worksheet.getCell(`R${rowIndex}`).value = farmer.crops.tomato || 0;
-
-    // Add borders to all cells in the row
-    for (let col = 1; col <= 21; col++) {
-      const cell = worksheet.getCell(rowIndex, col);
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-      cell.alignment = { vertical: "middle" };
-    }
-
-    rowIndex++;
-    counter++;
-  });
-
-  // Add empty rows to reach 35 rows
-  while (counter <= 35) {
-    worksheet.getCell(`A${rowIndex}`).value = counter;
-
-    // Add borders to all cells in the row
-    for (let col = 1; col <= 21; col++) {
-      const cell = worksheet.getCell(rowIndex, col);
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-    }
-
-    rowIndex++;
-    counter++;
-  }
-
-  // Add signature section
-  rowIndex += 3;
-  worksheet.getCell(`A${rowIndex}`).value = "Prepared by:";
-  worksheet.getCell(`F${rowIndex}`).value = "Reviewed by:";
-  worksheet.getCell(`K${rowIndex}`).value = "Noted:";
-
-  rowIndex += 3;
-  worksheet.getCell(`A${rowIndex}`).value = "CARLA AMOR E. TAYAG";
-  worksheet.getCell(`A${rowIndex}`).font = { bold: true };
-  worksheet.getCell(`F${rowIndex}`).value = "MELANIO M. CATAYAS";
-  worksheet.getCell(`F${rowIndex}`).font = { bold: true };
-  worksheet.getCell(`K${rowIndex}`).value = "PIERRE ANTHONY D. JOVEN";
-  worksheet.getCell(`K${rowIndex}`).font = { bold: true };
-
-  rowIndex += 1;
-  worksheet.getCell(`A${rowIndex}`).value = "AT";
-  worksheet.getCell(`F${rowIndex}`).value = "HVCDP Coordinator";
   worksheet.getCell(`K${rowIndex}`).value = "City Agriculturist";
 };

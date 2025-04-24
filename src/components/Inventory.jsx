@@ -45,7 +45,7 @@ const MilkIcon = (props) => (
     {...props}
   >
     <path d="M8 2h8" />
-    <path d="M9 2v2.789a4 4 0 0 1-.672 2.219l-.656.984A4 4 0 0 0 7 10.212V20a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9.789a4 4 0 0 0-.672-2.219l-.656.984A4 4 0 0 1 15 4.788V2" />
+    <path d="M9 2v2.789a4 4 0 0 1-.672 2.219l-.656.984A4 4 0 0 0 7 10.212V20a2 2 0 0 0 2 2h6a2 2 0 0 2-2v-9.789a4 4 0 0 0-.672-2.219l-.656.984A4 4 0 0 1 15 4.788V2" />
     <path d="M7 15a6.472 6.472 0 0 1 5 0 6.47 6.47 0 0 0 5 0" />
   </svg>
 );
@@ -337,11 +337,11 @@ const Inventory = () => {
   const handleExportWithModal = (format, includeFilters, exportFilters) => {
     // Use the exportFilters object instead of the current filters
     handleExportToExcel(
-      format,
       includeFilters,
       exportFilters.barangay,
-      exportFilters.month,
-      exportFilters.year,
+      exportFilters.startMonth || exportFilters.month,
+      exportFilters.endMonth,
+      exportFilters.year || new Date().getFullYear().toString(),
       exportFilters.cropType
     );
     setShowExportModal(false);
@@ -398,16 +398,43 @@ const Inventory = () => {
                   // Parse production_data
                   const productionData = parseProductionData(crop);
 
+                  // Create a more comprehensive farmer data object
                   return {
                     ...crop,
                     farmer_id: farmer.farmer_id,
+                    // Try multiple possible name fields
                     farmer_name:
                       farmer.name ||
                       `${farmer.first_name || ""} ${
                         farmer.last_name || ""
                       }`.trim() ||
                       "Unknown",
-                    barangay: farmer.barangay,
+                    // Copy all farmer fields directly to the crop
+                    name:
+                      farmer.name ||
+                      `${farmer.first_name || ""} ${
+                        farmer.last_name || ""
+                      }`.trim() ||
+                      "Unknown",
+                    contact_number: farmer.contact_number || farmer.phone || "",
+                    facebook_email: farmer.facebook_email || farmer.email || "",
+                    home_address: farmer.home_address || farmer.address || "",
+                    barangay: farmer.barangay || "",
+                    farm_address: farmer.farm_address || "",
+                    // Location coordinates
+                    longitude: farmer.longitude || "",
+                    latitude: farmer.latitude || "",
+                    farm_location_longitude:
+                      farmer.farm_location_longitude || farmer.longitude || "",
+                    farm_location_latitude:
+                      farmer.farm_location_latitude || farmer.latitude || "",
+                    // Other farmer details
+                    market_outlet_location: farmer.market_outlet_location || "",
+                    buyer_name: farmer.buyer_name || "",
+                    association_organization:
+                      farmer.association_organization ||
+                      farmer.organization ||
+                      "",
                     // Add parsed production data fields
                     crop_value: productionData.crop || crop.crop_value || "",
                     quantity: productionData.quantity || crop.quantity || "",
@@ -1090,10 +1117,10 @@ const Inventory = () => {
   // Modify the handleExportToExcel function to accept format and includeFilters parameters
   const handleExportToExcel = useCallback(
     async (
-      format = "excel",
       includeFilters = true,
       barangay = "",
-      month = "",
+      startMonth = "",
+      endMonth = "",
       year = "",
       cropType = ""
     ) => {
@@ -1103,17 +1130,31 @@ const Inventory = () => {
       setLoading(true);
 
       try {
+        // Debug the data being passed to the export function
+        console.log("Export data:", {
+          dataType: selectedDataType,
+          recordCount: allData.length,
+          sampleRecord: allData.length > 0 ? allData[0] : null,
+          filters: {
+            barangay,
+            startMonth,
+            endMonth,
+            year,
+            cropType,
+          },
+        });
+
         // Pass the crop filters to the export function
         await exportDataToExcel(
           selectedDataType,
           allData,
           barangay,
-          month,
+          startMonth,
           year,
           monthOptions,
           showToast,
           cropType,
-          format
+          endMonth // Pass the end month parameter
         );
       } finally {
         setLoading(false);
@@ -2250,8 +2291,20 @@ const Inventory = () => {
             month: monthFilter,
             year: yearFilter,
           }}
-          barangayOptions={barangayOptions}
+          barangayOptions={
+            selectedDataType === "crops" && cropFilters.cropType
+              ? barangayOptions.filter((barangay) => {
+                  // Only include barangays that have data for the selected crop type
+                  return allData.some(
+                    (item) =>
+                      item.barangay === barangay &&
+                      item.crop_type === cropFilters.cropType
+                  );
+                })
+              : barangayOptions
+          }
           cropTypeOptions={cropTypeOptions}
+          allData={allData} // Pass all data to the export modal
         />
       )}
     </div>
