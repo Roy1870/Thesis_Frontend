@@ -26,9 +26,11 @@ export default function ExportModal({
   const [selectedHighValueCropType, setSelectedHighValueCropType] =
     useState("");
 
+  // Add a new state for area type selection (for rice)
+  const [selectedAreaType, setSelectedAreaType] = useState("");
+
   // Add endMonth state and update the getDateRangeText function
   // Add this after the other state declarations:
-
   const [endMonth, setEndMonth] = useState("");
 
   // Reset filters when modal opens or filters prop changes
@@ -58,6 +60,7 @@ export default function ExportModal({
       setEndMonth(""); // Reset end month too
       setSelectedYear(new Date().getFullYear().toString());
       setSelectedHighValueCropType(""); // Reset high value crop type too
+      setSelectedAreaType(""); // Reset area type too
     }
   }, [isOpen]);
 
@@ -155,6 +158,15 @@ export default function ExportModal({
       });
     }
 
+    // Apply area type filter for rice
+    if (dataType === "rice" && selectedAreaType) {
+      filtered = filtered.filter(
+        (item) =>
+          item.area_type &&
+          item.area_type.toLowerCase() === selectedAreaType.toLowerCase()
+      );
+    }
+
     // Apply month filter based on data type
     if (dataType === "highValueCrops") {
       // For high value crops, use January as start month and the selected month as end month
@@ -167,6 +179,17 @@ export default function ExportModal({
           const month = Number.parseInt(itemMonth);
           // Include data from January (1) up to and including the selected month
           return month >= 1 && month <= Number.parseInt(startMonth);
+        });
+      }
+    } else if (dataType === "rice") {
+      // For rice, use single month filter
+      if (startMonth) {
+        filtered = filtered.filter((item) => {
+          if (!item.created_at) return false;
+          const itemMonth = (
+            new Date(item.created_at).getMonth() + 1
+          ).toString();
+          return itemMonth === startMonth;
         });
       }
     } else {
@@ -215,6 +238,7 @@ export default function ExportModal({
     startMonth,
     endMonth,
     dataType,
+    selectedAreaType,
   ]);
 
   // Format month for display
@@ -242,11 +266,11 @@ export default function ExportModal({
   const getDateRangeText = () => {
     if (!startMonth && !endMonth) return "";
 
-    if (dataType === "highValueCrops") {
+    if (dataType === "rice") {
+      return `${getMonthName(startMonth)} ${selectedYear}`;
+    } else if (dataType === "highValueCrops") {
       return `As of ${getMonthName(startMonth)} ${selectedYear}`;
-    }
-
-    if (startMonth && endMonth) {
+    } else if (startMonth && endMonth) {
       return `${getMonthName(startMonth)} - ${getMonthName(
         endMonth
       )} ${selectedYear}`;
@@ -290,6 +314,15 @@ export default function ExportModal({
         });
       }
 
+      // Apply area type filter for rice
+      if (dataType === "rice" && selectedAreaType) {
+        dataToExport = dataToExport.filter(
+          (item) =>
+            item.area_type &&
+            item.area_type.toLowerCase() === selectedAreaType.toLowerCase()
+        );
+      }
+
       // Apply month filter based on data type
       if (dataType === "highValueCrops") {
         // For high value crops, use January as start month and the selected month as end month
@@ -308,6 +341,17 @@ export default function ExportModal({
             startMonth,
             getMonthName(startMonth)
           );
+        }
+      } else if (dataType === "rice") {
+        // For rice, use single month filter
+        if (startMonth) {
+          dataToExport = dataToExport.filter((item) => {
+            if (!item.created_at) return false;
+            const itemMonth = (
+              new Date(item.created_at).getMonth() + 1
+            ).toString();
+            return itemMonth === startMonth;
+          });
         }
       } else {
         // For regular crops, use start/end month range
@@ -353,7 +397,15 @@ export default function ExportModal({
     if (selectedYear) {
       const year = Number.parseInt(selectedYear);
 
-      if (dataType === "highValueCrops") {
+      if (dataType === "rice") {
+        // For rice, use the selected month
+        if (startMonth) {
+          const month = Number.parseInt(startMonth);
+          startDate = new Date(year, month - 1, 1); // First day of month
+          const lastDay = getLastDayOfMonth(year, month);
+          endDate = new Date(year, month - 1, lastDay); // Last day of month
+        }
+      } else if (dataType === "highValueCrops") {
         // For high value crops, start date is January 1st
         startDate = new Date(year, 0, 1); // January 1st (month is 0-indexed in Date)
 
@@ -409,8 +461,10 @@ export default function ExportModal({
       endMonth: includeFilters
         ? dataType === "highValueCrops"
           ? startMonth
+          : dataType === "rice"
+          ? startMonth // For rice, use the same month for both start and end
           : endMonth
-        : "", // For high value crops, use the selected month as end month
+        : "",
       month: includeFilters ? startMonth : "", // Keep for backward compatibility
       year: includeFilters ? selectedYear : "",
       isHighValueCrop: dataType === "highValueCrops",
@@ -420,7 +474,9 @@ export default function ExportModal({
           : "",
       // Add the month name for high value crops
       monthName:
-        includeFilters && dataType === "highValueCrops" && startMonth
+        includeFilters &&
+        (dataType === "highValueCrops" || dataType === "rice") &&
+        startMonth
           ? getMonthName(startMonth)
           : "",
       // Add formatted dates with proper end dates (last day of month)
@@ -429,6 +485,8 @@ export default function ExportModal({
       // Add day information to ensure we're using the last day of the month
       startDay: startDate ? 1 : null, // Always first day of month
       endDay: endDate ? endDate.getDate() : null, // Last day of the month
+      // Add area type for rice
+      areaType: includeFilters && dataType === "rice" ? selectedAreaType : "",
     };
 
     console.log("Exporting data count:", dataToExport.length);
@@ -575,6 +633,28 @@ export default function ExportModal({
                   </select>
                 </div>
 
+                {/* Area Type Filter - Only for Rice */}
+                {dataType === "rice" && (
+                  <div>
+                    <label
+                      htmlFor="area-type"
+                      className="block mb-1 text-xs font-medium text-gray-700"
+                    >
+                      Area Type
+                    </label>
+                    <select
+                      id="area-type"
+                      value={selectedAreaType}
+                      onChange={(e) => setSelectedAreaType(e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
+                    >
+                      <option value="">All (Both Irrigated & Rainfed)</option>
+                      <option value="irrigated">Irrigated Only</option>
+                      <option value="rainfed">Rainfed Only</option>
+                    </select>
+                  </div>
+                )}
+
                 {dataType === "highValueCrops" ? (
                   <div>
                     <label
@@ -608,6 +688,37 @@ export default function ExportModal({
                           Number.parseInt(startMonth)
                         )}
                         , {selectedYear}
+                      </div>
+                    )}
+                  </div>
+                ) : dataType === "rice" ? (
+                  <div>
+                    <label
+                      htmlFor="rice-month"
+                      className="block mb-1 text-xs font-medium text-gray-700"
+                    >
+                      Month
+                    </label>
+                    <select
+                      id="rice-month"
+                      value={startMonth}
+                      onChange={(e) => setStartMonth(e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
+                    >
+                      <option value="">Select Month</option>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map(
+                        (month) => (
+                          <option key={month} value={month.toString()}>
+                            {getMonthName(month.toString())}
+                          </option>
+                        )
+                      )}
+                    </select>
+
+                    {startMonth && (
+                      <div className="p-2 mt-2 text-xs text-center text-gray-700 bg-gray-100 rounded">
+                        <span className="font-medium">Export month:</span>{" "}
+                        {getMonthName(startMonth)} {selectedYear}
                       </div>
                     )}
                   </div>

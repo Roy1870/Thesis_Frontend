@@ -166,6 +166,7 @@ export const exportDataToExcel = async (
         endMonthFilter,
         yearFilter,
         cropTypeFilter,
+        areaTypeFilter: filters?.areaType || "",
       },
     });
 
@@ -253,12 +254,18 @@ export const exportDataToExcel = async (
     // Create worksheet based on data type
     switch (dataType) {
       case "rice":
+        // Import and use the rice template with area type filter
+        const { createRiceReport } = await import(
+          "../../exporting/rice-template"
+        );
         await createRiceReport(
           workbook,
           filteredData,
           barangayFilter,
           monthString,
-          year
+          year,
+          safeMergeCells,
+          filters?.areaType || "" // Pass the area type filter
         );
         break;
       case "crops":
@@ -356,6 +363,7 @@ export const exportDataToExcel = async (
             safeMergeCells
           );
         }
+        break;
       case "highValueCrops":
         // Import and use the high value crops template
         const { createHighValueCropsReport } = await import(
@@ -363,7 +371,7 @@ export const exportDataToExcel = async (
         );
 
         // Get the high value crop type from the filters
-        const highValueCropType = filters?.highValueCropType || "";
+        const highValueCropType = filters?.cropType || "";
 
         console.log("Using high value crops template with data:", {
           recordCount: filteredData.length,
