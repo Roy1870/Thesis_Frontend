@@ -431,7 +431,6 @@ export default function ExportModal({
       endDay: endDate ? endDate.getDate() : null, // Last day of the month
     };
 
-    console.log("Export filters:", exportFilters);
     console.log("Exporting data count:", dataToExport.length);
 
     // Pass the filtered data directly to the export function

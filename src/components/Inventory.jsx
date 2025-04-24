@@ -476,16 +476,43 @@ const Inventory = () => {
                   // Parse production_data
                   const productionData = parseProductionData(crop);
 
+                  // Create a more comprehensive farmer data object - similar to the crops case
                   return {
                     ...crop,
                     farmer_id: farmer.farmer_id,
+                    // Try multiple possible name fields
                     farmer_name:
                       farmer.name ||
                       `${farmer.first_name || ""} ${
                         farmer.last_name || ""
                       }`.trim() ||
                       "Unknown",
-                    barangay: farmer.barangay,
+                    // Copy all farmer fields directly to the crop
+                    name:
+                      farmer.name ||
+                      `${farmer.first_name || ""} ${
+                        farmer.last_name || ""
+                      }`.trim() ||
+                      "Unknown",
+                    contact_number: farmer.contact_number || farmer.phone || "",
+                    facebook_email: farmer.facebook_email || farmer.email || "",
+                    home_address: farmer.home_address || farmer.address || "",
+                    barangay: farmer.barangay || "",
+                    farm_address: farmer.farm_address || "",
+                    // Location coordinates
+                    longitude: farmer.longitude || "",
+                    latitude: farmer.latitude || "",
+                    farm_location_longitude:
+                      farmer.farm_location_longitude || farmer.longitude || "",
+                    farm_location_latitude:
+                      farmer.farm_location_latitude || farmer.latitude || "",
+                    // Other farmer details
+                    market_outlet_location: farmer.market_outlet_location || "",
+                    buyer_name: farmer.buyer_name || "",
+                    association_organization:
+                      farmer.association_organization ||
+                      farmer.organization ||
+                      "",
                     // Add parsed production data fields
                     month: productionData.month || "",
                     crop_value: productionData.crop || crop.crop_value || "",

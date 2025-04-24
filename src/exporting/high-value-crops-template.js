@@ -52,6 +52,26 @@ export const createHighValueCropsReport = async (
         console.log("Using production_data object directly:", productionData);
       }
     }
+
+    // Add farmer info to each crop
+    if (crop.farmer_id && !crop.farmer_name) {
+      // If we have a farmer_id but no farmer info, try to add basic farmer details
+      productionData.farmer_name = crop.name || crop.farmer_name || "";
+      productionData.contact_number = crop.contact_number || crop.phone || "";
+      productionData.facebook_email = crop.facebook_email || crop.email || "";
+      productionData.home_address = crop.home_address || crop.address || "";
+      productionData.barangay = crop.barangay || "";
+      productionData.farm_address = crop.farm_address || "";
+      productionData.farm_location_longitude =
+        crop.farm_location_longitude || crop.longitude || "";
+      productionData.farm_location_latitude =
+        crop.farm_location_latitude || crop.latitude || "";
+      productionData.market_outlet_location = crop.market_outlet_location || "";
+      productionData.buyer_name = crop.buyer_name || "";
+      productionData.association_organization =
+        crop.association_organization || crop.organization || "";
+    }
+
     return productionData;
   };
 
