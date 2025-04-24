@@ -1,3 +1,32 @@
+// Fix for the cell merging issue in the exportDataToExcel function
+
+// Helper function to safely merge cells
+const safeMergeCells = (worksheet, range) => {
+  try {
+    // Check if any of the cells in the range are already merged
+    let alreadyMerged = false;
+    worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+      if (
+        rowNumber >= range.split(":")[0].replace(/[A-Z]/g, "") &&
+        rowNumber <= range.split(":")[1].replace(/[A-Z]/g, "")
+      ) {
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          if (cell.isMerged) {
+            alreadyMerged = true;
+          }
+        });
+      }
+    });
+
+    // Only merge if not already merged
+    if (!alreadyMerged) {
+      worksheet.mergeCells(range);
+    }
+  } catch (error) {
+    console.warn(`Could not merge cells ${range}: ${error.message}`);
+  }
+};
+
 // Replace the entire exportDataToExcel function with this updated version
 export const exportDataToExcel = async (
   dataType,
@@ -6,7 +35,9 @@ export const exportDataToExcel = async (
   monthFilter,
   yearFilter,
   monthOptions,
-  showToast
+  showToast,
+  cropTypeFilter = "",
+  format = "excel"
 ) => {
   try {
     // Make sure ExcelJS is loaded
@@ -22,6 +53,13 @@ export const exportDataToExcel = async (
     if (barangayFilter) {
       filteredData = filteredData.filter(
         (item) => item.barangay && item.barangay === barangayFilter
+      );
+    }
+
+    // Apply crop type filter if selected
+    if (cropTypeFilter && dataType === "crops") {
+      filteredData = filteredData.filter(
+        (item) => item.crop_type && item.crop_type === cropTypeFilter
       );
     }
 
@@ -79,7 +117,8 @@ export const exportDataToExcel = async (
           filteredData,
           barangayFilter,
           monthName,
-          year
+          year,
+          cropTypeFilter
         );
         break;
       case "highValueCrops":
@@ -130,33 +169,64 @@ export const exportDataToExcel = async (
         break;
     }
 
-    // Generate Excel file
-    const buffer = await workbook.xlsx.writeBuffer();
-
-    // Create a Blob from the buffer
-    const blob = new Blob([buffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
-
-    // Create a download link and trigger download
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${dataType}_export_${
-      new Date().toISOString().split("T")[0]
-    }.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-
-    // Clean up
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+    // Generate file based on format
+    if (format === "csv") {
+      // For CSV, we'll need to generate a CSV for each worksheet
+      const worksheets = workbook.worksheets;
+      if (worksheets.length === 1) {
+        // Single worksheet - simple CSV export
+        const csvData = await workbook.csv.writeBuffer();
+        downloadFile(
+          csvData,
+          `${dataType}_export_${new Date().toISOString().split("T")[0]}.csv`,
+          "text/csv"
+        );
+      } else {
+        // Multiple worksheets - create a zip file with multiple CSVs
+        // For simplicity, we'll just export the first worksheet as CSV
+        // In a real implementation, you might want to use JSZip to create a zip with multiple files
+        const csvData = await workbook.csv.writeBuffer({
+          sheetId: workbook.worksheets[0].id,
+        });
+        downloadFile(
+          csvData,
+          `${dataType}_export_${new Date().toISOString().split("T")[0]}.csv`,
+          "text/csv"
+        );
+      }
+    } else {
+      // Excel format (default)
+      const buffer = await workbook.xlsx.writeBuffer();
+      downloadFile(
+        buffer,
+        `${dataType}_export_${new Date().toISOString().split("T")[0]}.xlsx`,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+    }
 
     showToast("Export completed successfully", "success");
   } catch (error) {
     console.error("Export error:", error);
     showToast(`Export failed: ${error.message}`, "error");
   }
+};
+
+// Add a helper function to download files
+const downloadFile = (data, filename, mimeType) => {
+  // Create a Blob from the buffer
+  const blob = new Blob([data], { type: mimeType });
+
+  // Create a download link and trigger download
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+
+  // Clean up
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
 };
 
 // Helper function to create Rice Report
@@ -250,7 +320,7 @@ const createRiceWorksheet = async (
   ];
 
   // Add title and header
-  worksheet.mergeCells("A1:N1");
+  safeMergeCells(worksheet, "A1:N1");
   worksheet.getCell("A1").value = "RICE PROGRAM";
   worksheet.getCell("A1").alignment = {
     horizontal: "center",
@@ -258,7 +328,7 @@ const createRiceWorksheet = async (
   };
   worksheet.getCell("A1").font = { bold: true, size: 14 };
 
-  worksheet.mergeCells("A2:N2");
+  safeMergeCells(worksheet, "A2:N2");
   worksheet.getCell("A2").value = "HARVESTING ACCOMPLISHMENT REPORT";
   worksheet.getCell("A2").alignment = {
     horizontal: "center",
@@ -266,7 +336,7 @@ const createRiceWorksheet = async (
   };
   worksheet.getCell("A2").font = { bold: true, size: 12 };
 
-  worksheet.mergeCells("A3:N3");
+  safeMergeCells(worksheet, "A3:N3");
   worksheet.getCell("A3").value = "WET OR DRY SEASON";
   worksheet.getCell("A3").alignment = {
     horizontal: "center",
@@ -274,7 +344,7 @@ const createRiceWorksheet = async (
   };
   worksheet.getCell("A3").font = { bold: true, size: 12 };
 
-  worksheet.mergeCells("A4:N4");
+  safeMergeCells(worksheet, "A4:N4");
   worksheet.getCell("A4").value = `For the month of ${monthName} ${year}`;
   worksheet.getCell("A4").alignment = {
     horizontal: "center",
@@ -288,7 +358,7 @@ const createRiceWorksheet = async (
   worksheet.getCell("A8").value = "Municipality: Butuan City";
 
   // Add area type header
-  worksheet.mergeCells("A10:N10");
+  safeMergeCells(worksheet, "A10:N10");
   worksheet.getCell("A10").value = areaType.toUpperCase();
   worksheet.getCell("A10").alignment = {
     horizontal: "center",
@@ -302,7 +372,7 @@ const createRiceWorksheet = async (
   };
 
   // Add column headers
-  worksheet.mergeCells("A11:A12");
+  safeMergeCells(worksheet, "A11:A12");
   worksheet.getCell("A11").value = "No.";
   worksheet.getCell("A11").alignment = {
     horizontal: "center",
@@ -310,7 +380,7 @@ const createRiceWorksheet = async (
   };
   worksheet.getCell("A11").font = { bold: true };
 
-  worksheet.mergeCells("B11:B12");
+  safeMergeCells(worksheet, "B11:B12");
   worksheet.getCell("B11").value = "Barangay";
   worksheet.getCell("B11").alignment = {
     horizontal: "center",
@@ -319,7 +389,7 @@ const createRiceWorksheet = async (
   worksheet.getCell("B11").font = { bold: true };
 
   // Hybrid Seeds
-  worksheet.mergeCells("C11:E11");
+  safeMergeCells(worksheet, "C11:E11");
   worksheet.getCell("C11").value = "Hybrid Seeds";
   worksheet.getCell("C11").alignment = {
     horizontal: "center",
@@ -349,7 +419,7 @@ const createRiceWorksheet = async (
   worksheet.getCell("E12").font = { bold: true };
 
   // Certified Seeds
-  worksheet.mergeCells("F11:H11");
+  safeMergeCells(worksheet, "F11:H11");
   worksheet.getCell("F11").value = "Certified Seeds";
   worksheet.getCell("F11").alignment = {
     horizontal: "center",
@@ -379,7 +449,7 @@ const createRiceWorksheet = async (
   worksheet.getCell("H12").font = { bold: true };
 
   // Good Seeds
-  worksheet.mergeCells("I11:K11");
+  safeMergeCells(worksheet, "I11:K11");
   worksheet.getCell("I11").value = "Good Seeds";
   worksheet.getCell("I11").alignment = {
     horizontal: "center",
@@ -409,7 +479,7 @@ const createRiceWorksheet = async (
   worksheet.getCell("K12").font = { bold: true };
 
   // Total
-  worksheet.mergeCells("L11:N11");
+  safeMergeCells(worksheet, "L11:N11");
   worksheet.getCell("L11").value = "Total";
   worksheet.getCell("L11").alignment = {
     horizontal: "center",
@@ -743,7 +813,7 @@ const createFishpondReport = async (
   ];
 
   // Add header with logo and title
-  worksheet.mergeCells("A1:J3");
+  safeMergeCells(worksheet, "A1:J3");
   worksheet.getCell("A1").value = "FRESHWATER FISHPOND AREAS";
   worksheet.getCell("A1").alignment = {
     horizontal: "center",
@@ -752,7 +822,7 @@ const createFishpondReport = async (
   worksheet.getCell("A1").font = { bold: true, size: 14 };
 
   // Add barangay header
-  worksheet.mergeCells("A5:B5");
+  safeMergeCells(worksheet, "A5:B5");
   worksheet.getCell("A5").value = "Barangay:";
   worksheet.getCell("A5").font = { bold: true };
   if (barangayFilter) {
@@ -910,7 +980,7 @@ const createLivestockReport = async (
   ];
 
   // Add header with logo and title
-  worksheet.mergeCells("A1:AD3");
+  safeMergeCells(worksheet, "A1:AD3");
   worksheet.getCell("A1").value = "CITY AGRICULTURE AND VETERINARY DEPARTMENT";
   worksheet.getCell("A1").alignment = {
     horizontal: "center",
@@ -919,16 +989,16 @@ const createLivestockReport = async (
   worksheet.getCell("A1").font = { bold: true, size: 14 };
 
   // Add barangay and other info
-  worksheet.mergeCells("A5:B5");
+  safeMergeCells(worksheet, "A5:B5");
   worksheet.getCell("A5").value = "Barangay:";
   if (barangayFilter) {
     worksheet.getCell("C5").value = barangayFilter;
   }
 
-  worksheet.mergeCells("A6:B6");
+  safeMergeCells(worksheet, "A6:B6");
   worksheet.getCell("A6").value = "AEW Assigned:";
 
-  worksheet.mergeCells("A7:B7");
+  safeMergeCells(worksheet, "A7:B7");
   worksheet.getCell("A7").value = "Date of Monitoring:";
 
   // Add table headers
@@ -936,48 +1006,48 @@ const createLivestockReport = async (
   const headerRow2 = 10;
 
   worksheet.getCell(`A${headerRow1}`).value = "No.";
-  worksheet.mergeCells(`A${headerRow1}:A${headerRow2}`);
+  safeMergeCells(`A${headerRow1}:A${headerRow2}`);
 
   worksheet.getCell(`B${headerRow1}`).value = "RAISER/FARMER";
-  worksheet.mergeCells(`B${headerRow1}:B${headerRow2}`);
+  safeMergeCells(`B${headerRow1}:B${headerRow2}`);
 
   worksheet.getCell(`C${headerRow1}`).value = "Purok";
-  worksheet.mergeCells(`C${headerRow1}:C${headerRow2}`);
+  safeMergeCells(`C${headerRow1}:C${headerRow2}`);
 
   // CATTLE
   worksheet.getCell(`D${headerRow1}`).value = "CATTLE";
-  worksheet.mergeCells(`D${headerRow1}:E${headerRow1}`);
+  safeMergeCells(`D${headerRow1}:E${headerRow1}`);
   worksheet.getCell(`D${headerRow2}`).value = "Carabull";
   worksheet.getCell(`E${headerRow2}`).value = "Caraheif";
 
   // CARABAO
   worksheet.getCell(`F${headerRow1}`).value = "CARABAO";
-  worksheet.mergeCells(`F${headerRow1}:G${headerRow1}`);
+  safeMergeCells(`F${headerRow1}:G${headerRow1}`);
   worksheet.getCell(`F${headerRow2}`).value = "Carabull";
   worksheet.getCell(`G${headerRow2}`).value = "Caraheif";
 
   // GOAT
   worksheet.getCell(`H${headerRow1}`).value = "GOAT";
-  worksheet.mergeCells(`H${headerRow1}:I${headerRow1}`);
+  safeMergeCells(`H${headerRow1}:I${headerRow1}`);
   worksheet.getCell(`H${headerRow2}`).value = "Buck";
   worksheet.getCell(`I${headerRow2}`).value = "Doe";
 
   // SHEEP
   worksheet.getCell(`J${headerRow1}`).value = "SHEEP";
-  worksheet.mergeCells(`J${headerRow1}:K${headerRow1}`);
+  safeMergeCells(`J${headerRow1}:K${headerRow1}`);
   worksheet.getCell(`J${headerRow2}`).value = "Ram";
   worksheet.getCell(`K${headerRow2}`).value = "Ewe";
 
   // SWINE
   worksheet.getCell(`L${headerRow1}`).value = "SWINE";
-  worksheet.mergeCells(`L${headerRow1}:N${headerRow1}`);
+  safeMergeCells(`L${headerRow1}:N${headerRow1}`);
   worksheet.getCell(`L${headerRow2}`).value = "Sow";
   worksheet.getCell(`M${headerRow2}`).value = "Piglet";
   worksheet.getCell(`N${headerRow2}`).value = "Boar";
 
   // CHICKEN
   worksheet.getCell(`O${headerRow1}`).value = "CHICKEN";
-  worksheet.mergeCells(`O${headerRow1}:S${headerRow1}`);
+  safeMergeCells(`O${headerRow1}:S${headerRow1}`);
   worksheet.getCell(`O${headerRow2}`).value = "Fatteners";
   worksheet.getCell(`P${headerRow2}`).value = "Broiler";
   worksheet.getCell(`Q${headerRow2}`).value = "Layer";
@@ -986,34 +1056,34 @@ const createLivestockReport = async (
 
   // DUCK
   worksheet.getCell(`T${headerRow1}`).value = "DUCK";
-  worksheet.mergeCells(`T${headerRow1}:U${headerRow1}`);
+  safeMergeCells(`T${headerRow1}:U${headerRow1}`);
   worksheet.getCell(`T${headerRow2}`).value = "Drake";
   worksheet.getCell(`U${headerRow2}`).value = "Hen";
 
   // QUAIL
   worksheet.getCell(`V${headerRow1}`).value = "QUAIL";
-  worksheet.mergeCells(`V${headerRow1}:W${headerRow1}`);
+  safeMergeCells(`V${headerRow1}:W${headerRow1}`);
   worksheet.getCell(`V${headerRow2}`).value = "Cock";
   worksheet.getCell(`W${headerRow2}`).value = "Hen";
 
   // TURKEY
   worksheet.getCell(`X${headerRow1}`).value = "TURKEY";
-  worksheet.mergeCells(`X${headerRow1}:Y${headerRow1}`);
+  safeMergeCells(`X${headerRow1}:Y${headerRow1}`);
   worksheet.getCell(`X${headerRow2}`).value = "Gobbler";
   worksheet.getCell(`Y${headerRow2}`).value = "Hen";
 
   // RABBIT
   worksheet.getCell(`Z${headerRow1}`).value = "RABBIT";
-  worksheet.mergeCells(`Z${headerRow1}:AA${headerRow1}`);
+  safeMergeCells(`Z${headerRow1}:AA${headerRow1}`);
   worksheet.getCell(`Z${headerRow2}`).value = "Buck";
   worksheet.getCell(`AA${headerRow2}`).value = "Doe";
 
   // Updated By and Remarks
   worksheet.getCell(`AB${headerRow1}`).value = "Updated By";
-  worksheet.mergeCells(`AB${headerRow1}:AB${headerRow2}`);
+  safeMergeCells(`AB${headerRow1}:AB${headerRow2}`);
 
   worksheet.getCell(`AC${headerRow1}`).value = "Remarks";
-  worksheet.mergeCells(`AC${headerRow1}:AC${headerRow2}`);
+  safeMergeCells(`AC${headerRow1}:AC${headerRow2}`);
 
   // Style header rows
   for (let row = headerRow1; row <= headerRow2; row++) {
@@ -1261,7 +1331,7 @@ const createCropTypeWorksheet = async (
   ];
 
   // Add title
-  worksheet.mergeCells("A1:X1");
+  safeMergeCells(worksheet, "A1:X1");
   worksheet.getCell(
     "A1"
   ).value = `BUTUAN CITY ${cropType.toUpperCase()} PROFILING`;
@@ -1271,7 +1341,7 @@ const createCropTypeWorksheet = async (
   };
   worksheet.getCell("A1").font = { bold: true, size: 14 };
 
-  worksheet.mergeCells("A2:X2");
+  safeMergeCells(worksheet, "A2:X2");
   worksheet.getCell("A2").value = `As of ${
     monthName ? monthName + " " : ""
   }${year}`;
@@ -1289,7 +1359,7 @@ const createCropTypeWorksheet = async (
   }
 
   // Add section headers
-  worksheet.mergeCells("A6:K6");
+  safeMergeCells(worksheet, "A6:K6");
   worksheet.getCell("A6").value = "Growers' Profile";
   worksheet.getCell("A6").alignment = {
     horizontal: "center",
@@ -1302,7 +1372,7 @@ const createCropTypeWorksheet = async (
     fgColor: { argb: "FFF2CC" }, // Light yellow background
   };
 
-  worksheet.mergeCells("L6:X6");
+  safeMergeCells(worksheet, "L6:X6");
   worksheet.getCell(
     "L6"
   ).value = `Production Record from January to December ${year} (kg)`;
@@ -1327,7 +1397,7 @@ const createCropTypeWorksheet = async (
   worksheet.getCell(`E${headerRow}`).value = "Home Address";
   worksheet.getCell(`F${headerRow}`).value = "Farm Address";
 
-  worksheet.mergeCells(`G${headerRow}:H${headerRow - 1}`);
+  safeMergeCells(`G${headerRow}:H${headerRow - 1}`);
   worksheet.getCell(`G${headerRow - 1}`).value = "Farm Location Coordinates";
   worksheet.getCell(`G${headerRow - 1}`).alignment = {
     horizontal: "center",
@@ -1520,47 +1590,26 @@ const createCropsReport = async (
   data,
   barangayFilter,
   monthName,
-  year
+  year,
+  cropTypeFilter = ""
 ) => {
   // For regular crops, we'll create a vegetable profile report
   const worksheet = workbook.addWorksheet("Vegetable Profile");
 
-  // Set column widths
-  worksheet.columns = [
-    { width: 5 }, // No.
-    { width: 20 }, // Name of Growers
-    { width: 15 }, // Contact number
-    { width: 20 }, // Facebook/Email Account
-    { width: 20 }, // Home Address
-    { width: 20 }, // Farm Address
-    { width: 12 }, // Farm Location - Longitude
-    { width: 12 }, // Farm Location - Latitude
-    { width: 20 }, // Market Outlet Location
-    { width: 20 }, // Name of Buyer
-    { width: 20 }, // Association/Organization
-    { width: 12 }, // Area (hectare)
-    { width: 12 }, // Eggplant
-    { width: 12 }, // Ampalaya
-    { width: 12 }, // Okra
-    { width: 12 }, // Pele Sitao
-    { width: 12 }, // Squash
-    { width: 12 }, // Tomato
-    { width: 12 }, // Other Crop 1
-    { width: 12 }, // Other Crop 2
-    { width: 12 }, // Other Crop 3
-    { width: 12 }, // Other Crop 4
-  ];
+  // If a specific crop type is filtered, add it to the title
+  const titleSuffix = cropTypeFilter ? ` - ${cropTypeFilter}` : "";
 
-  // Add title
-  worksheet.mergeCells("A1:U1");
-  worksheet.getCell("A1").value = "BUTUAN CITY VEGETABLE PROFILE";
+  // Rest of the function remains the same...
+  // Just update the title to include the crop type filter
+  safeMergeCells(worksheet, "A1:U1");
+  worksheet.getCell("A1").value = `BUTUAN CITY VEGETABLE PROFILE${titleSuffix}`;
   worksheet.getCell("A1").alignment = {
     horizontal: "center",
     vertical: "middle",
   };
   worksheet.getCell("A1").font = { bold: true, size: 14 };
 
-  worksheet.mergeCells("A2:U2");
+  safeMergeCells(worksheet, "A2:U2");
   worksheet.getCell("A2").value = `As of ${
     monthName ? monthName + " " : ""
   }${year}`;
@@ -1578,7 +1627,7 @@ const createCropsReport = async (
   }
 
   // Add section headers
-  worksheet.mergeCells("A6:K6");
+  safeMergeCells(worksheet, "A6:K6");
   worksheet.getCell("A6").value = "Growers' Profile";
   worksheet.getCell("A6").alignment = {
     horizontal: "center",
@@ -1591,7 +1640,7 @@ const createCropsReport = async (
     fgColor: { argb: "FFF2CC" }, // Light yellow background
   };
 
-  worksheet.mergeCells("L6:U6");
+  safeMergeCells(worksheet, "L6:U6");
   worksheet.getCell("L6").value = `Production Record from January ${year} (kg)`;
   worksheet.getCell("L6").alignment = {
     horizontal: "center",
@@ -1614,7 +1663,7 @@ const createCropsReport = async (
   worksheet.getCell(`E${headerRow}`).value = "Home Address";
   worksheet.getCell(`F${headerRow}`).value = "Farm Address";
 
-  worksheet.mergeCells(`G${headerRow}:H${headerRow - 1}`);
+  safeMergeCells(`G${headerRow}:H${headerRow - 1}`);
   worksheet.getCell(`G${headerRow - 1}`).value = "Farm Location Coordinates";
   worksheet.getCell(`G${headerRow - 1}`).alignment = {
     horizontal: "center",

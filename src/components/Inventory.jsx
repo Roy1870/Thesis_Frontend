@@ -26,6 +26,10 @@ import EditFarmer from "./inventory/EditFarmer";
 import ViewFarmer from "./inventory/ViewFarmer";
 import { exportDataToExcel } from "./utils/excel-export";
 
+// Add these imports at the top of the file, after the existing imports
+import ExportModal from "../exporting/export-modal";
+import CropFilters from "../exporting/crop-filters";
+
 // Custom MilkIcon component since it's not in lucide-react
 const MilkIcon = (props) => (
   <svg
@@ -41,7 +45,7 @@ const MilkIcon = (props) => (
     {...props}
   >
     <path d="M8 2h8" />
-    <path d="M9 2v2.789a4 4 0 0 1-.672 2.219l-.656.984A4 4 0 0 0 7 10.212V20a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9.789a4 4 0 0 0-.672-2.219l-.656-.984A4 4 0 0 1 15 4.788V2" />
+    <path d="M9 2v2.789a4 4 0 0 1-.672 2.219l-.656.984A4 4 0 0 0 7 10.212V20a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9.789a4 4 0 0 0-.672-2.219l-.656.984A4 4 0 0 1 15 4.788V2" />
     <path d="M7 15a6.472 6.472 0 0 1 5 0 6.47 6.47 0 0 0 5 0" />
   </svg>
 );
@@ -91,6 +95,14 @@ const Inventory = () => {
   ]);
   const [yearOptions, setYearOptions] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+
+  // Add these new state variables inside the Inventory component, with the other state declarations
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [cropTypeOptions, setCropTypeOptions] = useState([]);
+  const [cropFilters, setCropFilters] = useState({
+    barangay: "",
+    cropType: "",
+  });
 
   // New refresh state
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -246,32 +258,49 @@ const Inventory = () => {
     return productionData;
   }, []);
 
-  // Extract unique barangays and years from data - memoized with useCallback
-  const extractFilterOptions = useCallback((data) => {
-    // Extract unique barangays
-    const barangays = [
-      ...new Set(data.map((item) => item.barangay).filter(Boolean)),
+  // Add this function inside the Inventory component to extract crop types
+  const extractCropTypes = useCallback((data) => {
+    // Extract unique crop types
+    const types = [
+      ...new Set(data.map((item) => item.crop_type).filter(Boolean)),
     ].sort();
-    setBarangayOptions(barangays);
-
-    // Extract unique years from created_at dates
-    const years = [
-      ...new Set(
-        data
-          .map((item) =>
-            item.created_at ? new Date(item.created_at).getFullYear() : null
-          )
-          .filter(Boolean)
-      ),
-    ].sort((a, b) => b - a); // Sort descending
-
-    // If no years found, add current year
-    if (years.length === 0) {
-      years.push(new Date().getFullYear());
-    }
-
-    setYearOptions(years);
+    setCropTypeOptions(types);
   }, []);
+
+  // Extract unique barangays and years from data - memoized with useCallback
+  const extractFilterOptions = useCallback(
+    (data) => {
+      // Extract unique barangays
+      const barangays = [
+        ...new Set(data.map((item) => item.barangay).filter(Boolean)),
+      ].sort();
+      setBarangayOptions(barangays);
+
+      // Extract unique years from created_at dates
+      const years = [
+        ...new Set(
+          data
+            .map((item) =>
+              item.created_at ? new Date(item.created_at).getFullYear() : null
+            )
+            .filter(Boolean)
+        ),
+      ].sort((a, b) => b - a); // Sort descending
+
+      // If no years found, add current year
+      if (years.length === 0) {
+        years.push(new Date().getFullYear());
+      }
+
+      setYearOptions(years);
+
+      // Extract crop types if we're viewing crops
+      if (selectedDataType === "crops") {
+        extractCropTypes(data);
+      }
+    },
+    [extractCropTypes, selectedDataType]
+  );
 
   // Add a manual refresh function to get fresh data
   const refreshData = useCallback(() => {
@@ -300,6 +329,23 @@ const Inventory = () => {
         setIsRefreshing(false);
       });
   }, []);
+
+  // Add this function inside the Inventory component, before the fetchAllData function
+  // Update the handleExportWithModal function in inventory.jsx to pass the new parameters
+
+  // Modify the handleExportWithModal function to accept and use the exportFilters parameter
+  const handleExportWithModal = (format, includeFilters, exportFilters) => {
+    // Use the exportFilters object instead of the current filters
+    handleExportToExcel(
+      format,
+      includeFilters,
+      exportFilters.barangay,
+      exportFilters.month,
+      exportFilters.year,
+      exportFilters.cropType
+    );
+    setShowExportModal(false);
+  };
 
   // Modify the fetchAllData function to avoid clearing existing data during refreshes
   const fetchAllData = useCallback(
@@ -614,13 +660,15 @@ const Inventory = () => {
     ]
   );
 
-  // Client-side filtering function - memoized with useCallback
+  // Modify the filterData function to include crop type filtering
   const filterData = useCallback(() => {
     const shouldPaginateDirectly =
       !debouncedSearchText.trim() &&
       !barangayFilter &&
       !monthFilter &&
-      !yearFilter;
+      !yearFilter &&
+      !cropFilters.barangay &&
+      !cropFilters.cropType;
 
     if (shouldPaginateDirectly) {
       paginateData();
@@ -780,11 +828,28 @@ const Inventory = () => {
       }
     }
 
-    // Apply barangay filter if selected
+    // Apply barangay filter if selected (from general filters)
     if (barangayFilter) {
       filtered = filtered.filter(
         (item) => item.barangay && item.barangay === barangayFilter
       );
+    }
+
+    // Apply crop-specific filters if we're on the crops page
+    if (selectedDataType === "crops") {
+      // Apply crop-specific barangay filter if selected
+      if (cropFilters.barangay) {
+        filtered = filtered.filter(
+          (item) => item.barangay && item.barangay === cropFilters.barangay
+        );
+      }
+
+      // Apply crop type filter if selected
+      if (cropFilters.cropType) {
+        filtered = filtered.filter(
+          (item) => item.crop_type && item.crop_type === cropFilters.cropType
+        );
+      }
     }
 
     // Apply year and month filters if selected
@@ -831,6 +896,7 @@ const Inventory = () => {
     parseProductionData,
     selectedDataType,
     yearFilter,
+    cropFilters,
   ]);
 
   const handleSearch = useCallback((selectedKeys, confirm, dataIndex) => {
@@ -1021,35 +1087,40 @@ const Inventory = () => {
     setCurrentPage(1);
   }, []);
 
-  // Export to Excel function using the separated utility
-  const handleExportToExcel = useCallback(async () => {
-    if (selectedDataType === "farmers") return; // Skip export for farmers
+  // Modify the handleExportToExcel function to accept format and includeFilters parameters
+  const handleExportToExcel = useCallback(
+    async (
+      format = "excel",
+      includeFilters = true,
+      barangay = "",
+      month = "",
+      year = "",
+      cropType = ""
+    ) => {
+      if (selectedDataType === "farmers") return; // Skip export for farmers
 
-    // Show loading state
-    setLoading(true);
+      // Show loading state
+      setLoading(true);
 
-    try {
-      await exportDataToExcel(
-        selectedDataType,
-        allData,
-        barangayFilter,
-        monthFilter,
-        yearFilter,
-        monthOptions,
-        showToast
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    allData,
-    selectedDataType,
-    barangayFilter,
-    monthFilter,
-    yearFilter,
-    monthOptions,
-    showToast,
-  ]);
+      try {
+        // Pass the crop filters to the export function
+        await exportDataToExcel(
+          selectedDataType,
+          allData,
+          barangay,
+          month,
+          year,
+          monthOptions,
+          showToast,
+          cropType,
+          format
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [allData, selectedDataType, monthOptions, showToast]
+  );
 
   // Function to determine the export button text
   const getExportButtonText = useCallback(() => {
@@ -1811,6 +1882,15 @@ const Inventory = () => {
                 />
               </button>
 
+              {selectedDataType === "crops" && (
+                <CropFilters
+                  barangayOptions={barangayOptions}
+                  cropTypeOptions={cropTypeOptions}
+                  onFilterChange={setCropFilters}
+                  currentFilters={cropFilters}
+                />
+              )}
+
               {isBackgroundRefreshing && (
                 <div className="flex items-center px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-md sm:text-sm">
                   <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" />
@@ -1840,12 +1920,12 @@ const Inventory = () => {
 
               {selectedDataType !== "farmers" && (
                 <button
-                  onClick={handleExportToExcel}
+                  onClick={() => setShowExportModal(true)}
                   disabled={loading || allData.length === 0}
                   className="inline-flex items-center px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium bg-[#5A8C79] text-white hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <FileDown className="w-3.5 h-3.5 mr-1" />
-                  {getExportButtonText()}
+                  Export
                 </button>
               )}
             </div>
@@ -2130,7 +2210,6 @@ const Inventory = () => {
           )}
         </div>
       </div>
-
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
@@ -2157,6 +2236,23 @@ const Inventory = () => {
             </div>
           </div>
         </div>
+      )}
+      // Update the ExportModal component usage to pass the required props
+      {showExportModal && (
+        <ExportModal
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          onExport={handleExportWithModal}
+          dataType={selectedDataType}
+          filters={{
+            barangay: barangayFilter || cropFilters.barangay,
+            cropType: cropFilters.cropType,
+            month: monthFilter,
+            year: yearFilter,
+          }}
+          barangayOptions={barangayOptions}
+          cropTypeOptions={cropTypeOptions}
+        />
       )}
     </div>
   );
