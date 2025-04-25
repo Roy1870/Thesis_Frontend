@@ -14,7 +14,6 @@ import Inventory from "./components/Inventory";
 import Analytics from "./components/Analytics";
 import Settings from "./components/Settings";
 import Login from "./components/Login";
-import "./components/sidebar.css";
 import Profile from "./components/Profile";
 import UserManagement from "./components/UserManagement";
 

@@ -14,7 +14,6 @@ export default function ExportModal({
   allData,
 }) {
   // State for filter selections
-  const [includeFilters, setIncludeFilters] = useState(true);
   const [selectedBarangay, setSelectedBarangay] = useState("");
   const [selectedCropType, setSelectedCropType] = useState("");
   const [startMonth, setStartMonth] = useState("");
@@ -52,7 +51,6 @@ export default function ExportModal({
         setSelectedYear(filters.year || new Date().getFullYear().toString());
 
       // Always set includeFilters to true when opening
-      setIncludeFilters(true);
     }
   }, [isOpen, filters]);
 
@@ -65,7 +63,6 @@ export default function ExportModal({
       setSelectedCropType("");
       setStartMonth("");
       setEndMonth(""); // Reset end month too
-      setSelectedYear(new Date().getFullYear().toString());
       setSelectedHighValueCropType(""); // Reset high value crop type too
       setSelectedAreaType(""); // Reset area type too
       setSelectedCulturedSpecies(""); // Reset cultured species too
@@ -178,7 +175,7 @@ export default function ExportModal({
       return 0;
     }
 
-    if (!includeFilters) {
+    if (!true) {
       return allData.length;
     }
 
@@ -300,7 +297,6 @@ export default function ExportModal({
     return filtered.length;
   }, [
     allData,
-    includeFilters,
     selectedCropType,
     selectedCulturedSpecies,
     selectedOperationalStatus,
@@ -361,7 +357,7 @@ export default function ExportModal({
     // Get the filtered data based on current selections
     let dataToExport = [...allData];
 
-    if (includeFilters) {
+    if (true) {
       // Apply crop type filter
       if (selectedCropType && dataType === "crops") {
         dataToExport = dataToExport.filter(
@@ -526,16 +522,16 @@ export default function ExportModal({
 
     // Create a new filters object with the selected values
     let exportFilters = {
-      barangay: includeFilters ? selectedBarangay : "",
-      cropType: includeFilters ? selectedCropType : "",
-      startMonth: includeFilters
+      barangay: true ? selectedBarangay : "",
+      cropType: true ? selectedCropType : "",
+      startMonth: true
         ? dataType === "highValueCrops"
           ? "1"
           : dataType === "operators" || dataType === "livestock"
           ? "" // No month filtering for operators or livestock
           : startMonth
         : "",
-      endMonth: includeFilters
+      endMonth: true
         ? dataType === "highValueCrops"
           ? startMonth
           : dataType === "operators" || dataType === "livestock"
@@ -545,18 +541,16 @@ export default function ExportModal({
           : endMonth
         : "",
       month:
-        includeFilters && dataType !== "operators" && dataType !== "livestock"
+        true && dataType !== "operators" && dataType !== "livestock"
           ? startMonth
           : "", // Keep for backward compatibility, but not for operators or livestock
-      year: includeFilters ? selectedYear : "",
+      year: true ? selectedYear : "",
       isHighValueCrop: dataType === "highValueCrops",
       highValueCropType:
-        includeFilters && dataType === "highValueCrops"
-          ? selectedHighValueCropType
-          : "",
+        true && dataType === "highValueCrops" ? selectedHighValueCropType : "",
       // Add the month name for high value crops and rice
       monthName:
-        includeFilters &&
+        true &&
         (dataType === "highValueCrops" || dataType === "rice") &&
         startMonth
           ? getMonthName(startMonth)
@@ -568,15 +562,15 @@ export default function ExportModal({
       startDay: startDate ? 1 : null, // Always first day of month
       endDay: endDate ? endDate.getDate() : null, // Last day of the month
       // Add area type for rice
-      areaType: includeFilters && dataType === "rice" ? selectedAreaType : "",
+      areaType: true && dataType === "rice" ? selectedAreaType : "",
     };
 
     // For livestock, only use barangay and year filters
     if (dataType === "livestock") {
       exportFilters = {
         ...exportFilters,
-        barangay: includeFilters ? selectedBarangay : "",
-        year: includeFilters ? selectedYear : "",
+        barangay: true ? selectedBarangay : "",
+        year: true ? selectedYear : "",
         startDate: startDate ? startDate.toISOString() : null,
         endDate: endDate ? endDate.toISOString() : null,
       };
@@ -585,7 +579,7 @@ export default function ExportModal({
     console.log("Exporting data count:", dataToExport.length);
 
     // Pass the filtered data directly to the export function
-    onExport("excel", includeFilters, exportFilters, dataToExport);
+    onExport("excel", true, exportFilters, dataToExport);
     onClose();
   };
 
@@ -613,306 +607,294 @@ export default function ExportModal({
           <div className="p-3 mb-4 border border-gray-200 rounded-md bg-gray-50">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-medium">Filters</h4>
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={includeFilters}
-                  onChange={() => setIncludeFilters(!includeFilters)}
-                  className="w-4 h-4 text-[#6A9C89] border-gray-300 rounded focus:ring-[#6A9C89]"
-                  id="include-filters"
-                />
-                <span className="text-sm">Include filters</span>
-              </label>
             </div>
 
-            {includeFilters && (
-              <div className="mt-3 space-y-3">
-                {dataType === "crops" && (
-                  <div>
-                    <label
-                      htmlFor="crop-type"
-                      className="block mb-1 text-xs font-medium text-gray-700"
-                    >
-                      Crop Type
-                    </label>
-                    <select
-                      id="crop-type"
-                      value={selectedCropType}
-                      onChange={(e) => {
-                        const newCropType = e.target.value;
-                        console.log("Crop type changed to:", newCropType);
-                        setSelectedCropType(newCropType);
-                      }}
-                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
-                    >
-                      <option value="">Select Crop Type</option>
-                      {cropTypeOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {dataType === "highValueCrops" && (
-                  <div>
-                    <label
-                      htmlFor="high-value-crop-type"
-                      className="block mb-1 text-xs font-medium text-gray-700"
-                    >
-                      High Value Crop Type
-                    </label>
-                    <select
-                      id="high-value-crop-type"
-                      value={selectedHighValueCropType}
-                      onChange={(e) =>
-                        setSelectedHighValueCropType(e.target.value)
-                      }
-                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
-                    >
-                      <option value="">Default (High Value Crop)</option>
-                      <option value="CACAO">Cacao</option>
-                      <option value="COFFEE">Coffee</option>
-                      <option value="MANGO">Mango</option>
-                      <option value="RUBBER">Rubber</option>
-                      <option value="OIL PALM">Oil Palm</option>
-                      <option value="DURIAN">Durian</option>
-                      <option value="COCONUT">Coconut</option>
-                    </select>
-                  </div>
-                )}
-
+            <div className="mt-3 space-y-3">
+              {dataType === "crops" && (
                 <div>
                   <label
-                    htmlFor="year"
+                    htmlFor="crop-type"
                     className="block mb-1 text-xs font-medium text-gray-700"
                   >
-                    Year
+                    Crop Type
                   </label>
                   <select
-                    id="year"
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(e.target.value)}
+                    id="crop-type"
+                    value={selectedCropType}
+                    onChange={(e) => {
+                      const newCropType = e.target.value;
+                      console.log("Crop type changed to:", newCropType);
+                      setSelectedCropType(newCropType);
+                    }}
                     className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
                   >
-                    {availableYears.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="barangay"
-                    className="block mb-1 text-xs font-medium text-gray-700"
-                  >
-                    Barangay
-                  </label>
-                  <select
-                    id="barangay"
-                    value={selectedBarangay}
-                    onChange={(e) => setSelectedBarangay(e.target.value)}
-                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
-                  >
-                    <option value="">Select Barangay</option>
-                    {availableBarangays.map((option) => (
+                    <option value="">Select Crop Type</option>
+                    {cropTypeOptions.map((option) => (
                       <option key={option} value={option}>
                         {option}
                       </option>
                     ))}
                   </select>
                 </div>
+              )}
 
-                {/* Area Type Filter - Only for Rice */}
-                {dataType === "rice" && (
-                  <div>
-                    <label
-                      htmlFor="area-type"
-                      className="block mb-1 text-xs font-medium text-gray-700"
-                    >
-                      Area Type
-                    </label>
-                    <select
-                      id="area-type"
-                      value={selectedAreaType}
-                      onChange={(e) => setSelectedAreaType(e.target.value)}
-                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
-                    >
-                      <option value="">All (Both Irrigated & Rainfed)</option>
-                      <option value="irrigated">Irrigated Only</option>
-                      <option value="rainfed">Rainfed Only</option>
-                    </select>
-                  </div>
-                )}
+              {dataType === "highValueCrops" && (
+                <div>
+                  <label
+                    htmlFor="high-value-crop-type"
+                    className="block mb-1 text-xs font-medium text-gray-700"
+                  >
+                    High Value Crop Type
+                  </label>
+                  <select
+                    id="high-value-crop-type"
+                    value={selectedHighValueCropType}
+                    onChange={(e) =>
+                      setSelectedHighValueCropType(e.target.value)
+                    }
+                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
+                  >
+                    <option value="">Default (High Value Crop)</option>
+                    <option value="CACAO">Cacao</option>
+                    <option value="COFFEE">Coffee</option>
+                    <option value="MANGO">Mango</option>
+                    <option value="RUBBER">Rubber</option>
+                    <option value="OIL PALM">Oil Palm</option>
+                    <option value="DURIAN">Durian</option>
+                    <option value="COCONUT">Coconut</option>
+                  </select>
+                </div>
+              )}
 
-                {/* Month filters - Only show for highValueCrops and rice, not for operators or livestock */}
-                {dataType === "highValueCrops" ? (
-                  <div>
-                    <label
-                      htmlFor="as-of-month"
-                      className="block mb-1 text-xs font-medium text-gray-700"
-                    >
-                      Month (As of)
-                    </label>
-                    <select
-                      id="as-of-month"
-                      value={startMonth}
-                      onChange={(e) => setStartMonth(e.target.value)}
-                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
-                    >
-                      <option value="">Select Month</option>
-                      {Array.from({ length: 12 }, (_, i) => i + 1).map(
-                        (month) => (
-                          <option key={month} value={month.toString()}>
-                            {getMonthName(month.toString())}
-                          </option>
-                        )
+              <div>
+                <label
+                  htmlFor="year"
+                  className="block mb-1 text-xs font-medium text-gray-700"
+                >
+                  Year
+                </label>
+                <select
+                  id="year"
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
+                >
+                  {availableYears.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="barangay"
+                  className="block mb-1 text-xs font-medium text-gray-700"
+                >
+                  Barangay
+                </label>
+                <select
+                  id="barangay"
+                  value={selectedBarangay}
+                  onChange={(e) => setSelectedBarangay(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
+                >
+                  <option value="">Select Barangay</option>
+                  {availableBarangays.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Area Type Filter - Only for Rice */}
+              {dataType === "rice" && (
+                <div>
+                  <label
+                    htmlFor="area-type"
+                    className="block mb-1 text-xs font-medium text-gray-700"
+                  >
+                    Area Type
+                  </label>
+                  <select
+                    id="area-type"
+                    value={selectedAreaType}
+                    onChange={(e) => setSelectedAreaType(e.target.value)}
+                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
+                  >
+                    <option value="">All (Both Irrigated & Rainfed)</option>
+                    <option value="irrigated">Irrigated Only</option>
+                    <option value="rainfed">Rainfed Only</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Month filters - Only show for highValueCrops and rice, not for operators or livestock */}
+              {dataType === "highValueCrops" ? (
+                <div>
+                  <label
+                    htmlFor="as-of-month"
+                    className="block mb-1 text-xs font-medium text-gray-700"
+                  >
+                    Month (As of)
+                  </label>
+                  <select
+                    id="as-of-month"
+                    value={startMonth}
+                    onChange={(e) => setStartMonth(e.target.value)}
+                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
+                  >
+                    <option value="">Select Month</option>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(
+                      (month) => (
+                        <option key={month} value={month.toString()}>
+                          {getMonthName(month.toString())}
+                        </option>
+                      )
+                    )}
+                  </select>
+
+                  {startMonth && (
+                    <div className="p-2 mt-2 text-xs text-center text-gray-700 bg-gray-100 rounded">
+                      <span className="font-medium">Export period:</span>{" "}
+                      January 1 - {getMonthName(startMonth)}{" "}
+                      {getLastDayOfMonth(
+                        Number.parseInt(selectedYear),
+                        Number.parseInt(startMonth)
                       )}
-                    </select>
+                      , {selectedYear}
+                    </div>
+                  )}
+                </div>
+              ) : dataType === "rice" ? (
+                <div>
+                  <label
+                    htmlFor="rice-month"
+                    className="block mb-1 text-xs font-medium text-gray-700"
+                  >
+                    Month
+                  </label>
+                  <select
+                    id="rice-month"
+                    value={startMonth}
+                    onChange={(e) => setStartMonth(e.target.value)}
+                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
+                  >
+                    <option value="">Select Month</option>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(
+                      (month) => (
+                        <option key={month} value={month.toString()}>
+                          {getMonthName(month.toString())}
+                        </option>
+                      )
+                    )}
+                  </select>
 
-                    {startMonth && (
-                      <div className="p-2 mt-2 text-xs text-center text-gray-700 bg-gray-100 rounded">
-                        <span className="font-medium">Export period:</span>{" "}
-                        January 1 - {getMonthName(startMonth)}{" "}
-                        {getLastDayOfMonth(
-                          Number.parseInt(selectedYear),
-                          Number.parseInt(startMonth)
+                  {startMonth && (
+                    <div className="p-2 mt-2 text-xs text-center text-gray-700 bg-gray-100 rounded">
+                      <span className="font-medium">Export month:</span>{" "}
+                      {getMonthName(startMonth)} {selectedYear}
+                    </div>
+                  )}
+                </div>
+              ) : dataType === "operators" || dataType === "livestock" ? (
+                // No month filters for operators or livestock
+                <div className="p-2 mt-2 text-xs text-center text-gray-700 bg-gray-100 rounded">
+                  <span className="font-medium">Export period:</span> Full year{" "}
+                  {selectedYear}
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label
+                        htmlFor="start-month"
+                        className="block mb-1 text-xs font-medium text-gray-700"
+                      >
+                        Start Month
+                      </label>
+                      <select
+                        id="start-month"
+                        value={startMonth}
+                        onChange={(e) => setStartMonth(e.target.value)}
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
+                      >
+                        <option value="">Select Month</option>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(
+                          (month) => (
+                            <option key={month} value={month.toString()}>
+                              {getMonthName(month.toString())}
+                            </option>
+                          )
                         )}
-                        , {selectedYear}
-                      </div>
-                    )}
-                  </div>
-                ) : dataType === "rice" ? (
-                  <div>
-                    <label
-                      htmlFor="rice-month"
-                      className="block mb-1 text-xs font-medium text-gray-700"
-                    >
-                      Month
-                    </label>
-                    <select
-                      id="rice-month"
-                      value={startMonth}
-                      onChange={(e) => setStartMonth(e.target.value)}
-                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
-                    >
-                      <option value="">Select Month</option>
-                      {Array.from({ length: 12 }, (_, i) => i + 1).map(
-                        (month) => (
-                          <option key={month} value={month.toString()}>
-                            {getMonthName(month.toString())}
-                          </option>
-                        )
-                      )}
-                    </select>
-
-                    {startMonth && (
-                      <div className="p-2 mt-2 text-xs text-center text-gray-700 bg-gray-100 rounded">
-                        <span className="font-medium">Export month:</span>{" "}
-                        {getMonthName(startMonth)} {selectedYear}
-                      </div>
-                    )}
-                  </div>
-                ) : dataType === "operators" || dataType === "livestock" ? (
-                  // No month filters for operators or livestock
-                  <div className="p-2 mt-2 text-xs text-center text-gray-700 bg-gray-100 rounded">
-                    <span className="font-medium">Export period:</span> Full
-                    year {selectedYear}
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label
-                          htmlFor="start-month"
-                          className="block mb-1 text-xs font-medium text-gray-700"
-                        >
-                          Start Month
-                        </label>
-                        <select
-                          id="start-month"
-                          value={startMonth}
-                          onChange={(e) => setStartMonth(e.target.value)}
-                          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
-                        >
-                          <option value="">Select Month</option>
-                          {Array.from({ length: 12 }, (_, i) => i + 1).map(
-                            (month) => (
-                              <option key={month} value={month.toString()}>
-                                {getMonthName(month.toString())}
-                              </option>
-                            )
-                          )}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label
-                          htmlFor="end-month"
-                          className="block mb-1 text-xs font-medium text-gray-700"
-                        >
-                          End Month
-                        </label>
-                        <select
-                          id="end-month"
-                          value={endMonth}
-                          onChange={(e) => setEndMonth(e.target.value)}
-                          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
-                        >
-                          <option value="">Select Month</option>
-                          {Array.from({ length: 12 }, (_, i) => i + 1).map(
-                            (month) => (
-                              <option key={month} value={month.toString()}>
-                                {getMonthName(month.toString())}
-                              </option>
-                            )
-                          )}
-                        </select>
-                      </div>
+                      </select>
                     </div>
 
-                    {(startMonth || endMonth) && (
-                      <div className="p-2 mt-2 text-xs text-center text-gray-700 bg-gray-100 rounded">
-                        <span className="font-medium">Export period:</span>{" "}
-                        {startMonth && (
-                          <>
-                            {getMonthName(startMonth)} 1
-                            {endMonth
-                              ? " - "
-                              : ` - ${getMonthName(
-                                  startMonth
-                                )} ${getLastDayOfMonth(
-                                  Number.parseInt(selectedYear),
-                                  Number.parseInt(startMonth)
-                                )}`}
-                          </>
+                    <div>
+                      <label
+                        htmlFor="end-month"
+                        className="block mb-1 text-xs font-medium text-gray-700"
+                      >
+                        End Month
+                      </label>
+                      <select
+                        id="end-month"
+                        value={endMonth}
+                        onChange={(e) => setEndMonth(e.target.value)}
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"
+                      >
+                        <option value="">Select Month</option>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(
+                          (month) => (
+                            <option key={month} value={month.toString()}>
+                              {getMonthName(month.toString())}
+                            </option>
+                          )
                         )}
-                        {endMonth && (
-                          <>
-                            {!startMonth && "January 1 - "}
-                            {getMonthName(endMonth)}{" "}
-                            {getLastDayOfMonth(
-                              Number.parseInt(selectedYear),
-                              Number.parseInt(endMonth)
-                            )}
-                          </>
-                        )}
-                        , {selectedYear}
-                      </div>
-                    )}
-                  </>
-                )}
+                      </select>
+                    </div>
+                  </div>
 
-                {/* Record count preview */}
-                <div className="p-2 mt-2 text-xs text-center text-gray-700 bg-gray-100 rounded">
-                  <span className="font-medium">Records to export:</span>{" "}
-                  {filteredRecordCount}
-                </div>
+                  {(startMonth || endMonth) && (
+                    <div className="p-2 mt-2 text-xs text-center text-gray-700 bg-gray-100 rounded">
+                      <span className="font-medium">Export period:</span>{" "}
+                      {startMonth && (
+                        <>
+                          {getMonthName(startMonth)} 1
+                          {endMonth
+                            ? " - "
+                            : ` - ${getMonthName(
+                                startMonth
+                              )} ${getLastDayOfMonth(
+                                Number.parseInt(selectedYear),
+                                Number.parseInt(startMonth)
+                              )}`}
+                        </>
+                      )}
+                      {endMonth && (
+                        <>
+                          {!startMonth && "January 1 - "}
+                          {getMonthName(endMonth)}{" "}
+                          {getLastDayOfMonth(
+                            Number.parseInt(selectedYear),
+                            Number.parseInt(endMonth)
+                          )}
+                        </>
+                      )}
+                      , {selectedYear}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Record count preview */}
+              <div className="p-2 mt-2 text-xs text-center text-gray-700 bg-gray-100 rounded">
+                <span className="font-medium">Records to export:</span>{" "}
+                {filteredRecordCount}
               </div>
-            )}
+            </div>
           </div>
         </div>
 
