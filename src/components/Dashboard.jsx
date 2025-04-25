@@ -1989,37 +1989,6 @@ export default function Dashboard() {
               Overview of all farmer types and production as of {formattedDate}
             </p>
           </div>
-          <div className="mt-4 md:mt-0">
-            <div className="inline-flex items-center px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-sm">
-              <Calendar className="w-4 h-4 mr-2 text-[#6A9C89]" />
-              <span className="text-sm font-medium">{formattedDate}</span>
-            </div>
-          </div>
-
-          {/* Production Trend Indicator */}
-          <div className="inline-flex flex-wrap items-center p-3 mt-4 transition-all duration-200 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md">
-            <Activity className="w-5 h-5 mr-2 text-[#6A9C89]" />
-            <span className="mr-2 text-sm font-medium">Production Trend:</span>
-            <div
-              className={`flex items-center ${
-                dashboardData.productionTrend >= 0
-                  ? "text-green-600"
-                  : "text-red-600"
-              }`}
-            >
-              {dashboardData.productionTrend >= 0 ? (
-                <ArrowUp className="w-4 h-4 mr-1" />
-              ) : (
-                <ArrowDown className="w-4 h-4 mr-1" />
-              )}
-              <span className="font-semibold">
-                {Math.abs(dashboardData.productionTrend).toFixed(1)}%
-              </span>
-              <span className="ml-1 text-sm text-gray-600">
-                from previous year
-              </span>
-            </div>
-          </div>
 
           {/* Background refresh indicator */}
           {isRefreshing && (
@@ -2030,9 +1999,16 @@ export default function Dashboard() {
           )}
 
           {/* Last refresh time indicator */}
-          <div className="inline-flex items-center p-2 mt-2 ml-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-md">
-            <span>Last updated: {lastRefresh.toLocaleTimeString()}</span>
+
+          <div className="mt-4 md:mt-0">
+            <div className="inline-flex items-center px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-sm">
+              <Calendar className="w-4 h-4 mr-2 text-[#6A9C89]" />
+              <span className="text-sm font-medium">{formattedDate}</span>
+            </div>
           </div>
+        </div>
+        <div className="inline-flex items-center p-2 mt-2 ml-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-md">
+          <span>Last updated: {lastRefresh.toLocaleTimeString()}</span>
         </div>
       </div>
       {/* Top Stats Cards */}

@@ -7,7 +7,13 @@ import {
   operatorAPI,
   prefetchRouteData,
 } from "./services/api";
-import { ChevronDown, RefreshCw } from "lucide-react";
+import {
+  ChevronDown,
+  RefreshCw,
+  Activity,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
 import { useRefreshStore } from "./shared-store";
 import {
   PieChart,
@@ -1533,6 +1539,44 @@ function Analytics() {
     return Array.from(years).sort((a, b) => b - a);
   }, [rawData]);
 
+  // Add a new state for production trend after the other state declarations (around line 50):
+  const [productionTrend, setProductionTrend] = useState(0);
+
+  // Calculate production trend compared to previous year
+  const calculateProductionTrend = useCallback(() => {
+    const currentYear = selectedYear;
+    const previousYear = currentYear - 1;
+
+    // Get total production for current year
+    const currentYearData = getMonthlyDataByType("Total", currentYear);
+    const currentYearTotal = currentYearData.reduce(
+      (sum, item) => sum + item.production,
+      0
+    );
+
+    // Get total production for previous year
+    const previousYearData = getMonthlyDataByType("Total", previousYear);
+    const previousYearTotal = previousYearData.reduce(
+      (sum, item) => sum + item.production,
+      0
+    );
+
+    // Calculate percentage change
+    if (previousYearTotal > 0) {
+      const trend =
+        ((currentYearTotal - previousYearTotal) / previousYearTotal) * 100;
+      return trend;
+    }
+
+    return 0; // Default to 0 if no previous year data
+  }, [selectedYear, getMonthlyDataByType]);
+
+  // Update production trend when data changes
+  useEffect(() => {
+    const trend = calculateProductionTrend();
+    setProductionTrend(trend);
+  }, [rawData, selectedYear, calculateProductionTrend]);
+
   // Toggle dropdown
   const toggleDropdownHandler = useCallback(() => {
     setDropdownOpen(!dropdownOpen);
@@ -1650,6 +1694,28 @@ function Analytics() {
                 </div>
               )
             )}
+          </div>
+          {/* Production Trend Indicator */}
+          <div className="inline-flex flex-wrap items-center p-3 mt-4 transition-all duration-200 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md">
+            <Activity className="w-5 h-5 mr-2 text-[#6A9C89]" />
+            <span className="mr-2 text-sm font-medium">Production Trend:</span>
+            <div
+              className={`flex items-center ${
+                productionTrend >= 0 ? "text-green-600" : "text-red-600"
+              }`}
+            >
+              {productionTrend >= 0 ? (
+                <ArrowUp className="w-4 h-4 mr-1" />
+              ) : (
+                <ArrowDown className="w-4 h-4 mr-1" />
+              )}
+              <span className="font-semibold">
+                {Math.abs(productionTrend).toFixed(1)}%
+              </span>
+              <span className="ml-1 text-sm text-gray-600">
+                from previous year
+              </span>
+            </div>
           </div>
         </div>
 
