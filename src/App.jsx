@@ -10,9 +10,8 @@ import {
 } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
 import AddData from "./components/AddData";
-import Inventory from "./components/Inventory";
+import Inventory from "./components/inventory/Inventory";
 import Analytics from "./components/Analytics";
-import Settings from "./components/Settings";
 import Login from "./components/Login";
 import Profile from "./components/Profile";
 import UserManagement from "./components/UserManagement";
@@ -94,7 +93,6 @@ function App() {
                 <Route path="/add-data" element={<AddData />} />
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/analytics" element={<Analytics />} />
-                <Route path="/settings" element={<Settings />} />
                 <Route path="/user-management" element={<UserManagement />} />
                 <Route path="/profile" element={<Profile />} />
 

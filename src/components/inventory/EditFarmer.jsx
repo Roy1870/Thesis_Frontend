@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Save, User, Home, Info, MapPin, Loader } from "lucide-react";
 import { farmerAPI } from "../services/api";
 import { livestockAPI } from "../services/api";
 import { operatorAPI } from "../services/api";
-import OperatorTab from "../operator-tab";
-import LivestockTab from "../livestock-tab";
-import RiceTab from "../rice-tab";
-import CropsTab from "../crops-tab";
+import OperatorTab from "./operator-tab";
+import LivestockTab from "./livestock-tab";
+import RiceTab from "./rice-tab";
+import CropsTab from "./crops-tab";
 // Add this at the top of the file, after the imports
 import { prefetchRouteData, prefetchFarmerDetails } from "../services/api";
 
@@ -36,6 +36,10 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
   const [livestockLoading, setLivestockLoading] = useState(true);
   const [operatorLoading, setOperatorLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showMap, setShowMap] = useState(false);
+  const [mapRef, setMapRef] = useState(useRef(null));
+  const [markerRef, setMarkerRef] = useState(useRef(null));
+  const [mapInstanceRef, setMapInstanceRef] = useState(useRef(null));
 
   // Function to trigger a refresh of all data
   const refreshAllData = useCallback(() => {
@@ -224,6 +228,74 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
     }
   }, [farmer]);
 
+  // Initialize map when component mounts and showMap is true
+  useEffect(() => {
+    if (showMap && typeof window !== "undefined") {
+      // Dynamically import Leaflet only on client side
+      const loadLeaflet = async () => {
+        // Only load if not already loaded
+        if (!window.L) {
+          // Add Leaflet CSS
+          const linkEl = document.createElement("link");
+          linkEl.rel = "stylesheet";
+          linkEl.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+          linkEl.integrity =
+            "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=";
+          linkEl.crossOrigin = "";
+          document.head.appendChild(linkEl);
+
+          // Wait for CSS to load
+          await new Promise((resolve) => setTimeout(resolve, 100));
+
+          // Add Leaflet JS
+          const scriptEl = document.createElement("script");
+          scriptEl.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+          scriptEl.integrity =
+            "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
+          scriptEl.crossOrigin = "";
+          document.body.appendChild(scriptEl);
+
+          // Wait for script to load
+          await new Promise((resolve) => {
+            scriptEl.onload = resolve;
+          });
+        }
+
+        initializeMap();
+      };
+
+      loadLeaflet();
+    }
+
+    return () => {
+      // Clean up map when component unmounts
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [showMap]);
+
+  // Update marker position when coordinates change
+  useEffect(() => {
+    if (
+      markerRef.current &&
+      formData.farm_location_latitude &&
+      formData.farm_location_longitude
+    ) {
+      const lat = Number.parseFloat(formData.farm_location_latitude);
+      const lng = Number.parseFloat(formData.farm_location_longitude);
+
+      if (!isNaN(lat) && !isNaN(lng)) {
+        markerRef.current.setLatLng([lat, lng]);
+        mapInstanceRef.current.setView(
+          [lat, lng],
+          mapInstanceRef.current.getZoom()
+        );
+      }
+    }
+  }, [formData.farm_location_latitude, formData.farm_location_longitude]);
+
   // Add a tab change handler that prefetches data for the selected tab
   const handleTabChange = useCallback(
     (newTab) => {
@@ -262,6 +334,94 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
       ...prev,
       [name]: value,
     }));
+  };
+
+  // Function to initialize the map
+  const initializeMap = () => {
+    if (!mapRef.current || mapInstanceRef.current) return;
+
+    // Default coordinates for Philippines (can be adjusted to your specific region)
+    const defaultLat = formData.farm_location_latitude
+      ? Number.parseFloat(formData.farm_location_latitude)
+      : 8.9456;
+    const defaultLng = formData.farm_location_longitude
+      ? Number.parseFloat(formData.farm_location_longitude)
+      : 125.5456;
+
+    // Initialize map
+    const L = window.L;
+    const map = L.map(mapRef.current).setView([defaultLat, defaultLng], 13);
+
+    // Add tile layer (OpenStreetMap)
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
+
+    // Add marker
+    const marker = L.marker([defaultLat, defaultLng], {
+      draggable: true,
+    }).addTo(map);
+
+    // Handle marker drag events
+    marker.on("dragend", (e) => {
+      const position = marker.getLatLng();
+      setFormData({
+        ...formData,
+        farm_location_latitude: position.lat.toFixed(6),
+        farm_location_longitude: position.lng.toFixed(6),
+      });
+    });
+
+    // Handle map click events
+    map.on("click", (e) => {
+      marker.setLatLng(e.latlng);
+      setFormData({
+        ...formData,
+        farm_location_latitude: e.latlng.lat.toFixed(6),
+        farm_location_longitude: e.latlng.lng.toFixed(6),
+      });
+    });
+
+    // Store references
+    setMarkerRef(marker);
+    setMapInstanceRef(map);
+
+    // Fix map display issue by triggering a resize after a short delay
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
+  };
+
+  // Function to get current location
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+
+          setFormData({
+            ...formData,
+            farm_location_latitude: latitude.toFixed(6),
+            farm_location_longitude: longitude.toFixed(6),
+          });
+
+          // Update map view and marker if map is initialized
+          if (mapInstanceRef.current && markerRef.current) {
+            markerRef.current.setLatLng([latitude, longitude]);
+            mapInstanceRef.current.setView([latitude, longitude], 15);
+          }
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          alert(
+            "Unable to retrieve your location. Please check your device settings."
+          );
+        }
+      );
+    } else {
+      alert("Geolocation is not supported by this browser.");
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -377,6 +537,25 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
           .pb-safe {
             padding-bottom: 80px;
           }
+        }
+
+        .map-container {
+          height: 300px;
+          width: 100%;
+          border-radius: 0.375rem;
+          position: relative;
+        }
+
+        .map-coordinates {
+          position: absolute;
+          bottom: 10px;
+          left: 10px;
+          background: rgba(255, 255, 255, 0.8);
+          padding: 5px 10px;
+          border-radius: 4px;
+          font-size: 12px;
+          z-index: 1000;
+          box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
         }
       `}</style>
       {/* Header with back button and farmer name */}
@@ -622,23 +801,62 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
                   <label className="block mb-1 text-xs font-medium text-gray-500 sm:text-sm">
                     Farm Location
                   </label>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <input
-                      type="text"
-                      name="farm_location_longitude"
-                      value={formData.farm_location_longitude}
-                      onChange={handleInputChange}
-                      placeholder="Longitude"
-                      className="w-full sm:w-1/2 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm sm:text-base"
-                    />
-                    <input
-                      type="text"
-                      name="farm_location_latitude"
-                      value={formData.farm_location_latitude}
-                      onChange={handleInputChange}
-                      placeholder="Latitude"
-                      className="w-full sm:w-1/2 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm sm:text-base"
-                    />
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowMap(!showMap)}
+                          className="flex items-center px-2 py-1 text-xs text-white rounded bg-emerald-600 hover:bg-emerald-700"
+                        >
+                          {showMap ? "Hide Map" : "Show Map"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={getCurrentLocation}
+                          className="flex items-center px-2 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700"
+                        >
+                          Get Current Location
+                        </button>
+                      </div>
+                    </div>
+
+                    {showMap && (
+                      <div className="p-2 mb-4 border border-gray-300 rounded-md">
+                        <p className="mb-2 text-xs text-gray-600">
+                          Click on the map to set the farm location coordinates
+                        </p>
+                        <div className="relative map-container">
+                          <div ref={mapRef} className="w-full h-full"></div>
+                          {formData.farm_location_latitude &&
+                            formData.farm_location_longitude && (
+                              <div className="map-coordinates">
+                                Lat: {formData.farm_location_latitude}, Lng:{" "}
+                                {formData.farm_location_longitude}
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <input
+                        type="text"
+                        name="farm_location_longitude"
+                        value={formData.farm_location_longitude}
+                        onChange={handleInputChange}
+                        placeholder="Longitude"
+                        className="w-full sm:w-1/2 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm sm:text-base"
+                      />
+                      <input
+                        type="text"
+                        name="farm_location_latitude"
+                        value={formData.farm_location_latitude}
+                        onChange={handleInputChange}
+                        placeholder="Latitude"
+                        className="w-full sm:w-1/2 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm sm:text-base"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

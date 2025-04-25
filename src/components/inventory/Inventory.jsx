@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { farmerAPI, livestockAPI, operatorAPI } from "./services/api";
+import { farmerAPI, livestockAPI, operatorAPI } from "../services/api";
 import {
   UserIcon,
   PhoneIcon,
@@ -22,13 +22,13 @@ import {
   RefreshCw,
 } from "lucide-react";
 import Highlighter from "react-highlight-words";
-import EditFarmer from "./inventory/EditFarmer";
-import ViewFarmer from "./inventory/ViewFarmer";
-import { exportDataToExcel } from "./utils/excel-export";
+import EditFarmer from "./EditFarmer";
+import ViewFarmer from "./ViewFarmer";
+import { exportDataToExcel } from "../utils/excel-export";
 
 // Add these imports at the top of the file, after the existing imports
-import ExportModal from "../exporting/export-modal";
-import CropFilters from "../exporting/crop-filters";
+import ExportModal from "../../exporting/export-modal";
+import CropFilters from "../../exporting/crop-filters";
 
 // Custom MilkIcon component since it's not in lucide-react
 const MilkIcon = (props) => (
@@ -676,6 +676,13 @@ const Inventory = () => {
 
         // Extract filter options from the data
         extractFilterOptions(processedData);
+
+        // Sort data by created_at in descending order (newest first)
+        processedData.sort((a, b) => {
+          if (!a.created_at) return 1;
+          if (!b.created_at) return -1;
+          return new Date(b.created_at) - new Date(a.created_at);
+        });
 
         // Only update the UI once all data is ready
         setAllData(processedData);

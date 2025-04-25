@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { farmerAPI } from "./services/api";
+import { farmerAPI } from "../services/api";
 
 const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
   const [rice, setRice] = useState([]);
@@ -28,6 +28,13 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
         setRiceLoading(true);
       }
 
+      // Check if rice data is already available in the farmerData object
+      if (farmerData && farmerData.rice && farmerData.rice.length > 0) {
+        setRice(farmerData.rice);
+        setRiceLoading(false);
+        return;
+      }
+
       // Get farmer data which includes rice
       const response = await farmerAPI.getFarmerById(farmerId);
 
@@ -37,13 +44,25 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       console.error("Error fetching rice data:", err);
       setRiceLoading(false);
     }
-  }, [farmerId, rice.length]);
+  }, [farmerId, rice.length, farmerData]);
 
   useEffect(() => {
     if (farmerId) {
-      fetchRiceData();
+      // If farmerData already has rice data, use it directly
+      if (
+        farmerData &&
+        farmerData.rice &&
+        farmerData.rice.length > 0 &&
+        rice.length === 0
+      ) {
+        setRice(farmerData.rice);
+        setRiceLoading(false);
+      } else {
+        // Only fetch if we don't have the data
+        fetchRiceData();
+      }
     }
-  }, [farmerId, fetchRiceData]);
+  }, [farmerId, fetchRiceData, farmerData, rice.length]);
 
   // Rice Modal Functions
   const showAddRiceModal = () => {
@@ -301,7 +320,7 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
             >
               <path
                 fillRule="evenodd"
-                d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 01-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
                 clipRule="evenodd"
               />
             </svg>

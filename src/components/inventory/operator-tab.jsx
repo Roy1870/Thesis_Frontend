@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { operatorAPI } from "./services/api";
+import { operatorAPI } from "../services/api";
 
 const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
   const [operatorData, setOperatorData] = useState([]);
@@ -27,15 +27,37 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
   useEffect(() => {
     if (farmerId) {
-      fetchOperatorData();
+      // If farmerData already has operator data, use it directly
+      if (
+        farmerData &&
+        farmerData.operatorData &&
+        farmerData.operatorData.length > 0
+      ) {
+        setOperatorData(farmerData.operatorData);
+        setOperatorLoading(false);
+      } else {
+        // Only fetch if we don't have the data
+        fetchOperatorData();
+      }
     }
-  }, [farmerId]);
+  }, [farmerId, farmerData]);
 
   const fetchOperatorData = async () => {
     try {
       // Only show loading on initial fetch, not on refreshes
       if (operatorData.length === 0) {
         setOperatorLoading(true);
+      }
+
+      // Check if operator data is already available in the farmerData object
+      if (
+        farmerData &&
+        farmerData.operatorData &&
+        farmerData.operatorData.length > 0
+      ) {
+        setOperatorData(farmerData.operatorData);
+        setOperatorLoading(false);
+        return;
       }
 
       // Get all operators

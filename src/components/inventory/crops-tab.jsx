@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { farmerAPI } from "./services/api";
+import { farmerAPI } from "../services/api";
 
 const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
   const [cropDataType, setCropDataType] = useState("Crop");
@@ -46,8 +46,13 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
         setCropLoading(true);
       }
 
-      // Get farmer data which includes crops
-      const response = await farmerAPI.getFarmerById(farmerId);
+      // Use the farmer data passed from parent instead of fetching it again
+      let response = farmerData;
+
+      // Only fetch if we don't have complete data
+      if (!farmerData.crops && farmerId) {
+        response = await farmerAPI.getFarmerById(farmerId);
+      }
 
       // Process the crops data to extract JSON values
       if (response.crops && response.crops.length > 0) {
@@ -94,13 +99,66 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       console.error("Error fetching crop data:", err);
       setCropLoading(false);
     }
-  }, [farmerId, crops.length, highValueCrops.length]);
+  }, [farmerId, crops.length, highValueCrops.length, farmerData]);
 
   useEffect(() => {
     if (farmerId) {
-      fetchCropData();
+      // If farmerData already has crops, process them directly
+      if (
+        farmerData &&
+        farmerData.crops &&
+        farmerData.crops.length > 0 &&
+        crops.length === 0 &&
+        highValueCrops.length === 0
+      ) {
+        setCropLoading(true);
+
+        const processedCrops = farmerData.crops.map((crop) => {
+          if (crop.production_data) {
+            try {
+              const data = JSON.parse(crop.production_data);
+              return {
+                ...crop,
+                crop_value: data.crop || null,
+                month_value: data.month || null,
+                quantity_value: data.quantity || null,
+              };
+            } catch (e) {
+              console.error("Error parsing production data:", e);
+              return {
+                ...crop,
+                crop_value: null,
+                month_value: null,
+                quantity_value: null,
+              };
+            }
+          }
+          return crop;
+        });
+
+        // Separate high value crops from regular crops
+        const highValue = processedCrops.filter(
+          (crop) => crop.crop_type === "High Value Crops"
+        );
+        const regular = processedCrops.filter(
+          (crop) => crop.crop_type !== "High Value Crops"
+        );
+
+        setHighValueCrops(highValue);
+        setCrops(regular);
+        setCropLoading(false);
+      } else {
+        // Only fetch if we don't have the data
+        fetchCropData();
+      }
     }
-  }, [farmerId, fetchCropData]);
+  }, [
+    farmerId,
+    fetchCropData,
+    farmerData,
+    crops.length,
+    highValueCrops.length,
+  ]);
 
   // Crop Modal Functions
   const showAddCropModal = (type = "crops") => {

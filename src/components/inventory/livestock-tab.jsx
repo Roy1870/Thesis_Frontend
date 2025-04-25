@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { livestockAPI } from "./services/api";
+import { livestockAPI } from "../services/api";
 
 const LivestockTab = ({ farmerId, farmerData, colors, onDataChange }) => {
   const [livestockRecords, setLivestockRecords] = useState([]);
@@ -20,15 +20,37 @@ const LivestockTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
   useEffect(() => {
     if (farmerId) {
-      fetchLivestockRecords();
+      // If farmerData already has livestock records, use them directly
+      if (
+        farmerData &&
+        farmerData.livestockRecords &&
+        farmerData.livestockRecords.length > 0
+      ) {
+        setLivestockRecords(farmerData.livestockRecords);
+        setLivestockLoading(false);
+      } else {
+        // Only fetch if we don't have the data
+        fetchLivestockRecords();
+      }
     }
-  }, [farmerId]);
+  }, [farmerId, farmerData]);
 
   const fetchLivestockRecords = async () => {
     try {
       // Only show loading on initial fetch, not on refreshes
       if (livestockRecords.length === 0) {
         setLivestockLoading(true);
+      }
+
+      // Check if livestock data is already available in the farmerData object
+      if (
+        farmerData &&
+        farmerData.livestockRecords &&
+        farmerData.livestockRecords.length > 0
+      ) {
+        setLivestockRecords(farmerData.livestockRecords);
+        setLivestockLoading(false);
+        return;
       }
 
       // Get all livestock records

@@ -30,10 +30,6 @@ import {
   BarChart,
   Bar,
 } from "recharts";
-// Add this import at the top with the other imports
-// Remove this import at the top
-// import { AIInsights } from "./components/ai-insights"
-
 function Analytics() {
   const [loading, setLoading] = useState(false);
   const {
