@@ -398,7 +398,42 @@ export const exportDataToExcel = async (
           safeMergeCells
         );
         break;
-
+      case "operators":
+        // Import and use the operator template
+        const { createOperatorReport } = await import(
+          "../../exporting/operator-template"
+        );
+        console.log("Using operator template with data:", {
+          recordCount: filteredData.length,
+          sampleRecord: filteredData.length > 0 ? filteredData[0] : null,
+        });
+        await createOperatorReport(
+          workbook,
+          filteredData,
+          barangayFilter,
+          monthString,
+          year,
+          safeMergeCells
+        );
+        break;
+      // Add this case to your switch statement in the exportDataToExcel function
+      case "livestock":
+        // Import and use the livestock template
+        const { createLivestockReport } = await import(
+          "../../exporting/livestock-template"
+        );
+        console.log("Using livestock template with data:", {
+          recordCount: filteredData.length,
+          sampleRecord: filteredData.length > 0 ? filteredData[0] : null,
+        });
+        await createLivestockReport(
+          workbook,
+          filteredData,
+          barangayFilter,
+          yearFilter,
+          safeMergeCells
+        );
+        break;
       default:
         // Default export for other data types
         const worksheet = workbook.addWorksheet("Data");

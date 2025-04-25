@@ -29,6 +29,13 @@ export default function ExportModal({
   // Add a new state for area type selection (for rice)
   const [selectedAreaType, setSelectedAreaType] = useState("");
 
+  // Add a new state for cultured species selection (for operators)
+  const [selectedCulturedSpecies, setSelectedCulturedSpecies] = useState("");
+
+  // Add a new state for operational status selection (for operators)
+  const [selectedOperationalStatus, setSelectedOperationalStatus] =
+    useState("");
+
   // Add endMonth state and update the getDateRangeText function
   // Add this after the other state declarations:
   const [endMonth, setEndMonth] = useState("");
@@ -61,8 +68,32 @@ export default function ExportModal({
       setSelectedYear(new Date().getFullYear().toString());
       setSelectedHighValueCropType(""); // Reset high value crop type too
       setSelectedAreaType(""); // Reset area type too
+      setSelectedCulturedSpecies(""); // Reset cultured species too
+      setSelectedOperationalStatus(""); // Reset operational status too
     }
   }, [isOpen]);
+
+  // Extract unique cultured species from operator data
+  const culturedSpeciesOptions = useMemo(() => {
+    if (dataType !== "operators" || !allData || allData.length === 0) {
+      return [];
+    }
+
+    return [
+      ...new Set(allData.map((item) => item.cultured_species).filter(Boolean)),
+    ].sort();
+  }, [dataType, allData]);
+
+  // Extract unique animal types from livestock data
+  const animalTypeOptions = useMemo(() => {
+    if (dataType !== "livestock" || !allData || allData.length === 0) {
+      return [];
+    }
+
+    return [
+      ...new Set(allData.map((item) => item.animal_type).filter(Boolean)),
+    ].sort();
+  }, [dataType, allData]);
 
   // Dynamically compute available years based on data
   const availableYears = useMemo(() => {
@@ -106,6 +137,13 @@ export default function ExportModal({
       );
     }
 
+    // Apply cultured species filter if selected
+    if (selectedCulturedSpecies && dataType === "operators") {
+      filteredData = filteredData.filter(
+        (item) => item.cultured_species === selectedCulturedSpecies
+      );
+    }
+
     // Apply year filter if selected
     if (selectedYear) {
       filteredData = filteredData.filter((item) => {
@@ -119,7 +157,14 @@ export default function ExportModal({
     return [
       ...new Set(filteredData.map((item) => item.barangay).filter(Boolean)),
     ].sort();
-  }, [allData, selectedCropType, selectedYear, barangayOptions, dataType]);
+  }, [
+    allData,
+    selectedCropType,
+    selectedCulturedSpecies,
+    selectedYear,
+    barangayOptions,
+    dataType,
+  ]);
 
   // Helper function to get the last day of a month
   const getLastDayOfMonth = (year, month) => {
@@ -142,6 +187,30 @@ export default function ExportModal({
     // Apply crop type filter
     if (selectedCropType && dataType === "crops") {
       filtered = filtered.filter((item) => item.crop_type === selectedCropType);
+    }
+
+    // Apply cultured species filter for operators
+    if (selectedCulturedSpecies && dataType === "operators") {
+      filtered = filtered.filter(
+        (item) => item.cultured_species === selectedCulturedSpecies
+      );
+    }
+
+    // Apply operational status filter for operators
+    if (selectedOperationalStatus && dataType === "operators") {
+      filtered = filtered.filter((item) => {
+        const status = (item.operational_status || "").toLowerCase();
+        if (selectedOperationalStatus === "operational") {
+          return status.includes("operational") || status.includes("active");
+        } else if (selectedOperationalStatus === "non-operational") {
+          return (
+            status.includes("non-operational") ||
+            status.includes("inactive") ||
+            status.includes("non operational")
+          );
+        }
+        return true;
+      });
     }
 
     // Apply barangay filter
@@ -192,8 +261,8 @@ export default function ExportModal({
           return itemMonth === startMonth;
         });
       }
-    } else {
-      // For regular crops, use start/end month range
+    } else if (dataType !== "operators" && dataType !== "livestock") {
+      // For regular crops (but not operators or livestock), use start/end month range
       if (startMonth && endMonth) {
         filtered = filtered.filter((item) => {
           if (!item.created_at) return false;
@@ -233,6 +302,8 @@ export default function ExportModal({
     allData,
     includeFilters,
     selectedCropType,
+    selectedCulturedSpecies,
+    selectedOperationalStatus,
     selectedBarangay,
     selectedYear,
     startMonth,
@@ -337,7 +408,7 @@ export default function ExportModal({
             return month >= 1 && month <= Number.parseInt(startMonth);
           });
           console.log(
-            "High value crops - filtering from January to month:",
+            `${dataType} - filtering from January to month:`,
             startMonth,
             getMonthName(startMonth)
           );
@@ -353,8 +424,8 @@ export default function ExportModal({
             return itemMonth === startMonth;
           });
         }
-      } else {
-        // For regular crops, use start/end month range
+      } else if (dataType !== "operators" && dataType !== "livestock") {
+        // For regular crops (but not operators or livestock), use start/end month range
         if (startMonth && endMonth) {
           dataToExport = dataToExport.filter((item) => {
             if (!item.created_at) return false;
@@ -418,6 +489,10 @@ export default function ExportModal({
           // If no month selected, use December 31st
           endDate = new Date(year, 11, 31); // December 31st
         }
+      } else if (dataType === "operators" || dataType === "livestock") {
+        // For operators and livestock, use the entire year (no month filtering)
+        startDate = new Date(year, 0, 1); // January 1st
+        endDate = new Date(year, 11, 31); // December 31st
       } else {
         // For regular crops
         if (startMonth) {
@@ -450,29 +525,36 @@ export default function ExportModal({
     });
 
     // Create a new filters object with the selected values
-    const exportFilters = {
+    let exportFilters = {
       barangay: includeFilters ? selectedBarangay : "",
       cropType: includeFilters ? selectedCropType : "",
       startMonth: includeFilters
         ? dataType === "highValueCrops"
           ? "1"
+          : dataType === "operators" || dataType === "livestock"
+          ? "" // No month filtering for operators or livestock
           : startMonth
-        : "", // For high value crops, always use January as start month
+        : "",
       endMonth: includeFilters
         ? dataType === "highValueCrops"
           ? startMonth
+          : dataType === "operators" || dataType === "livestock"
+          ? "" // No month filtering for operators or livestock
           : dataType === "rice"
           ? startMonth // For rice, use the same month for both start and end
           : endMonth
         : "",
-      month: includeFilters ? startMonth : "", // Keep for backward compatibility
+      month:
+        includeFilters && dataType !== "operators" && dataType !== "livestock"
+          ? startMonth
+          : "", // Keep for backward compatibility, but not for operators or livestock
       year: includeFilters ? selectedYear : "",
       isHighValueCrop: dataType === "highValueCrops",
       highValueCropType:
         includeFilters && dataType === "highValueCrops"
           ? selectedHighValueCropType
           : "",
-      // Add the month name for high value crops
+      // Add the month name for high value crops and rice
       monthName:
         includeFilters &&
         (dataType === "highValueCrops" || dataType === "rice") &&
@@ -488,6 +570,17 @@ export default function ExportModal({
       // Add area type for rice
       areaType: includeFilters && dataType === "rice" ? selectedAreaType : "",
     };
+
+    // For livestock, only use barangay and year filters
+    if (dataType === "livestock") {
+      exportFilters = {
+        ...exportFilters,
+        barangay: includeFilters ? selectedBarangay : "",
+        year: includeFilters ? selectedYear : "",
+        startDate: startDate ? startDate.toISOString() : null,
+        endDate: endDate ? endDate.toISOString() : null,
+      };
+    }
 
     console.log("Exporting data count:", dataToExport.length);
 
@@ -655,6 +748,7 @@ export default function ExportModal({
                   </div>
                 )}
 
+                {/* Month filters - Only show for highValueCrops and rice, not for operators or livestock */}
                 {dataType === "highValueCrops" ? (
                   <div>
                     <label
@@ -721,6 +815,12 @@ export default function ExportModal({
                         {getMonthName(startMonth)} {selectedYear}
                       </div>
                     )}
+                  </div>
+                ) : dataType === "operators" || dataType === "livestock" ? (
+                  // No month filters for operators or livestock
+                  <div className="p-2 mt-2 text-xs text-center text-gray-700 bg-gray-100 rounded">
+                    <span className="font-medium">Export period:</span> Full
+                    year {selectedYear}
                   </div>
                 ) : (
                   <>
