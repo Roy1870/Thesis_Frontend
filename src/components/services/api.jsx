@@ -213,7 +213,6 @@ const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
-    Connection: "keep-alive",
   },
   timeout: 15000, // Increased timeout for slower connections
 });
@@ -230,7 +229,6 @@ apiClient.interceptors.request.use(
     }
 
     // Add compression support
-    config.headers["Accept-Encoding"] = "gzip, deflate, br";
 
     // Add request ID for tracing
     config.headers["X-Request-ID"] = `req-${Date.now()}-${Math.random()
