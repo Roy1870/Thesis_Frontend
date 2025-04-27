@@ -508,7 +508,6 @@ export default function Dashboard() {
   useEffect(() => {
     // Check if we have data in the cache first
     if (Object.values(dataCache).some((arr) => arr.length > 0)) {
-      console.log("Dashboard: Using cached data from store");
       setRawData(dataCache);
       setLoading(false);
     }

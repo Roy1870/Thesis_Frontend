@@ -178,10 +178,6 @@ export const createVegetableReport = async (
     : data;
 
   // Debug the data structure
-  console.log(
-    "Data structure sample:",
-    filteredData.length > 0 ? filteredData[0] : "No data"
-  );
 
   // Filter only vegetable crops
   const vegetableCrops = filteredData.filter(
@@ -190,8 +186,6 @@ export const createVegetableReport = async (
       (item.crop_type.toLowerCase() === "vegetable" ||
         item.crop_type.toLowerCase().includes("vegetable"))
   );
-
-  console.log(`Found ${vegetableCrops.length} vegetable crops`);
 
   // Group crops by farmer_id
   const farmersMap = {};
@@ -202,7 +196,6 @@ export const createVegetableReport = async (
     // If this is the first crop for this farmer, initialize the farmer data
     if (!farmersMap[crop.farmer_id]) {
       // Debug the crop structure to see what fields are available
-      console.log("Crop structure:", JSON.stringify(crop, null, 2));
 
       farmersMap[crop.farmer_id] = {
         farmer_id: crop.farmer_id,
@@ -297,12 +290,7 @@ export const createVegetableReport = async (
     return 0;
   });
 
-  console.log(`Processed ${sortedFarmers.length} farmers with vegetable crops`);
   if (sortedFarmers.length > 0) {
-    console.log(
-      "First farmer data:",
-      JSON.stringify(sortedFarmers[0], null, 2)
-    );
   }
 
   // Add farmer rows

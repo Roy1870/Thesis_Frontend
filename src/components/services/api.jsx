@@ -228,16 +228,6 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Add PostgreSQL hint to avoid cached plan issues
-    if (
-      config.method?.toLowerCase() === "get" &&
-      (config.url?.includes("/farmers") ||
-        config.url?.includes("/livestock-records"))
-    ) {
-      config.headers["X-PostgreSQL-Hint"] =
-        "SET plan_cache_mode TO force_custom_plan";
-    }
-
     // Add compression support
 
     // Add request ID for tracing
@@ -339,24 +329,6 @@ apiClient.interceptors.response.use(
     // Implement faster retry logic for network errors
     const config = error.config;
 
-    // Check for PostgreSQL plan cache error
-    const isPlanCacheError =
-      error.response?.data?.message?.includes(
-        "cached plan must not change result type"
-      ) || error.message?.includes("cached plan must not change result type");
-
-    // Handle PostgreSQL plan cache error
-    if (isPlanCacheError && config && !config._planCacheRetry) {
-      console.log(
-        "Detected PostgreSQL plan cache error, retrying with custom plan hint"
-      );
-      config._planCacheRetry = true;
-      config.headers = config.headers || {};
-      config.headers["X-PostgreSQL-Hint"] =
-        "SET plan_cache_mode TO force_custom_plan";
-      return apiClient(config);
-    }
-
     // Only retry certain requests and limit retries
     if (
       config &&
@@ -381,10 +353,6 @@ apiClient.interceptors.response.use(
           1000 // Max 1 second
         );
 
-        console.log(
-          `Retrying request (${config._retryCount}/2) after ${delay}ms`
-        );
-
         return new Promise((resolve) => {
           setTimeout(() => resolve(apiClient(config)), delay);
         });
@@ -397,7 +365,6 @@ apiClient.interceptors.response.use(
       const cachedData = cache.get(cacheKey);
 
       if (cachedData) {
-        console.log("Returning stale cache data after request failure");
         return Promise.resolve({
           data: cachedData.data,
           status: 200,
@@ -516,9 +483,6 @@ export const batchRequests = async (requests, forceRefresh = false) => {
       }
 
       if (partialResults.length > 0) {
-        console.log(
-          `Returning ${partialResults.length} cached results after batch failure`
-        );
         return partialResults;
       }
     }
@@ -582,7 +546,6 @@ export const prefetchFarmerDetails = (farmerId) => {
 
       // Check if we've already prefetched this farmer
       if (cache.has(cacheKey)) {
-        console.log(`Farmer ${farmerId} already prefetched, skipping`);
         return;
       }
 
@@ -599,7 +562,6 @@ export const prefetchFarmerDetails = (farmerId) => {
             { prefetched: true, timestamp: Date.now() },
             CACHE_TTL
           );
-          console.log(`Successfully prefetched farmer ${farmerId}`);
         })
         .catch((err) => {
           console.error(`Prefetch error for farmer ${farmerId}:`, err);
@@ -798,9 +760,6 @@ export const farmerAPI = {
             return response.data;
           } catch (directError) {
             // If direct access fails, try to get all farmers and filter
-            console.log(
-              "Direct farmer fetch failed, trying alternative method"
-            );
 
             // Get all farmers without pagination but with minimal fields
             const response = await apiClient.get(`/farmers`, {
@@ -1075,7 +1034,6 @@ export const livestockAPI = {
   // Delete a livestock record with optimized cache invalidation
   deleteLivestockRecord: async (recordId) => {
     try {
-      console.log("API Service - Deleting livestock record with ID:", recordId);
       if (!recordId) {
         throw new Error("Record ID is required for deletion");
       }

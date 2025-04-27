@@ -1169,18 +1169,6 @@ const Inventory = () => {
 
       try {
         // Debug the data being passed to the export function
-        console.log("Export data:", {
-          dataType: selectedDataType,
-          recordCount: allData.length,
-          sampleRecord: allData.length > 0 ? allData[0] : null,
-          filters: {
-            barangay,
-            startMonth,
-            endMonth,
-            year,
-            cropType,
-          },
-        });
 
         // Pass the crop filters to the export function
         await exportDataToExcel(

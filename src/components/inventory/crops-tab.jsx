@@ -348,7 +348,6 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
           crops: [cropEntry],
         };
 
-        console.log("Updating crop data:", JSON.stringify(cropData, null, 2));
         await farmerAPI.updateCrop(farmerId, currentCrop.crop_id, cropData);
         alert("Crop updated successfully.");
       } else {
@@ -386,7 +385,6 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
           crops: [cropEntry],
         };
 
-        console.log("Creating crop data:", JSON.stringify(cropsData, null, 2));
         await farmerAPI.addCrops(farmerId, cropsData);
         alert("Crop added successfully.");
       }

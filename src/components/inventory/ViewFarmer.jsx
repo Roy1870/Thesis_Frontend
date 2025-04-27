@@ -522,7 +522,6 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
     try {
       // Trigger the API call to prefetch farmer details
       await farmerAPI.getFarmerById(farmerId);
-      console.log(`Prefetched farmer details for farmer ${farmerId}`);
     } catch (error) {
       console.error("Error prefetching farmer details:", error);
     }

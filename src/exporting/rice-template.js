@@ -10,15 +10,6 @@ export const createRiceReport = async (
   safeMergeCells,
   areaTypeFilter = "" // New parameter for filtering by area_type (irrigated/rainfed)
 ) => {
-  console.log("Creating rice report with data:", {
-    recordCount: data.length,
-    sampleRecord: data.length > 0 ? data[0] : null,
-    barangayFilter,
-    monthName,
-    year,
-    areaTypeFilter,
-  });
-
   // Filter data by area_type if specified
   let irrigatedData, rainfedData;
 
@@ -41,10 +32,6 @@ export const createRiceReport = async (
       (item) => item.area_type?.toLowerCase() === "rainfed"
     );
   }
-
-  console.log(
-    `Found ${irrigatedData.length} irrigated and ${rainfedData.length} rainfed records`
-  );
 
   // Create irrigated worksheet if data exists or if specifically requested
   if (

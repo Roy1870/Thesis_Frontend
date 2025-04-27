@@ -145,10 +145,7 @@ const LivestockTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
       if (isEditingLivestock && currentLivestock) {
         // Update existing livestock record
-        console.log(
-          "Updating livestock record with data:",
-          JSON.stringify(livestockData, null, 2)
-        );
+
         await livestockAPI.updateLivestockRecord(
           currentLivestock.record_id,
           livestockData
@@ -165,10 +162,7 @@ const LivestockTab = ({ farmerId, farmerData, colors, onDataChange }) => {
           barangay: farmerData.barangay || "",
           ...livestockData,
         };
-        console.log(
-          "Creating livestock record with data:",
-          JSON.stringify(dataWithFarmerId, null, 2)
-        );
+
         await livestockAPI.createLivestockRecords(dataWithFarmerId);
         alert("Livestock record added successfully.");
       }
@@ -212,8 +206,6 @@ const LivestockTab = ({ farmerId, farmerData, colors, onDataChange }) => {
         alert("Failed to delete livestock record: Record ID is missing");
         return;
       }
-
-      console.log(`Deleting livestock record with ID: ${recordId}`);
 
       // Use the API function from the provided API service
       await livestockAPI.deleteLivestockRecord(recordId);

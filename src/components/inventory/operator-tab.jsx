@@ -179,10 +179,7 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
       if (isEditingOperator && currentOperator) {
         // Update existing operator
-        console.log(
-          "Updating operator with data:",
-          JSON.stringify(FarmersData, null, 2)
-        );
+
         await operatorAPI.updateOperator(
           currentOperator.farmer_id || currentOperator.id,
           FarmersData
@@ -190,10 +187,7 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
         alert("Operator data updated successfully.");
       } else {
         // Add new operator
-        console.log(
-          "Creating operator with data:",
-          JSON.stringify(FarmersData, null, 2)
-        );
+
         await operatorAPI.addOperator(FarmersData);
         alert("Operator data added successfully.");
       }

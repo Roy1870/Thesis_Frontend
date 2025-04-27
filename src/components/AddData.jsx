@@ -96,7 +96,6 @@ const AddData = () => {
 
           return new Promise((resolve) => {
             script.onload = () => {
-              console.log("Tesseract.js loaded successfully");
               resolve();
             };
             script.onerror = () => {
@@ -349,7 +348,6 @@ const AddData = () => {
 
   // Function to extract coordinates from OCR text
   const extractCoordinatesFromText = (text) => {
-    console.log("OCR Text:", text);
     setOcrDebug(text); // Store full OCR text for debugging
 
     // Department of Agriculture specific format (most precise pattern)
@@ -379,10 +377,6 @@ const AddData = () => {
       const longitude = Number.parseFloat(doaMatch[2]);
 
       if (isValidCoordinate(latitude, longitude)) {
-        console.log("Extracted coordinates using DoA pattern:", {
-          latitude,
-          longitude,
-        });
         return { latitude, longitude };
       }
     }
@@ -401,10 +395,6 @@ const AddData = () => {
       );
 
       if (isValidCoordinate(latitude, longitude)) {
-        console.log("Extracted coordinates using digit-by-digit pattern:", {
-          latitude,
-          longitude,
-        });
         return { latitude, longitude };
       }
     }
@@ -416,10 +406,6 @@ const AddData = () => {
       const longitude = Number.parseFloat(doaMatch2[2]);
 
       if (isValidCoordinate(latitude, longitude)) {
-        console.log("Extracted coordinates using alternative DoA pattern:", {
-          latitude,
-          longitude,
-        });
         return { latitude, longitude };
       }
     }
@@ -433,10 +419,6 @@ const AddData = () => {
       const longitude = Number.parseFloat(lngMatch[1]);
 
       if (isValidCoordinate(latitude, longitude)) {
-        console.log("Extracted coordinates using generic patterns:", {
-          latitude,
-          longitude,
-        });
         return { latitude, longitude };
       }
     }
@@ -454,10 +436,6 @@ const AddData = () => {
     // Check if any of the pairs are valid coordinates
     for (const coord of pairs) {
       if (isValidCoordinate(coord.lat, coord.lng)) {
-        console.log("Extracted coordinates using pair pattern:", {
-          latitude: coord.lat,
-          longitude: coord.lng,
-        });
         return { latitude: coord.lat, longitude: coord.lng };
       }
     }
@@ -477,15 +455,10 @@ const AddData = () => {
       const longitude = numbers[1];
 
       if (isValidCoordinate(latitude, longitude)) {
-        console.log("Extracted coordinates using last resort pattern:", {
-          latitude,
-          longitude,
-        });
         return { latitude, longitude };
       }
     }
 
-    console.log("No coordinates found in OCR text");
     return null;
   };
 
@@ -525,7 +498,7 @@ const AddData = () => {
 
       // Create a worker with specific configuration for better text recognition
       const worker = await window.Tesseract.createWorker({
-        logger: (m) => console.log(m),
+        logger: (m) => m,
         workerPath:
           "https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/worker.min.js",
         corePath:
@@ -551,7 +524,7 @@ const AddData = () => {
 
       // Recognize text in the processed image
       const result = await worker.recognize(processedImageUrl);
-      console.log("OCR Result:", result);
+
       setOcrResult(result.data.text);
 
       // Extract coordinates from the recognized text
@@ -569,13 +542,10 @@ const AddData = () => {
       }
 
       // If no coordinates found, try with the full image
-      console.log(
-        "No coordinates found in cropped image, trying full image..."
-      );
 
       // Create a new worker for the full image
       const fullWorker = await window.Tesseract.createWorker({
-        logger: (m) => console.log(m),
+        logger: (m) => m,
       });
 
       await fullWorker.loadLanguage("eng");
@@ -590,7 +560,7 @@ const AddData = () => {
 
       // Try with the original image
       const fullResult = await fullWorker.recognize(imageUrl);
-      console.log("Full Image OCR Result:", fullResult);
+
       setOcrResult(
         (prev) => prev + "\n\n--- FULL IMAGE OCR ---\n" + fullResult.data.text
       );
@@ -610,13 +580,10 @@ const AddData = () => {
       }
 
       // If still no coordinates, try one more approach with different preprocessing
-      console.log(
-        "Still no coordinates, trying with alternative preprocessing..."
-      );
 
       // Create a third worker with different preprocessing
       const altWorker = await window.Tesseract.createWorker({
-        logger: (m) => console.log(m),
+        logger: (m) => m,
       });
 
       await altWorker.loadLanguage("eng");
@@ -626,7 +593,7 @@ const AddData = () => {
       const altProcessedImage = await createAlternativeProcessedImage(imageUrl);
 
       const altResult = await altWorker.recognize(altProcessedImage);
-      console.log("Alternative Processing OCR Result:", altResult);
+
       setOcrResult(
         (prev) =>
           prev +
@@ -1184,7 +1151,6 @@ const AddData = () => {
   // We're not uploading photos anymore, just extracting coordinates
   // Function kept as a placeholder in case upload functionality is needed in the future
   const uploadPhoto = async (file) => {
-    console.log("Photo upload skipped - only using for coordinate extraction");
     return "";
   };
 
@@ -1302,15 +1268,10 @@ const AddData = () => {
     const newAnimals = [...animals];
     newAnimals[index][field] = value;
 
-    // Auto-select subcategory based on animal type
+    // Auto-populate subcategory dropdown options based on animal type
     if (field === "animal_type") {
-      if (value === "Cattle") {
-        newAnimals[index].subcategory = "Carabull";
-      } else if (value === "Carabao") {
-        newAnimals[index].subcategory = "Caracow";
-      } else {
-        newAnimals[index].subcategory = "";
-      }
+      // Reset subcategory when animal type changes
+      newAnimals[index].subcategory = "";
     }
 
     setAnimals(newAnimals);
@@ -1378,6 +1339,7 @@ const AddData = () => {
         contact_number: values.contact_number,
         facebook_email: values.facebook_email,
         barangay: values.barangay,
+        rsbsa_id: values.rsbsa_id || "", // Include RSBSA ID for all farmer types
       };
 
       // Add the new grower fields if they exist
@@ -1641,11 +1603,6 @@ const AddData = () => {
         formattedData.rice = riceEntries;
       }
 
-      console.log(
-        "Formatted JSON Data:",
-        JSON.stringify(formattedData, null, 2)
-      );
-
       // Determine which API endpoint to use based on the data
       let response;
 
@@ -1840,6 +1797,53 @@ const AddData = () => {
     "Durian",
     "Coconut",
   ];
+
+  // Helper function to get subcategories based on animal type
+  const getSubcategories = (animalType) => {
+    switch (animalType) {
+      case "Cattle":
+      case "Carabao":
+        return [
+          { value: "Carabull", label: "Carabull" },
+          { value: "Caracow", label: "Caracow" },
+        ];
+      case "Goat":
+      case "Rabbit":
+        return [
+          { value: "Buck", label: "Buck" },
+          { value: "Doe", label: "Doe" },
+        ];
+      case "Sheep":
+        return [
+          { value: "Ram", label: "Ram" },
+          { value: "Ewe", label: "Ewe" },
+        ];
+      case "Swine":
+        return [
+          { value: "Sow", label: "Sow" },
+          { value: "Piglet", label: "Piglet" },
+          { value: "Boar", label: "Boar" },
+          { value: "Fatteners", label: "Fatteners" },
+        ];
+      case "Chicken":
+        return [
+          { value: "Broiler", label: "Broiler" },
+          { value: "Layer", label: "Layer" },
+          { value: "Freerange", label: "Freerange" },
+          { value: "Gamefowl", label: "Gamefowl" },
+          { value: "Fighting Cocks", label: "Fighting Cocks" },
+        ];
+      case "Duck":
+      case "Quail":
+      case "Turkey":
+        return [
+          { value: "Drake", label: "Drake" },
+          { value: "Hen", label: "Hen" },
+        ];
+      default:
+        return [];
+    }
+  };
 
   return (
     <div className="w-full min-h-screen p-4 pb-24 overflow-auto bg-white">
@@ -2137,6 +2141,93 @@ const AddData = () => {
               </div>
               <div className="p-4 bg-emerald-50 hide-scrollbar">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Geotagged Photo
+                    </label>
+                    <div className="photo-upload-container">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        ref={fileInputRef}
+                      />
+                      <svg
+                        className="w-6 h-6 mx-auto text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-5l-4 4-4-4m-4-5l4-4 4 4 4-4"
+                        ></path>
+                      </svg>
+                      <p className="text-sm text-gray-500">
+                        Select a geotagged photo with coordinates overlaid on
+                        the image
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        The system will extract location data using OCR
+                        technology without uploading the image
+                      </p>
+                    </div>
+                    {isProcessingImage && (
+                      <div className="mt-2 text-center">
+                        <div className="inline-block w-6 h-6 border-2 rounded-full border-t-emerald-500 animate-spin"></div>
+                        <p className="mt-1 text-sm text-gray-600">
+                          Processing image...
+                        </p>
+                      </div>
+                    )}
+                    {photoPreview && (
+                      <div className="mt-2">
+                        <img
+                          src={photoPreview || "/placeholder.svg"}
+                          alt="Photo preview"
+                          className="photo-preview"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  {formData.operator_location_latitude &&
+                    formData.operator_location_longitude && (
+                      <div className="sm:col-span-2">
+                        <label className="block mb-1 text-sm font-medium text-gray-700">
+                          Operator Location Map
+                        </label>
+                        <div className="map-container">
+                          <div className="map-coordinates">
+                            <span className="font-medium">Coordinates:</span>{" "}
+                            {formData.operator_location_latitude},{" "}
+                            {formData.operator_location_longitude}
+                          </div>
+                          <div
+                            className="w-full h-full"
+                            ref={operatorMapRef}
+                          ></div>
+                        </div>
+                        <div className="flex mt-2 space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowOperatorMap(!showOperatorMap)}
+                            className="px-4 py-2 font-medium text-white rounded-md bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          >
+                            {showOperatorMap ? "Hide Map" : "Show Map"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={getOperatorCurrentLocation}
+                            className="px-4 py-2 font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            Get Current Location
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
                       Fishpond Location <span className="text-red-500">*</span>
@@ -2195,12 +2286,14 @@ const AddData = () => {
                       Stocking Density
                     </label>
                     <input
-                      type="text"
+                      type="number"
                       name="stocking_density"
                       value={formData.stocking_density}
                       onChange={handleInputChange}
                       placeholder="Enter stocking density"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                      min="0"
+                      step="1"
                     />
                   </div>
 
@@ -2260,115 +2353,6 @@ const AddData = () => {
                       <option value="non-operational">Non-operational</option>
                     </select>
                   </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block mb-1 text-sm font-medium text-gray-700">
-                      Geotagged Photo
-                    </label>
-                    <div className="photo-upload-container">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handlePhotoUpload}
-                        ref={fileInputRef}
-                      />
-                      <svg
-                        className="w-6 h-6 mx-auto text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-5l-4 4-4-4m-4-5l4-4 4 4 4-4"
-                        ></path>
-                      </svg>
-                      <p className="text-sm text-gray-500">
-                        Select a geotagged photo with coordinates overlaid on
-                        the image
-                      </p>
-                      <p className="mt-1 text-xs text-gray-500">
-                        The system will extract location data using OCR
-                        technology without uploading the image
-                      </p>
-                    </div>
-                    {isProcessingImage && (
-                      <div className="mt-2 text-center">
-                        <div className="inline-block w-6 h-6 border-2 rounded-full border-t-emerald-500 animate-spin"></div>
-                        <p className="mt-1 text-sm text-gray-600">
-                          Processing image...
-                        </p>
-                      </div>
-                    )}
-                    {photoPreview && (
-                      <div className="mt-2">
-                        <img
-                          src={photoPreview || "/placeholder.svg"}
-                          alt="Photo preview"
-                          className="photo-preview"
-                        />
-                        {ocrResult && (
-                          <div className="p-2 mt-2 text-sm rounded-md bg-gray-50">
-                            <p className="font-medium">Extracted Text:</p>
-                            <p className="text-gray-700 whitespace-pre-wrap">
-                              {ocrResult}
-                            </p>
-                          </div>
-                        )}
-                        {ocrDebug && (
-                          <details className="mt-2">
-                            <summary className="text-sm font-medium text-gray-700 cursor-pointer">
-                              Debug OCR Data
-                            </summary>
-                            <div className="p-2 mt-1 text-xs rounded-md bg-gray-50">
-                              <pre className="whitespace-pre-wrap">
-                                {ocrDebug}
-                              </pre>
-                            </div>
-                          </details>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {formData.operator_location_latitude &&
-                    formData.operator_location_longitude && (
-                      <div className="sm:col-span-2">
-                        <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Operator Location Map
-                        </label>
-                        <div className="map-container">
-                          <div className="map-coordinates">
-                            <span className="font-medium">Coordinates:</span>{" "}
-                            {formData.operator_location_latitude},{" "}
-                            {formData.operator_location_longitude}
-                          </div>
-                          <div
-                            className="w-full h-full"
-                            ref={operatorMapRef}
-                          ></div>
-                        </div>
-                        <div className="flex mt-2 space-x-2">
-                          <button
-                            type="button"
-                            onClick={() => setShowOperatorMap(!showOperatorMap)}
-                            className="px-4 py-2 font-medium text-white rounded-md bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                          >
-                            {showOperatorMap ? "Hide Map" : "Show Map"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={getOperatorCurrentLocation}
-                            className="px-4 py-2 font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            Get Current Location
-                          </button>
-                        </div>
-                      </div>
-                    )}
                 </div>
               </div>
             </div>
@@ -2406,8 +2390,13 @@ const AddData = () => {
                           <option value="Cattle">Cattle</option>
                           <option value="Carabao">Carabao</option>
                           <option value="Goat">Goat</option>
+                          <option value="Sheep">Sheep</option>
                           <option value="Swine">Swine</option>
-                          <option value="Poultry">Poultry</option>
+                          <option value="Chicken">Chicken</option>
+                          <option value="Duck">Duck</option>
+                          <option value="Quail">Quail</option>
+                          <option value="Turkey">Turkey</option>
+                          <option value="Rabbit">Rabbit</option>
                         </select>
                       </div>
 
@@ -2415,8 +2404,7 @@ const AddData = () => {
                         <label className="block mb-1 text-sm font-medium text-gray-700">
                           Subcategory
                         </label>
-                        <input
-                          type="text"
+                        <select
                           value={animal.subcategory}
                           onChange={(e) =>
                             handleAnimalChange(
@@ -2425,9 +2413,68 @@ const AddData = () => {
                               e.target.value
                             )
                           }
-                          placeholder="Enter subcategory"
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                        />
+                          disabled={!animal.animal_type}
+                        >
+                          <option value="">Select Subcategory</option>
+                          {animal.animal_type === "Cattle" && (
+                            <>
+                              <option value="Carabull">Carabull</option>
+                              <option value="Caracow">Caracow</option>
+                            </>
+                          )}
+                          {animal.animal_type === "Carabao" && (
+                            <>
+                              <option value="Carabull">Carabull</option>
+                              <option value="Caracow">Caracow</option>
+                            </>
+                          )}
+                          {animal.animal_type === "Goat" && (
+                            <>
+                              <option value="Buck">Buck</option>
+                              <option value="Doe">Doe</option>
+                            </>
+                          )}
+                          {animal.animal_type === "Sheep" && (
+                            <>
+                              <option value="Ram">Ram</option>
+                              <option value="Ewe">Ewe</option>
+                            </>
+                          )}
+                          {animal.animal_type === "Swine" && (
+                            <>
+                              <option value="Sow">Sow</option>
+                              <option value="Piglet">Piglet</option>
+                              <option value="Boar">Boar</option>
+                              <option value="Fatteners">Fatteners</option>
+                            </>
+                          )}
+                          {animal.animal_type === "Chicken" && (
+                            <>
+                              <option value="Broiler">Broiler</option>
+                              <option value="Layer">Layer</option>
+                              <option value="Freerange">Freerange</option>
+                              <option value="Gamefowl">Gamefowl</option>
+                              <option value="Fighting Cocks">
+                                Fighting Cocks
+                              </option>
+                            </>
+                          )}
+                          {(animal.animal_type === "Duck" ||
+                            animal.animal_type === "Quail" ||
+                            animal.animal_type === "Turkey") && (
+                            <>
+                              <option value="Drake">Drake</option>
+                              <option value="Hen">Hen</option>
+                            </>
+                          )}
+                          {animal.animal_type === "Rabbit" && (
+                            <>
+                              <option value="Buck">Buck</option>
+                              <option value="Doe">Doe</option>
+                            </>
+                          )}
+                        </select>
                       </div>
 
                       <div>
@@ -2470,6 +2517,90 @@ const AddData = () => {
               </div>
               <div className="p-4 bg-emerald-50 hide-scrollbar">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Geotagged Photo
+                    </label>
+                    <div className="photo-upload-container">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleGrowerPhotoUpload}
+                        ref={fileInputRef}
+                      />
+                      <svg
+                        className="w-6 h-6 mx-auto text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-5l-4 4-4-4m-4-5l4-4 4 4 4-4"
+                        ></path>
+                      </svg>
+                      <p className="text-sm text-gray-500">
+                        Select a geotagged photo with coordinates overlaid on
+                        the image
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        The system will extract location data using OCR
+                        technology without uploading the image
+                      </p>
+                    </div>
+                    {isProcessingImage && (
+                      <div className="mt-2 text-center">
+                        <div className="inline-block w-6 h-6 border-2 rounded-full border-t-emerald-500 animate-spin"></div>
+                        <p className="mt-1 text-sm text-gray-600">
+                          Processing image...
+                        </p>
+                      </div>
+                    )}
+                    {photoPreview && (
+                      <div className="mt-2">
+                        <img
+                          src={photoPreview || "/placeholder.svg"}
+                          alt="Photo preview"
+                          className="photo-preview"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  {formData.farm_location_latitude &&
+                    formData.farm_location_longitude && (
+                      <div className="sm:col-span-2">
+                        <label className="block mb-1 text-sm font-medium text-gray-700">
+                          Farm Location Map
+                        </label>
+                        <div className="map-container">
+                          <div className="map-coordinates">
+                            <span className="font-medium">Coordinates:</span>{" "}
+                            {formData.farm_location_latitude},{" "}
+                            {formData.farm_location_longitude}
+                          </div>
+                          <div className="w-full h-full" ref={mapRef}></div>
+                        </div>
+                        <div className="flex mt-2 space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowMap(!showMap)}
+                            className="px-4 py-2 font-medium text-white rounded-md bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          >
+                            {showMap ? "Hide Map" : "Show Map"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={getCurrentLocation}
+                            className="px-4 py-2 font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            Get Current Location
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
                       Farm Address
@@ -2552,116 +2683,6 @@ const AddData = () => {
                       placeholder="Enter association/organization"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                     />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block mb-1 text-sm font-medium text-gray-700">
-                      Geotagged Photo
-                    </label>
-                    <div className="photo-upload-container">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleGrowerPhotoUpload}
-                        ref={fileInputRef}
-                      />
-                      <svg
-                        className="w-6 h-6 mx-auto text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-5l-4 4-4-4m-4-5l4-4 4 4 4-4"
-                        ></path>
-                      </svg>
-                      <p className="text-sm text-gray-500">
-                        Select a geotagged photo with coordinates overlaid on
-                        the image
-                      </p>
-                      <p className="mt-1 text-xs text-gray-500">
-                        The system will extract location data using OCR
-                        technology without uploading the image
-                      </p>
-                    </div>
-                    {isProcessingImage && (
-                      <div className="mt-2 text-center">
-                        <div className="inline-block w-6 h-6 border-2 rounded-full border-t-emerald-500 animate-spin"></div>
-                        <p className="mt-1 text-sm text-gray-600">
-                          Processing image...
-                        </p>
-                      </div>
-                    )}
-                    {photoPreview && (
-                      <div className="mt-2">
-                        <img
-                          src={photoPreview || "/placeholder.svg"}
-                          alt="Photo preview"
-                          className="photo-preview"
-                        />
-                        {ocrResult && (
-                          <div className="p-2 mt-2 text-sm rounded-md bg-gray-50">
-                            <p className="font-medium">Extracted Text:</p>
-                            <p className="text-gray-700 whitespace-pre-wrap">
-                              {ocrResult}
-                            </p>
-                          </div>
-                        )}
-                        {ocrDebug && (
-                          <details className="mt-2">
-                            <summary className="text-sm font-medium text-gray-700 cursor-pointer">
-                              Debug OCR Data
-                            </summary>
-                            <div className="p-2 mt-1 text-xs rounded-md bg-gray-50">
-                              <pre className="whitespace-pre-wrap">
-                                {ocrDebug}
-                              </pre>
-                            </div>
-                          </details>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block mb-1 text-sm font-medium text-gray-700">
-                      Farm Location Map
-                    </label>
-                    <div className="map-container">
-                      <div className="map-coordinates">
-                        <span className="font-medium">Coordinates:</span>{" "}
-                        {formData.farm_location_latitude},{" "}
-                        {formData.farm_location_longitude}
-                      </div>
-                      <div className="w-full h-full" ref={mapRef}></div>
-                    </div>
-                    <div className="flex mt-2 space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowMap(!showMap)}
-                        className="px-4 py-2 font-medium text-white rounded-md bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                      >
-                        {showMap ? "Hide Map" : "Show Map"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={getCurrentLocation}
-                        className="px-4 py-2 font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        Get Current Location
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleMapInvalidateSize}
-                        className="px-4 py-2 font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        Refresh Map
-                      </button>
-                    </div>
                   </div>
                 </div>
               </div>

@@ -352,7 +352,6 @@ export default function ExportModal({
 
   const handleExport = () => {
     // Take a snapshot of the data at export time
-    console.log("Exporting data:", allData.length, "records");
 
     // Get the filtered data based on current selections
     let dataToExport = [...allData];
@@ -403,11 +402,6 @@ export default function ExportModal({
             // Include data from January (1) up to and including the selected month
             return month >= 1 && month <= Number.parseInt(startMonth);
           });
-          console.log(
-            `${dataType} - filtering from January to month:`,
-            startMonth,
-            getMonthName(startMonth)
-          );
         }
       } else if (dataType === "rice") {
         // For rice, use single month filter
@@ -515,11 +509,6 @@ export default function ExportModal({
       return date.toISOString().split("T")[0]; // YYYY-MM-DD format
     };
 
-    console.log("Date range for export:", {
-      startDate: formatDate(startDate),
-      endDate: formatDate(endDate),
-    });
-
     // Create a new filters object with the selected values
     let exportFilters = {
       barangay: true ? selectedBarangay : "",
@@ -576,8 +565,6 @@ export default function ExportModal({
       };
     }
 
-    console.log("Exporting data count:", dataToExport.length);
-
     // Pass the filtered data directly to the export function
     onExport("excel", true, exportFilters, dataToExport);
     onClose();
@@ -623,7 +610,7 @@ export default function ExportModal({
                     value={selectedCropType}
                     onChange={(e) => {
                       const newCropType = e.target.value;
-                      console.log("Crop type changed to:", newCropType);
+
                       setSelectedCropType(newCropType);
                     }}
                     className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6A9C89] focus:border-[#6A9C89]"

@@ -38,7 +38,7 @@ function Analytics() {
     setRefreshing,
     setLastRefresh,
     dataCache,
-    updateDataCache,  
+    updateDataCache,
   } = useRefreshStore();
   const [currentCategory, setCurrentCategory] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -225,7 +225,6 @@ function Analytics() {
   useEffect(() => {
     // Check if we have data in the cache first
     if (Object.values(dataCache).some((arr) => arr.length > 0)) {
-      console.log("Analytics: Using cached data from store");
       setRawData(dataCache);
       setLoading(false);
     }
@@ -627,7 +626,6 @@ function Analytics() {
     const total = items.reduce((sum, item) => sum + item.value, 0);
 
     // Log the processed data for debugging
-    console.log("Processed livestock data:", { total, items });
 
     return {
       total,

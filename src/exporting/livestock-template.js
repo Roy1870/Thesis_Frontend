@@ -6,13 +6,6 @@ export async function createLivestockReport(
   year,
   safeMergeCells
 ) {
-  console.log("Creating livestock report with data:", {
-    recordCount: data.length,
-    sampleRecord: data.length > 0 ? data[0] : null,
-    barangayFilter,
-    year,
-  });
-
   // Create a new worksheet
   const worksheet = workbook.addWorksheet("Livestock Report");
 
@@ -466,14 +459,12 @@ export async function createLivestockReport(
 
   // Log the first few records to help with debugging
   if (data.length > 0) {
-    console.log("Sample livestock records:", data.slice(0, 3));
   }
 
   // Process data directly from the livestock_records table
   data.forEach((record) => {
     // Skip records without required fields
     if (!record.animal_type || !record.subcategory || !record.farmer_id) {
-      console.log("Skipping record with missing fields:", record);
       return;
     }
 
@@ -494,9 +485,6 @@ export async function createLivestockReport(
 
     // Check if this animal type and subcategory combination exists in our mapping
     if (!columnMapping[animalType] || !columnMapping[animalType][subcategory]) {
-      console.log(
-        `Skipping unknown animal type/subcategory: ${animalType}/${subcategory}`
-      );
       return;
     }
 
@@ -522,8 +510,6 @@ export async function createLivestockReport(
       farmer.remarks = record.remarks;
     }
   });
-
-  console.log(`Processed ${farmerMap.size} farmers with livestock data`);
 
   // Add data rows
   let rowNum = 1;

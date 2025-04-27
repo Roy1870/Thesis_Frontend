@@ -9,14 +9,6 @@ export const createSpicesReport = async (
   year,
   safeMergeCells
 ) => {
-  console.log("Creating spices report with data:", {
-    recordCount: data.length,
-    sampleRecord: data.length > 0 ? data[0] : null,
-    barangayFilter,
-    monthName,
-    year,
-  });
-
   // Create a new worksheet
   const worksheet = workbook.addWorksheet("Spices");
 
@@ -177,17 +169,11 @@ export const createSpicesReport = async (
     : data;
 
   // Debug the data structure
-  console.log(
-    "Data structure sample:",
-    filteredData.length > 0 ? filteredData[0] : "No data"
-  );
 
   // Filter only spice crops - case insensitive match
   const spiceCrops = filteredData.filter(
     (item) => item.crop_type && /^spices?$/i.test(item.crop_type)
   );
-
-  console.log(`Found ${spiceCrops.length} spice crops`);
 
   // Group crops by farmer_id
   const farmersMap = {};
@@ -287,8 +273,6 @@ export const createSpicesReport = async (
     if (a.barangay > b.barangay) return 1;
     return 0;
   });
-
-  console.log(`Processed ${sortedFarmers.length} farmers with spice crops`);
 
   // Add farmer rows
   let rowIndex = headerRow + 1;

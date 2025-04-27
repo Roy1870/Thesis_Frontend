@@ -210,16 +210,14 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
             // Prefetch the next farmer if available (user might navigate to next)
             if (currentIndex < farmers.length - 1) {
               const nextFarmer = farmers[currentIndex + 1];
-              console.log(`Prefetching next farmer: ${nextFarmer.farmer_id}`);
+
               prefetchFarmerDetails(nextFarmer.farmer_id);
             }
 
             // Prefetch the previous farmer if available (user might navigate to previous)
             if (currentIndex > 0) {
               const prevFarmer = farmers[currentIndex - 1];
-              console.log(
-                `Prefetching previous farmer: ${prevFarmer.farmer_id}`
-              );
+
               prefetchFarmerDetails(prevFarmer.farmer_id);
             }
           }
@@ -308,19 +306,18 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
         case "crops":
           // Prefetch any additional crops data if needed
           if (farmerData && farmerData.farmer_id) {
-            console.log("Prefetching additional crops data");
             // This will use the cached data if available
             farmerAPI.getFarmerById(farmerData.farmer_id);
           }
           break;
         case "livestock":
           // Prefetch livestock data
-          console.log("Prefetching livestock data");
+
           fetchLivestockRecords();
           break;
         case "operator":
           // Prefetch operator data
-          console.log("Prefetching operator data");
+
           fetchOperatorData();
           break;
         default:
@@ -430,7 +427,6 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
     e.preventDefault();
     setLoading(true);
     try {
-      console.log("Updating farmer with data:", formData);
       await farmerAPI.updateFarmer(farmer.farmer_id, formData);
       alert("Farmer updated successfully.");
       refreshAllData(); // Refresh data after update

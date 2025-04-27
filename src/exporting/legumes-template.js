@@ -9,14 +9,6 @@ export const createLegumesReport = async (
   year,
   safeMergeCells
 ) => {
-  console.log("Creating legumes report with data:", {
-    recordCount: data.length,
-    sampleRecord: data.length > 0 ? data[0] : null,
-    barangayFilter,
-    monthName,
-    year,
-  });
-
   // Create a new worksheet
   const worksheet = workbook.addWorksheet("Legumes");
 
@@ -144,10 +136,6 @@ export const createLegumesReport = async (
     if (crop.production_data && typeof crop.production_data === "string") {
       try {
         productionData = JSON.parse(crop.production_data);
-        console.log(
-          "Successfully parsed production_data string:",
-          productionData
-        );
       } catch (e) {
         console.warn("Error parsing production_data string:", e.message);
       }
@@ -158,14 +146,9 @@ export const createLegumesReport = async (
         // If it's an array, use the first item or merge all items
         if (crop.production_data.length > 0) {
           productionData = crop.production_data[0];
-          console.log(
-            "Using first item from production_data array:",
-            productionData
-          );
         }
       } else {
         productionData = crop.production_data;
-        console.log("Using production_data object directly:", productionData);
       }
     }
 
@@ -178,17 +161,11 @@ export const createLegumesReport = async (
     : data;
 
   // Debug the data structure
-  console.log(
-    "Data structure sample:",
-    filteredData.length > 0 ? filteredData[0] : "No data"
-  );
 
   // Filter only legume crops - case insensitive match
   const legumeCrops = filteredData.filter(
     (item) => item.crop_type && /^legumes?$/i.test(item.crop_type)
   );
-
-  console.log(`Found ${legumeCrops.length} legume crops`);
 
   // Group crops by farmer_id
   const farmersMap = {};
@@ -250,47 +227,30 @@ export const createLegumesReport = async (
     // First check production data
     if (productionData.quantity !== undefined) {
       quantity = Number.parseFloat(productionData.quantity) || 0;
-      console.log(`Found quantity in productionData: ${quantity}`);
     }
     // Then check direct crop quantity
     else if (crop.quantity !== undefined) {
       quantity = Number.parseFloat(crop.quantity) || 0;
-      console.log(`Found quantity directly on crop: ${quantity}`);
     }
     // Then check production field
     else if (crop.production !== undefined) {
       quantity = Number.parseFloat(crop.production) || 0;
-      console.log(`Found quantity in production field: ${quantity}`);
     }
-
-    console.log(`Processing legume crop: ${cropValue}, quantity: ${quantity}`);
 
     // Add legume variety data based on crop value with improved matching
     if (cropValue.includes("peanut")) {
       farmersMap[crop.farmer_id].varieties.peanut += quantity;
-      console.log(
-        `Added ${quantity} to peanut total for farmer ${crop.farmer_id}`
-      );
     } else if (
       cropValue.includes("mungbean") ||
       cropValue.includes("mung bean")
     ) {
       farmersMap[crop.farmer_id].varieties.mungbean += quantity;
-      console.log(
-        `Added ${quantity} to mungbean total for farmer ${crop.farmer_id}`
-      );
     } else if (
       cropValue.includes("soybean") ||
       cropValue.includes("soy bean")
     ) {
       farmersMap[crop.farmer_id].varieties.soybean += quantity;
-      console.log(
-        `Added ${quantity} to soybean total for farmer ${crop.farmer_id}`
-      );
     } else {
-      console.log(
-        `Unrecognized legume type: ${cropValue}, not adding quantity to any specific variety`
-      );
     }
   });
 
@@ -300,8 +260,6 @@ export const createLegumesReport = async (
     if (a.barangay > b.barangay) return 1;
     return 0;
   });
-
-  console.log(`Processed ${sortedFarmers.length} farmers with legume crops`);
 
   // Add farmer rows
   let rowIndex = headerRow + 1;

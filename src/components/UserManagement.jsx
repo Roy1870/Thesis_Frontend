@@ -177,7 +177,6 @@ const UserManagement = () => {
   useEffect(() => {
     // Check if we have data in the cache first
     if (dataCache.users && dataCache.users.length > 0) {
-      console.log("UserManagement: Using cached users data");
       setUsers(dataCache.users);
       setLoading(false);
     }

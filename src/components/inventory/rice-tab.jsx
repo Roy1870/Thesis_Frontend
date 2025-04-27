@@ -144,7 +144,6 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
           ],
         };
 
-        console.log("Updating rice data:", JSON.stringify(riceData, null, 2));
         await farmerAPI.updateRice(farmerId, currentRice.rice_id, riceData);
         alert("Rice data updated successfully.");
       } else {
@@ -161,7 +160,6 @@ const RiceTab = ({ farmerId, farmerData, colors, onDataChange }) => {
           ],
         };
 
-        console.log("Creating rice data:", JSON.stringify(riceData, null, 2));
         await farmerAPI.addRice(farmerId, riceData);
         alert("Rice data added successfully.");
       }

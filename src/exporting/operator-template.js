@@ -9,14 +9,6 @@ export const createOperatorReport = async (
   year,
   safeMergeCells
 ) => {
-  console.log("Creating operator report with data:", {
-    recordCount: data.length,
-    sampleRecord: data.length > 0 ? data[0] : null,
-    barangayFilter,
-    monthName,
-    year,
-  });
-
   // Create worksheet with a modern name
   const worksheet = workbook.addWorksheet("Fishpond Operators");
 

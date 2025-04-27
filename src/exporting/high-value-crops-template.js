@@ -9,14 +9,6 @@ export const createHighValueCropsReport = async (
   year,
   safeMergeCells
 ) => {
-  console.log("Creating high value crops report with data:", {
-    recordCount: data.length,
-    sampleRecord: data.length > 0 ? data[0] : null,
-    barangayFilter,
-    monthName,
-    year,
-  });
-
   // Determine the crop type from the data
   // Default to "HIGH VALUE CROP" if no specific crop type is found
   let cropType = "HIGH VALUE CROP";
@@ -27,10 +19,6 @@ export const createHighValueCropsReport = async (
     if (crop.production_data && typeof crop.production_data === "string") {
       try {
         productionData = JSON.parse(crop.production_data);
-        console.log(
-          "Successfully parsed production_data string:",
-          productionData
-        );
       } catch (e) {
         console.warn("Error parsing production_data string:", e.message);
       }
@@ -42,14 +30,9 @@ export const createHighValueCropsReport = async (
         // If it's an array, use the first item or merge all items
         if (crop.production_data.length > 0) {
           productionData = crop.production_data[0];
-          console.log(
-            "Using first item from production_data array:",
-            productionData
-          );
         }
       } else {
         productionData = crop.production_data;
-        console.log("Using production_data object directly:", productionData);
       }
     }
 
@@ -81,15 +64,15 @@ export const createHighValueCropsReport = async (
       const productionData = parseProductionData(item);
       if (productionData.crop) {
         cropType = productionData.crop.toUpperCase();
-        console.log("Found crop in production_data:", cropType);
+
         break;
       } else if (item.crop_value) {
         cropType = item.crop_value.toUpperCase();
-        console.log("Found crop_value:", cropType);
+
         break;
       } else if (item.variety_clone) {
         cropType = item.variety_clone.toUpperCase();
-        console.log("Found variety_clone:", cropType);
+
         break;
       }
     }
@@ -102,10 +85,7 @@ export const createHighValueCropsReport = async (
     data[0].highValueCropType
   ) {
     cropType = data[0].highValueCropType;
-    console.log("Using highValueCropType from filter:", cropType);
   }
-
-  console.log("Using crop type for report:", cropType);
 
   // Create worksheet with the crop type name
   const worksheet = workbook.addWorksheet(`${cropType} Profile`);
@@ -333,12 +313,9 @@ export const createHighValueCropsReport = async (
   // Group data by farmer
   const farmersMap = {};
 
-  console.log("Processing filtered data:", filteredData.length, "records");
-
   // First pass: collect all unique farmers and their basic information
   filteredData.forEach((item) => {
     if (!item.farmer_id) {
-      console.log("Skipping item without farmer_id:", item);
       return;
     }
 
@@ -424,10 +401,6 @@ export const createHighValueCropsReport = async (
     if (a.barangay > b.barangay) return 1;
     return 0;
   });
-
-  console.log(
-    `Processed ${sortedFarmers.length} farmers with ${cropType} crops`
-  );
 
   // Add farmer rows
   let rowIndex = headerRow + 1;

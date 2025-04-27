@@ -68,8 +68,6 @@ const Sidebar = () => {
           }
         );
 
-        console.log("User API response:", userResponse.data);
-
         // Extract user data from the nested response
         if (userResponse.data && userResponse.data.user) {
           const userData = userResponse.data.user;
@@ -176,7 +174,7 @@ const Sidebar = () => {
     // Check if we've already prefetched this route
     if (!prefetchedRoutes[path]) {
       // Prefetch data for the route being navigated to
-      console.log(`Prefetching data for route: ${path}`);
+
       prefetchRouteData(path);
 
       // Mark this route as prefetched
@@ -194,7 +192,6 @@ const Sidebar = () => {
         relatedRoutes.forEach((route, index) => {
           if (!prefetchedRoutes[route]) {
             setTimeout(() => {
-              console.log(`Prefetching related route: ${route}`);
               prefetchRouteData(route);
 
               // Update prefetched routes
