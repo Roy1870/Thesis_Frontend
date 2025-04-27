@@ -1222,6 +1222,9 @@ const Inventory = () => {
               Name
             </th>
             <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
+              RSBSA ID
+            </th>
+            <th className="px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase sm:px-6 sm:py-3">
               Contact
             </th>
             <th className="hidden px-2 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase md:table-cell sm:px-6 sm:py-3">
@@ -1425,6 +1428,11 @@ const Inventory = () => {
                   )}
                 </span>
               </div>
+            </td>
+            <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
+              <span className="text-xs text-gray-900 sm:text-sm">
+                {farmer.rsbsa_id || "N/A"}
+              </span>
             </td>
             <td className="px-2 py-2 sm:px-6 sm:py-3 whitespace-nowrap">
               <div className="flex items-center">

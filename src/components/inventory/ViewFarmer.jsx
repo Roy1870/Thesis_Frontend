@@ -819,6 +819,15 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
 
               <div className="mb-3 sm:mb-4">
                 <div className="mb-1 text-xs text-gray-500 sm:text-sm">
+                  RSBSA ID
+                </div>
+                <div className="text-xs font-medium sm:text-sm">
+                  {farmerData.rsbsa_id || "N/A"}
+                </div>
+              </div>
+
+              <div className="mb-3 sm:mb-4">
+                <div className="mb-1 text-xs text-gray-500 sm:text-sm">
                   Contact Number
                 </div>
                 <div className="text-xs sm:text-sm">

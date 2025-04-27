@@ -25,6 +25,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
     buyer_name: "",
     association_organization: "",
     barangay: "",
+    rsbsa_id: "", // Add this line
   });
   const [loading, setLoading] = useState(false);
   const [farmerData, setFarmerData] = useState(null);
@@ -100,6 +101,7 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
         buyer_name: response.buyer_name || "",
         association_organization: response.association_organization || "",
         barangay: response.barangay || "",
+        rsbsa_id: response.rsbsa_id || "", // Add this line
       });
 
       setFetchLoading(false);
@@ -720,6 +722,19 @@ const EditFarmer = ({ farmer, onClose, colors }) => {
                     onChange={handleInputChange}
                     className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm sm:text-base"
                     required
+                  />
+                </div>
+
+                <div className="mb-3 sm:mb-4">
+                  <label className="block mb-1 text-xs font-medium text-gray-500 sm:text-sm">
+                    RSBSA ID
+                  </label>
+                  <input
+                    type="text"
+                    name="rsbsa_id"
+                    value={formData.rsbsa_id}
+                    onChange={handleInputChange}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#6A9C89] focus:border-transparent text-sm sm:text-base"
                   />
                 </div>
 
