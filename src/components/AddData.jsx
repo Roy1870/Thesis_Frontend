@@ -3,16 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import { farmerAPI, livestockAPI, operatorAPI } from "./services/api";
 
-// Dynamically import the map component with no SSR to avoid window is not defined errors
-// const MapComponent = dynamic(() => import("./map-component"), {
-//   ssr: false,
-//   loading: () => (
-//     <div className="w-full h-[300px] bg-gray-100 rounded-md flex items-center justify-center">
-//       <div className="text-gray-500">Loading map...</div>
-//     </div>
-//   ),
-// })
-
 const AddData = () => {
   const [formData, setFormData] = useState({
     name: "",
@@ -28,6 +18,23 @@ const AddData = () => {
     market_outlet_location: "",
     buyer_name: "",
     association_organization: "",
+    // Added fields for operator
+    fishpond_location: "",
+    operator_location_longitude: "",
+    operator_location_latitude: "",
+    geotagged_photo: null,
+    geotagged_photo_url: "",
+    area_type: "",
+    seed_type: "",
+    area_harvested: "",
+    production: "",
+    ave_yield: "",
+    month: "",
+    high_value_crop: "",
+    variety_clone: "",
+    cropping_intensity: "",
+    quantity: "",
+    crop_value: "",
   });
 
   const [farmerType, setFarmerType] = useState(null);
@@ -60,13 +67,55 @@ const AddData = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: "", content: "" });
   const [showMap, setShowMap] = useState(false);
+  const [showOperatorMap, setShowOperatorMap] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const [ocrResult, setOcrResult] = useState(null);
+  const [ocrDebug, setOcrDebug] = useState(null); // Add debug state
+
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const mapInstanceRef = useRef(null);
+  const operatorMapRef = useRef(null);
+  const operatorMarkerRef = useRef(null);
+  const operatorMapInstanceRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const canvasRef = useRef(null);
+
+  // Load Tesseract.js for OCR
+  useEffect(() => {
+    const loadTesseract = async () => {
+      if (!window.Tesseract) {
+        try {
+          const script = document.createElement("script");
+          script.src =
+            "https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js";
+          script.async = true;
+          document.body.appendChild(script);
+
+          return new Promise((resolve) => {
+            script.onload = () => {
+              console.log("Tesseract.js loaded successfully");
+              resolve();
+            };
+            script.onerror = () => {
+              console.error("Failed to load Tesseract.js");
+              resolve();
+            };
+          });
+        } catch (error) {
+          console.error("Error loading Tesseract.js:", error);
+        }
+      }
+      return Promise.resolve();
+    };
+
+    loadTesseract();
+  }, []);
 
   // Initialize map when component mounts and showMap is true
   useEffect(() => {
-    if (showMap && typeof window !== "undefined") {
+    if ((showMap || showOperatorMap) && typeof window !== "undefined") {
       // Dynamically import Leaflet only on client side
       const loadLeaflet = async () => {
         // Only load if not already loaded
@@ -97,7 +146,13 @@ const AddData = () => {
           });
         }
 
-        initializeMap();
+        if (showMap) {
+          initializeMap();
+        }
+
+        if (showOperatorMap) {
+          initializeOperatorMap();
+        }
       };
 
       loadLeaflet();
@@ -109,8 +164,13 @@ const AddData = () => {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
+
+      if (operatorMapInstanceRef.current) {
+        operatorMapInstanceRef.current.remove();
+        operatorMapInstanceRef.current = null;
+      }
     };
-  }, [showMap]);
+  }, [showMap, showOperatorMap]);
 
   // Update marker position when coordinates change
   useEffect(() => {
@@ -131,6 +191,932 @@ const AddData = () => {
       }
     }
   }, [formData.farm_location_latitude, formData.farm_location_longitude]);
+
+  // Update operator marker position when coordinates change
+  useEffect(() => {
+    if (
+      operatorMarkerRef.current &&
+      formData.operator_location_latitude &&
+      formData.operator_location_longitude
+    ) {
+      const lat = Number.parseFloat(formData.operator_location_latitude);
+      const lng = Number.parseFloat(formData.operator_location_longitude);
+
+      if (!isNaN(lat) && !isNaN(lng)) {
+        operatorMarkerRef.current.setLatLng([lat, lng]);
+        operatorMapInstanceRef.current.setView(
+          [lat, lng],
+          operatorMapInstanceRef.current.getZoom()
+        );
+      }
+    }
+  }, [
+    formData.operator_location_latitude,
+    formData.operator_location_longitude,
+  ]);
+
+  // Preprocess image for better OCR results
+  const preprocessImage = async (imageUrl) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        // Create canvas
+        const canvas = document.createElement("canvas");
+
+        // Set canvas dimensions - focus on the top portion where coordinates are likely to be
+        const cropHeight = Math.min(img.height * 0.25, 200); // Increased height to capture more of the header
+        canvas.width = img.width;
+        canvas.height = cropHeight;
+
+        const ctx = canvas.getContext("2d");
+
+        // Draw only the top portion of the image
+        ctx.drawImage(
+          img,
+          0,
+          0,
+          img.width,
+          cropHeight,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+        // Apply multiple image processing techniques for better OCR results
+
+        // First pass: Create a grayscale version
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        // Convert to grayscale
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+
+          // Weighted grayscale conversion (gives better results than simple average)
+          const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+
+          data[i] = gray;
+          data[i + 1] = gray;
+          data[i + 2] = gray;
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+
+        // Second pass: Apply adaptive thresholding
+        const imageData2 = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data2 = imageData2.data;
+
+        // Increase contrast with adaptive approach
+        const blockSize = 15; // Size of the local neighborhood for adaptive thresholding
+        const C = 10; // Constant subtracted from the mean
+
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            // Calculate local mean
+            let sum = 0;
+            let count = 0;
+
+            for (
+              let dy = -Math.floor(blockSize / 2);
+              dy <= Math.floor(blockSize / 2);
+              dy++
+            ) {
+              for (
+                let dx = -Math.floor(blockSize / 2);
+                dx <= Math.floor(blockSize / 2);
+                dx++
+              ) {
+                const nx = x + dx;
+                const ny = y + dy;
+
+                if (
+                  nx >= 0 &&
+                  nx < canvas.width &&
+                  ny >= 0 &&
+                  ny < canvas.height
+                ) {
+                  const idx = (ny * canvas.width + nx) * 4;
+                  sum += data2[idx];
+                  count++;
+                }
+              }
+            }
+
+            const mean = sum / count;
+            const idx = (y * canvas.width + x) * 4;
+
+            // Apply threshold
+            const value = data2[idx] < mean - C ? 0 : 255;
+
+            data2[idx] = value;
+            data2[idx + 1] = value;
+            data2[idx + 2] = value;
+          }
+        }
+
+        ctx.putImageData(imageData2, 0, 0);
+
+        // Third pass: Apply sharpening
+        const imageData3 = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        const tempCtx = tempCanvas.getContext("2d");
+        tempCtx.putImageData(imageData3, 0, 0);
+
+        // Apply unsharp masking
+        ctx.globalAlpha = 1.0;
+        ctx.drawImage(tempCanvas, 0, 0);
+        ctx.globalCompositeOperation = "overlay";
+        ctx.globalAlpha = 0.5;
+        ctx.drawImage(tempCanvas, 0, 0);
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = 1.0;
+
+        // Convert canvas to data URL
+        const processedImageUrl = canvas.toDataURL("image/png");
+        resolve(processedImageUrl);
+      };
+
+      img.src = imageUrl;
+    });
+  };
+
+  // Function to extract coordinates from OCR text
+  const extractCoordinatesFromText = (text) => {
+    console.log("OCR Text:", text);
+    setOcrDebug(text); // Store full OCR text for debugging
+
+    // Department of Agriculture specific format (most precise pattern)
+    const doaPattern =
+      /Department\s+of\s+Agriculture[\s\S]*?(?:Lat(?:itude)?[:\s]*([0-9.]+))[\s\S]*?(?:Long(?:itude)?[:\s]*([0-9.]+))/i;
+
+    // Alternative Department of Agriculture pattern
+    const doaPattern2 =
+      /(?:Lat(?:itude)?[:\s]*([0-9.]+))[\s\S]{1,50}(?:Long(?:itude)?[:\s]*([0-9.]+))/i;
+
+    // Generic patterns as fallbacks
+    const latitudePattern = /lat(?:itude)?[:\s]*([0-9.-]+)/i;
+    const longitudePattern = /long(?:itude)?[:\s]*([0-9.-]+)/i;
+
+    // Coordinate pair pattern (like "8.473194, 126.094194")
+    const coordinatePairPattern = /(\d+\.\d+)[,\s]+(\d+\.\d+)/g;
+
+    // Digit-by-digit pattern for Department of Agriculture format
+    // This is a very specific pattern for the exact format seen in the images
+    const digitPattern =
+      /Latitude:\s+(\d)\.(\d)(\d)(\d)(\d)(\d)(\d)[\s\S]*?Longitude:\s+(\d)(\d)(\d)\.(\d)(\d)(\d)(\d)(\d)(\d)/i;
+
+    // Try Department of Agriculture specific format first (most precise)
+    const doaMatch = text.match(doaPattern);
+    if (doaMatch && doaMatch[1] && doaMatch[2]) {
+      const latitude = Number.parseFloat(doaMatch[1]);
+      const longitude = Number.parseFloat(doaMatch[2]);
+
+      if (isValidCoordinate(latitude, longitude)) {
+        console.log("Extracted coordinates using DoA pattern:", {
+          latitude,
+          longitude,
+        });
+        return { latitude, longitude };
+      }
+    }
+
+    // Try digit-by-digit pattern for Department of Agriculture format
+    const digitMatch = text.match(digitPattern);
+    if (digitMatch) {
+      // Reconstruct latitude from individual digits
+      const latitude = Number.parseFloat(
+        `${digitMatch[1]}.${digitMatch[2]}${digitMatch[3]}${digitMatch[4]}${digitMatch[5]}${digitMatch[6]}${digitMatch[7]}`
+      );
+
+      // Reconstruct longitude from individual digits
+      const longitude = Number.parseFloat(
+        `${digitMatch[8]}${digitMatch[9]}${digitMatch[10]}.${digitMatch[11]}${digitMatch[12]}${digitMatch[13]}${digitMatch[14]}${digitMatch[15]}${digitMatch[16]}`
+      );
+
+      if (isValidCoordinate(latitude, longitude)) {
+        console.log("Extracted coordinates using digit-by-digit pattern:", {
+          latitude,
+          longitude,
+        });
+        return { latitude, longitude };
+      }
+    }
+
+    // Try alternative Department of Agriculture pattern
+    const doaMatch2 = text.match(doaPattern2);
+    if (doaMatch2 && doaMatch2[1] && doaMatch2[2]) {
+      const latitude = Number.parseFloat(doaMatch2[1]);
+      const longitude = Number.parseFloat(doaMatch2[2]);
+
+      if (isValidCoordinate(latitude, longitude)) {
+        console.log("Extracted coordinates using alternative DoA pattern:", {
+          latitude,
+          longitude,
+        });
+        return { latitude, longitude };
+      }
+    }
+
+    // Try generic latitude/longitude patterns
+    const latMatch = text.match(latitudePattern);
+    const lngMatch = text.match(longitudePattern);
+
+    if (latMatch && latMatch[1] && lngMatch && lngMatch[1]) {
+      const latitude = Number.parseFloat(latMatch[1]);
+      const longitude = Number.parseFloat(lngMatch[1]);
+
+      if (isValidCoordinate(latitude, longitude)) {
+        console.log("Extracted coordinates using generic patterns:", {
+          latitude,
+          longitude,
+        });
+        return { latitude, longitude };
+      }
+    }
+
+    // Try coordinate pair pattern
+    const pairs = [];
+    let match;
+    while ((match = coordinatePairPattern.exec(text)) !== null) {
+      pairs.push({
+        lat: Number.parseFloat(match[1]),
+        lng: Number.parseFloat(match[2]),
+      });
+    }
+
+    // Check if any of the pairs are valid coordinates
+    for (const coord of pairs) {
+      if (isValidCoordinate(coord.lat, coord.lng)) {
+        console.log("Extracted coordinates using pair pattern:", {
+          latitude: coord.lat,
+          longitude: coord.lng,
+        });
+        return { latitude: coord.lat, longitude: coord.lng };
+      }
+    }
+
+    // Last resort: Look for any numbers that could be coordinates
+    const numberPattern = /(\d+\.\d+)/g;
+    const numbers = [];
+    let numMatch;
+
+    while ((numMatch = numberPattern.exec(text)) !== null) {
+      numbers.push(Number.parseFloat(numMatch[1]));
+    }
+
+    // If we found at least two numbers, assume the first two might be coordinates
+    if (numbers.length >= 2) {
+      const latitude = numbers[0];
+      const longitude = numbers[1];
+
+      if (isValidCoordinate(latitude, longitude)) {
+        console.log("Extracted coordinates using last resort pattern:", {
+          latitude,
+          longitude,
+        });
+        return { latitude, longitude };
+      }
+    }
+
+    console.log("No coordinates found in OCR text");
+    return null;
+  };
+
+  // Helper function to validate coordinates
+  const isValidCoordinate = (latitude, longitude) => {
+    return (
+      !isNaN(latitude) &&
+      !isNaN(longitude) &&
+      latitude >= -90 &&
+      latitude <= 90 &&
+      longitude >= -180 &&
+      longitude <= 180 &&
+      // Additional check for Philippines region (optional)
+      latitude >= 4 &&
+      latitude <= 21 &&
+      longitude >= 116 &&
+      longitude <= 127
+    );
+  };
+
+  // Function to perform OCR on an image
+  const performOCR = async (imageUrl) => {
+    if (!window.Tesseract) {
+      console.error("Tesseract.js not loaded");
+      return null;
+    }
+
+    try {
+      setIsProcessingImage(true);
+      setMessage({
+        type: "info",
+        content: "Processing image to extract coordinates...",
+      });
+
+      // Create multiple preprocessed versions of the image for better results
+      const processedImageUrl = await preprocessImage(imageUrl);
+
+      // Create a worker with specific configuration for better text recognition
+      const worker = await window.Tesseract.createWorker({
+        logger: (m) => console.log(m),
+        workerPath:
+          "https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/worker.min.js",
+        corePath:
+          "https://cdn.jsdelivr.net/npm/tesseract.js-core@4/tesseract-core.wasm.js",
+        langPath: "https://tessdata.projectnaptha.com/4.0.0",
+      });
+
+      // Load English language data
+      await worker.loadLanguage("eng");
+      await worker.initialize("eng");
+
+      // Set parameters optimized for coordinate text recognition
+      await worker.setParameters({
+        tessedit_char_whitelist:
+          "0123456789.,:-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ",
+        tessedit_pageseg_mode: "4", // Assume a single column of text of variable sizes
+        tessjs_create_hocr: "0",
+        tessjs_create_tsv: "0",
+        tessjs_create_box: "0",
+        tessjs_create_unlv: "0",
+        tessjs_create_osd: "0",
+      });
+
+      // Recognize text in the processed image
+      const result = await worker.recognize(processedImageUrl);
+      console.log("OCR Result:", result);
+      setOcrResult(result.data.text);
+
+      // Extract coordinates from the recognized text
+      let coordinates = extractCoordinatesFromText(result.data.text);
+
+      // If coordinates were found, terminate worker and return
+      if (coordinates) {
+        await worker.terminate();
+        setIsProcessingImage(false);
+        setMessage({
+          type: "success",
+          content: "Coordinates extracted successfully!",
+        });
+        return coordinates;
+      }
+
+      // If no coordinates found, try with the full image
+      console.log(
+        "No coordinates found in cropped image, trying full image..."
+      );
+
+      // Create a new worker for the full image
+      const fullWorker = await window.Tesseract.createWorker({
+        logger: (m) => console.log(m),
+      });
+
+      await fullWorker.loadLanguage("eng");
+      await fullWorker.initialize("eng");
+
+      // Set parameters for the full image scan
+      await fullWorker.setParameters({
+        tessedit_char_whitelist:
+          "0123456789.,:-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ",
+        tessedit_pageseg_mode: "3", // Fully automatic page segmentation, but no OSD
+      });
+
+      // Try with the original image
+      const fullResult = await fullWorker.recognize(imageUrl);
+      console.log("Full Image OCR Result:", fullResult);
+      setOcrResult(
+        (prev) => prev + "\n\n--- FULL IMAGE OCR ---\n" + fullResult.data.text
+      );
+
+      // Extract coordinates from the full image text
+      coordinates = extractCoordinatesFromText(fullResult.data.text);
+
+      await fullWorker.terminate();
+      setIsProcessingImage(false);
+
+      if (coordinates) {
+        setMessage({
+          type: "success",
+          content: "Coordinates extracted from full image successfully!",
+        });
+        return coordinates;
+      }
+
+      // If still no coordinates, try one more approach with different preprocessing
+      console.log(
+        "Still no coordinates, trying with alternative preprocessing..."
+      );
+
+      // Create a third worker with different preprocessing
+      const altWorker = await window.Tesseract.createWorker({
+        logger: (m) => console.log(m),
+      });
+
+      await altWorker.loadLanguage("eng");
+      await altWorker.initialize("eng");
+
+      // Apply a different preprocessing approach
+      const altProcessedImage = await createAlternativeProcessedImage(imageUrl);
+
+      const altResult = await altWorker.recognize(altProcessedImage);
+      console.log("Alternative Processing OCR Result:", altResult);
+      setOcrResult(
+        (prev) =>
+          prev +
+          "\n\n--- ALTERNATIVE PROCESSING OCR ---\n" +
+          altResult.data.text
+      );
+
+      // Extract coordinates from the alternatively processed image
+      coordinates = extractCoordinatesFromText(altResult.data.text);
+
+      await altWorker.terminate();
+
+      if (coordinates) {
+        setMessage({
+          type: "success",
+          content: "Coordinates extracted with alternative processing!",
+        });
+        return coordinates;
+      }
+
+      // If all attempts failed
+      setMessage({
+        type: "error",
+        content:
+          "Could not extract coordinates from the image. Please enter them manually.",
+      });
+      return null;
+    } catch (error) {
+      console.error("OCR Error:", error);
+      setIsProcessingImage(false);
+      setMessage({
+        type: "error",
+        content: "Error processing image: " + error.message,
+      });
+      return null;
+    } finally {
+      setIsProcessingImage(false);
+    }
+  };
+
+  // Alternative image preprocessing for difficult cases
+  const createAlternativeProcessedImage = async (imageUrl) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        // Create canvas
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+
+        // Draw the original image
+        ctx.drawImage(img, 0, 0);
+
+        // Get image data
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        // Apply extreme contrast and inversion for difficult text
+        for (let i = 0; i < data.length; i += 4) {
+          // Convert to grayscale
+          const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+
+          // Apply binary threshold with inversion
+          const threshold = 128;
+          const value = avg < threshold ? 255 : 0; // Invert colors
+
+          data[i] = value;
+          data[i + 1] = value;
+          data[i + 2] = value;
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+
+        // Convert canvas to data URL
+        const processedImageUrl = canvas.toDataURL("image/png");
+        resolve(processedImageUrl);
+      };
+
+      img.src = imageUrl;
+    });
+  };
+
+  // Function to handle photo upload
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Create a preview URL for the image
+    const previewUrl = URL.createObjectURL(file);
+    setPhotoPreview(previewUrl);
+
+    // Store the file in formData
+    setFormData({
+      ...formData,
+      geotagged_photo: file,
+      geotagged_photo_url: previewUrl,
+    });
+
+    try {
+      setMessage({
+        type: "info",
+        content: "Analyzing image for coordinates...",
+      });
+
+      // Perform OCR on the image to extract coordinates
+      const coordinates = await performOCR(previewUrl);
+
+      if (coordinates) {
+        // Update coordinates in state
+        setFormData((prevData) => ({
+          ...prevData,
+          operator_location_latitude: coordinates.latitude.toFixed(6),
+          operator_location_longitude: coordinates.longitude.toFixed(6),
+        }));
+
+        // Auto-show map after extracting coordinates
+        setShowOperatorMap(true);
+
+        // Perform reverse geocoding to get the place name
+        fetchLocationName(coordinates.latitude, coordinates.longitude);
+
+        setMessage({
+          type: "success",
+          content: `Coordinates extracted: ${coordinates.latitude.toFixed(
+            6
+          )}, ${coordinates.longitude.toFixed(6)}`,
+        });
+      } else {
+        // If OCR failed, show a message
+        setMessage({
+          type: "warning",
+          content:
+            "Could not extract coordinates from the image. Please enter them manually.",
+        });
+      }
+    } catch (error) {
+      console.error("Error processing image:", error);
+      setMessage({
+        type: "error",
+        content: "Error processing image: " + error.message,
+      });
+    }
+  };
+
+  // Function to handle grower photo upload
+  const handleGrowerPhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Create a preview URL for the image
+    const previewUrl = URL.createObjectURL(file);
+    setPhotoPreview(previewUrl);
+
+    // Store the file in formData
+    setFormData({
+      ...formData,
+      geotagged_photo: file,
+      geotagged_photo_url: previewUrl,
+    });
+
+    try {
+      setMessage({
+        type: "info",
+        content: "Analyzing image for coordinates...",
+      });
+
+      // Perform OCR on the image to extract coordinates
+      const coordinates = await performOCR(previewUrl);
+
+      if (coordinates) {
+        // Update coordinates in state
+        setFormData((prevData) => ({
+          ...prevData,
+          farm_location_latitude: coordinates.latitude.toFixed(6),
+          farm_location_longitude: coordinates.longitude.toFixed(6),
+        }));
+
+        // Auto-show map after extracting coordinates
+        setShowMap(true);
+
+        // Perform reverse geocoding to get the place name
+        fetchGrowerLocationName(coordinates.latitude, coordinates.longitude);
+
+        setMessage({
+          type: "success",
+          content: `Coordinates extracted: ${coordinates.latitude.toFixed(
+            6
+          )}, ${coordinates.longitude.toFixed(6)}`,
+        });
+      } else {
+        // If OCR failed, show a message
+        setMessage({
+          type: "warning",
+          content:
+            "Could not extract coordinates from the image. Please enter them manually.",
+        });
+      }
+    } catch (error) {
+      console.error("Error processing image:", error);
+      setMessage({
+        type: "error",
+        content: "Error processing image: " + error.message,
+      });
+    }
+  };
+
+  // Add this new function for reverse geocoding
+  const fetchLocationName = async (latitude, longitude) => {
+    try {
+      // Using OpenStreetMap's Nominatim API for reverse geocoding
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+        {
+          headers: {
+            Accept: "application/json",
+            "User-Agent": "Agricultural Inventory App", // Required by Nominatim's usage policy
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch location name");
+      }
+
+      const data = await response.json();
+
+      // Extract relevant location information
+      let locationName = "";
+
+      if (data.display_name) {
+        // For a more concise name, we can use parts of the address
+        const addressParts = [];
+
+        if (data.address) {
+          // Build a more concise address from components
+          if (data.address.water) addressParts.push(data.address.water);
+          if (data.address.hamlet) addressParts.push(data.address.hamlet);
+          if (data.address.village) addressParts.push(data.address.village);
+          if (data.address.town) addressParts.push(data.address.town);
+          if (data.address.city) addressParts.push(data.address.city);
+          if (data.address.municipality)
+            addressParts.push(data.address.municipality);
+          if (data.address.county) addressParts.push(data.address.county);
+          if (data.address.state) addressParts.push(data.address.state);
+        }
+
+        // If we have address parts, use them; otherwise use the full display_name
+        locationName =
+          addressParts.length > 0
+            ? addressParts.join(", ")
+            : data.display_name.split(",").slice(0, 3).join(","); // Take first 3 parts of display_name
+      } else {
+        // Fallback to coordinates if no name is found
+        locationName = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+      }
+
+      // Update the fishpond location with the place name
+      setFormData((prevData) => ({
+        ...prevData,
+        fishpond_location: locationName,
+      }));
+
+      setMessage({
+        type: "success",
+        content: "Location name retrieved successfully!",
+      });
+    } catch (error) {
+      console.error("Error fetching location name:", error);
+      // Fallback to coordinates if reverse geocoding fails
+      setFormData((prevData) => ({
+        ...prevData,
+        fishpond_location: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+      }));
+
+      setMessage({
+        type: "warning",
+        content: "Could not retrieve location name. Using coordinates instead.",
+      });
+    }
+  };
+
+  // Add this new function for reverse geocoding for grower
+  const fetchGrowerLocationName = async (latitude, longitude) => {
+    try {
+      // Using OpenStreetMap's Nominatim API for reverse geocoding
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+        {
+          headers: {
+            Accept: "application/json",
+            "User-Agent": "Agricultural Inventory App", // Required by Nominatim's usage policy
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch location name");
+      }
+
+      const data = await response.json();
+
+      // Extract relevant location information
+      let locationName = "";
+
+      if (data.display_name) {
+        // For a more concise name, we can use parts of the address
+        const addressParts = [];
+
+        if (data.address) {
+          // Build a more concise address from components
+          if (data.address.water) addressParts.push(data.address.water);
+          if (data.address.hamlet) addressParts.push(data.address.hamlet);
+          if (data.address.village) addressParts.push(data.address.village);
+          if (data.address.town) addressParts.push(data.address.town);
+          if (data.address.city) addressParts.push(data.address.city);
+          if (data.address.municipality)
+            addressParts.push(data.address.municipality);
+          if (data.address.county) addressParts.push(data.address.county);
+          if (data.address.state) addressParts.push(data.address.state);
+        }
+
+        // If we have address parts, use them; otherwise use the full display_name
+        locationName =
+          addressParts.length > 0
+            ? addressParts.join(", ")
+            : data.display_name.split(",").slice(0, 3).join(","); // Take first 3 parts of display_name
+      } else {
+        // Fallback to coordinates if no name is found
+        locationName = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+      }
+
+      // Update the farm address with the place name
+      setFormData((prevData) => ({
+        ...prevData,
+        farm_address: locationName,
+      }));
+
+      setMessage({
+        type: "success",
+        content: "Farm location name retrieved successfully!",
+      });
+    } catch (error) {
+      console.error("Error fetching location name:", error);
+      // Fallback to coordinates if reverse geocoding fails
+      setFormData((prevData) => ({
+        ...prevData,
+        farm_address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+      }));
+
+      setMessage({
+        type: "warning",
+        content: "Could not retrieve location name. Using coordinates instead.",
+      });
+    }
+  };
+
+  // Also update the getOperatorCurrentLocation function to use reverse geocoding
+  const getOperatorCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+
+          setFormData({
+            ...formData,
+            operator_location_latitude: latitude.toFixed(6),
+            operator_location_longitude: longitude.toFixed(6),
+          });
+
+          // Update map view and marker if map is initialized
+          if (operatorMapInstanceRef.current && operatorMarkerRef.current) {
+            operatorMarkerRef.current.setLatLng([latitude, longitude]);
+            operatorMapInstanceRef.current.setView([latitude, longitude], 15);
+          }
+
+          // Fetch location name based on coordinates
+          fetchLocationName(latitude, longitude);
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          alert(
+            "Unable to retrieve your location. Please check your device settings."
+          );
+        }
+      );
+    } else {
+      alert("Geolocation is not supported by this browser.");
+    }
+  };
+
+  // Function to get current location
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+
+          setFormData({
+            ...formData,
+            farm_location_latitude: latitude.toFixed(6),
+            farm_location_longitude: longitude.toFixed(6),
+          });
+
+          // Update map view and marker if map is initialized
+          if (mapInstanceRef.current && markerRef.current) {
+            markerRef.current.setLatLng([latitude, longitude]);
+            mapInstanceRef.current.setView([latitude, longitude], 15);
+          }
+
+          // Fetch location name based on coordinates
+          fetchGrowerLocationName(latitude, longitude);
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          alert(
+            "Unable to retrieve your location. Please check your device settings."
+          );
+        }
+      );
+    } else {
+      alert("Geolocation is not supported by this browser.");
+    }
+  };
+
+  // Update the map click handler in initializeOperatorMap to use reverse geocoding
+  const initializeOperatorMap = () => {
+    if (!operatorMapRef.current || operatorMapInstanceRef.current) return;
+
+    // Default coordinates for Philippines (can be adjusted to your specific region)
+    const defaultLat = formData.operator_location_latitude
+      ? Number.parseFloat(formData.operator_location_latitude)
+      : 8.9456;
+    const defaultLng = formData.operator_location_longitude
+      ? Number.parseFloat(formData.operator_location_longitude)
+      : 125.5456;
+
+    // Initialize map
+    const L = window.L;
+    const map = L.map(operatorMapRef.current).setView(
+      [defaultLat, defaultLng],
+      13
+    );
+
+    // Add tile layer (OpenStreetMap)
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
+
+    // Add marker
+    const marker = L.marker([defaultLat, defaultLng], {
+      draggable: true,
+    }).addTo(map);
+
+    // Handle marker drag events
+    marker.on("dragend", (e) => {
+      const position = marker.getLatLng();
+      setFormData({
+        ...formData,
+        operator_location_latitude: position.lat.toFixed(6),
+        operator_location_longitude: position.lng.toFixed(6),
+      });
+
+      // Fetch location name based on new coordinates
+      fetchLocationName(position.lat, position.lng);
+    });
+
+    // Handle map click events
+    map.on("click", (e) => {
+      marker.setLatLng(e.latlng);
+      setFormData({
+        ...formData,
+        operator_location_latitude: e.latlng.lat.toFixed(6),
+        operator_location_longitude: e.latlng.lng.toFixed(6),
+      });
+
+      // Fetch location name based on clicked coordinates
+      fetchLocationName(e.latlng.lat, e.latlng.lng);
+    });
+
+    // Store references
+    operatorMarkerRef.current = marker;
+    operatorMapInstanceRef.current = map;
+
+    // Fix map display issue by triggering a resize after a short delay
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
+  };
 
   const initializeMap = () => {
     if (!mapRef.current || mapInstanceRef.current) return;
@@ -166,6 +1152,9 @@ const AddData = () => {
         farm_location_latitude: position.lat.toFixed(6),
         farm_location_longitude: position.lng.toFixed(6),
       });
+
+      // Fetch location name based on new coordinates
+      fetchGrowerLocationName(position.lat, position.lng);
     });
 
     // Handle map click events
@@ -176,6 +1165,9 @@ const AddData = () => {
         farm_location_latitude: e.latlng.lat.toFixed(6),
         farm_location_longitude: e.latlng.lng.toFixed(6),
       });
+
+      // Fetch location name based on clicked coordinates
+      fetchGrowerLocationName(e.latlng.lat, e.latlng.lng);
     });
 
     // Store references
@@ -186,6 +1178,13 @@ const AddData = () => {
     setTimeout(() => {
       map.invalidateSize();
     }, 100);
+  };
+
+  // We're not uploading photos anymore, just extracting coordinates
+  // Function kept as a placeholder in case upload functionality is needed in the future
+  const uploadPhoto = async (file) => {
+    console.log("Photo upload skipped - only using for coordinate extraction");
+    return "";
   };
 
   // Handler functions
@@ -353,13 +1352,22 @@ const AddData = () => {
     setAdditionalVegetableDetails(newDetails);
   };
 
+  const handleMapInvalidateSize = () => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.invalidateSize();
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      // We're not uploading the photo, just using it for coordinates
       const values = {
         ...formData,
+        // Don't include the photo URL in the submitted data
+        geotagged_photo_url: "",
       };
 
       // Format data for API submission
@@ -425,7 +1433,7 @@ const AddData = () => {
           production_kg: values.production || "",
           date_of_harvest: values.date_of_harvest || "",
           remarks: values.remarks || "",
-          geotagged_photo_url: values.geotagged_photo || "",
+          geotagged_photo_url: values.geotagged_photo_url || "",
         };
 
         // Only add operators array if at least one required field is provided
@@ -702,6 +1710,22 @@ const AddData = () => {
           market_outlet_location: "",
           buyer_name: "",
           association_organization: "",
+          fishpond_location: "",
+          operator_location_longitude: "",
+          operator_location_latitude: "",
+          geotagged_photo: null,
+          geotagged_photo_url: "",
+          area_type: "",
+          seed_type: "",
+          area_harvested: "",
+          production: "",
+          ave_yield: "",
+          month: "",
+          high_value_crop: "",
+          variety_clone: "",
+          cropping_intensity: "",
+          quantity: "",
+          crop_value: "",
         });
         setFarmerType(null);
         setAnimals([{ animal_type: "", subcategory: "", quantity: "" }]);
@@ -723,6 +1747,8 @@ const AddData = () => {
           { vegetable_type: "", quantity: "", other_vegetable: "" },
         ]);
         setShowMap(false);
+        setShowOperatorMap(false);
+        setPhotoPreview(null);
       } else {
         setMessage({ type: "error", content: "Failed to submit data." });
       }
@@ -734,37 +1760,6 @@ const AddData = () => {
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Function to get current location
-  const getCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-
-          setFormData({
-            ...formData,
-            farm_location_latitude: latitude.toFixed(6),
-            farm_location_longitude: longitude.toFixed(6),
-          });
-
-          // Update map view and marker if map is initialized
-          if (mapInstanceRef.current && markerRef.current) {
-            markerRef.current.setLatLng([latitude, longitude]);
-            mapInstanceRef.current.setView([latitude, longitude], 15);
-          }
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-          alert(
-            "Unable to retrieve your location. Please check your device settings."
-          );
-        }
-      );
-    } else {
-      alert("Geolocation is not supported by this browser.");
     }
   };
 
@@ -876,6 +1871,41 @@ const AddData = () => {
           z-index: 1000;
           box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
         }
+
+        /* Photo preview styles */
+        .photo-preview {
+          width: 100%;
+          max-height: 200px;
+          object-fit: contain;
+          border-radius: 0.375rem;
+          margin-top: 0.5rem;
+        }
+
+        .photo-upload-container {
+          position: relative;
+          width: 100%;
+          border: 2px dashed #e2e8f0;
+          border-radius: 0.375rem;
+          padding: 1rem;
+          text-align: center;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .photo-upload-container:hover {
+          border-color: #10b981;
+          background-color: rgba(16, 185, 129, 0.05);
+        }
+
+        .photo-upload-container input {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          opacity: 0;
+          cursor: pointer;
+        }
       `}</style>
 
       <div className="mb-4 bg-white border border-gray-200 rounded-lg shadow-md">
@@ -910,6 +1940,10 @@ const AddData = () => {
               className={`mb-4 p-3 rounded-md ${
                 message.type === "success"
                   ? "bg-green-100 text-green-800"
+                  : message.type === "info"
+                  ? "bg-blue-100 text-blue-800"
+                  : message.type === "warning"
+                  ? "bg-yellow-100 text-yellow-800"
                   : "bg-red-100 text-red-800"
               }`}
             >
@@ -922,7 +1956,7 @@ const AddData = () => {
             <div className="p-3 font-medium text-white bg-emerald-700">
               Farmer Information
             </div>
-            <div className="p-4 bg-emerald-50 max-h-[calc(100vh-240px)] overflow-y-auto overflow-x-hidden hide-scrollbar">
+            <div className="p-4 bg-emerald-50 hide-scrollbar">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block mb-1 text-sm font-medium text-gray-700">
@@ -1061,256 +2095,39 @@ const AddData = () => {
             </div>
           </div>
 
-          {/* Livestock Records Section */}
-          {farmerType === "Raiser" && (
-            <div className="mb-6 overflow-hidden bg-white border border-gray-200 rounded-lg shadow-md">
-              <div className="p-3 font-medium text-white bg-emerald-700">
-                Livestock Records
-              </div>
-              <div className="p-4 bg-emerald-50 max-h-[500px] overflow-auto hide-scrollbar">
-                {animals.map((animal, index) => (
-                  <div
-                    key={index}
-                    className="p-3 mb-3 bg-white border border-gray-300 border-dashed rounded-md"
-                  >
-                    <div className="grid items-center grid-cols-1 gap-4 sm:grid-cols-12">
-                      <div className="sm:col-span-4">
-                        <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Animal Type <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          value={animal.animal_type}
-                          onChange={(e) =>
-                            handleAnimalChange(
-                              index,
-                              "animal_type",
-                              e.target.value
-                            )
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                          required
-                        >
-                          <option value="">Select Animal Type</option>
-                          <option value="Cattle">Cattle</option>
-                          <option value="Carabao">Carabao</option>
-                          <option value="Goat">Goat</option>
-                          <option value="Sheep">Sheep</option>
-                          <option value="Swine">Swine</option>
-                          <option value="Chicken">Chicken</option>
-                          <option value="Duck">Duck</option>
-                          <option value="Quail">Quail</option>
-                          <option value="Turkey">Turkey</option>
-                          <option value="Rabbit">Rabbit</option>
-                        </select>
-                      </div>
-                      <div className="sm:col-span-4">
-                        <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Subcategory <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          value={animal.subcategory}
-                          onChange={(e) =>
-                            handleAnimalChange(
-                              index,
-                              "subcategory",
-                              e.target.value
-                            )
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                          required
-                        >
-                          <option value="">Select Subcategory</option>
-                          {animal.animal_type === "Cattle" && (
-                            <>
-                              <option value="Carabull">Carabull</option>
-                              <option value="Caracow">Caracow</option>
-                            </>
-                          )}
-                          {animal.animal_type === "Carabao" && (
-                            <>
-                              <option value="Carabull">Carabull</option>
-                              <option value="Caracow">Caracow</option>
-                            </>
-                          )}
-                          {animal.animal_type === "Goat" && (
-                            <>
-                              <option value="Buck">Buck</option>
-                              <option value="Doe">Doe</option>
-                            </>
-                          )}
-                          {animal.animal_type === "Sheep" && (
-                            <>
-                              <option value="Ram">Ram</option>
-                              <option value="Ewe">Ewe</option>
-                            </>
-                          )}
-                          {animal.animal_type === "Swine" && (
-                            <>
-                              <option value="Sow">Sow</option>
-                              <option value="Piglet">Piglet</option>
-                              <option value="Boar">Boar</option>
-                              <option value="Fatteners">Fatteners</option>
-                            </>
-                          )}
-                          {animal.animal_type === "Chicken" && (
-                            <>
-                              <option value="Broiler">Broiler</option>
-                              <option value="Layer">Layer</option>
-                              <option value="Freerange">Freerange</option>
-                              <option value="Gamefowl">Gamefowl</option>
-                              <option value="Fighting Cocks">
-                                Fighting Cocks
-                              </option>
-                            </>
-                          )}
-                          {animal.animal_type === "Duck" && (
-                            <>
-                              <option value="Drake">Drake</option>
-                              <option value="Hen">Hen</option>
-                            </>
-                          )}
-                          {animal.animal_type === "Quail" && (
-                            <>
-                              <option value="Cock">Cock</option>
-                              <option value="Hen">Hen</option>
-                            </>
-                          )}
-                          {animal.animal_type === "Turkey" && (
-                            <>
-                              <option value="Gobbler">Gobbler</option>
-                              <option value="Hen">Hen</option>
-                            </>
-                          )}
-                          {animal.animal_type === "Rabbit" && (
-                            <>
-                              <option value="Buck">Buck</option>
-                              <option value="Doe">Doe</option>
-                            </>
-                          )}
-                        </select>
-                      </div>
-                      <div className="sm:col-span-3">
-                        <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Quantity <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="number"
-                          value={animal.quantity}
-                          onChange={(e) =>
-                            handleAnimalChange(
-                              index,
-                              "quantity",
-                              e.target.value
-                            )
-                          }
-                          placeholder="Enter Quantity"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                          required
-                        />
-                      </div>
-                      <div className="sm:col-span-1">
-                        <label className="block mb-1 text-sm font-medium text-white">
-                          &nbsp;
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newAnimals = [...animals];
-                            newAnimals.splice(index, 1);
-                            setAnimals(newAnimals);
-                          }}
-                          className="flex items-center justify-center w-full px-3 py-2 text-sm text-white bg-red-600 rounded-md hover:bg-red-700"
-                          disabled={animals.length === 1}
-                        >
-                          <svg
-                            className="w-4 h-4 mr-1"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            ></path>
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="p-4 bg-emerald-50">
-                <button
-                  type="button"
-                  onClick={addAnimal}
-                  className="flex items-center justify-center w-full px-4 py-2 border border-dashed rounded-md border-emerald-700 text-emerald-700 hover:bg-emerald-50"
-                >
-                  <svg
-                    className="w-4 h-4 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                    ></path>
-                  </svg>
-                  Add Animal
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Operator Details Section */}
+          {/* Operator Information Section */}
           {farmerType === "Operator" && (
             <div className="mb-6 overflow-hidden bg-white border border-gray-200 rounded-lg shadow-md">
               <div className="p-3 font-medium text-white bg-emerald-700">
-                Operator Details
+                Operator Information
               </div>
-              <div className="p-4 bg-emerald-50 max-h-[calc(100vh-240px)] overflow-y-auto overflow-x-hidden hide-scrollbar">
+              <div className="p-4 bg-emerald-50 hide-scrollbar">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
-                      Fishpond Location
+                      Fishpond Location <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       name="fishpond_location"
-                      value={formData.fishpond_location || ""}
+                      value={formData.fishpond_location}
                       onChange={handleInputChange}
-                      placeholder="Enter Fishpond Location"
+                      placeholder="Enter fishpond location"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                      required
                     />
                   </div>
+
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
-                      Geotagged Photo
-                    </label>
-                    <input
-                      type="text"
-                      name="geotagged_photo"
-                      value={formData.geotagged_photo || ""}
-                      onChange={handleInputChange}
-                      placeholder="Enter Geotagged Photo URL"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block mb-1 text-sm font-medium text-gray-700">
-                      Cultured Species
+                      Cultured Species <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="cultured_species"
-                      value={formData.cultured_species || ""}
+                      value={formData.cultured_species}
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                      required
                     >
                       <option value="">Select Species</option>
                       <option value="Tilapia">Tilapia</option>
@@ -1324,19 +2141,21 @@ const AddData = () => {
                       <option value="Mudcrab">Mudcrab</option>
                     </select>
                   </div>
+
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
-                      Area (Hectares)
+                      Productive Area (sqm)
                     </label>
                     <input
                       type="number"
                       name="area"
-                      value={formData.area || ""}
+                      value={formData.area}
                       onChange={handleInputChange}
-                      placeholder="Enter Area"
+                      placeholder="Enter productive area"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                     />
                   </div>
+
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
                       Stocking Density
@@ -1344,12 +2163,13 @@ const AddData = () => {
                     <input
                       type="text"
                       name="stocking_density"
-                      value={formData.stocking_density || ""}
+                      value={formData.stocking_density}
                       onChange={handleInputChange}
-                      placeholder="Enter Stocking Density"
+                      placeholder="Enter stocking density"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                     />
                   </div>
+
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
                       Date of Stocking
@@ -1357,24 +2177,26 @@ const AddData = () => {
                     <input
                       type="date"
                       name="date_of_stocking"
-                      value={formData.date_of_stocking || ""}
+                      value={formData.date_of_stocking}
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                     />
                   </div>
+
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
-                      Production
+                      Production (kg)
                     </label>
                     <input
-                      type="text"
+                      type="number"
                       name="production"
-                      value={formData.production || ""}
+                      value={formData.production}
                       onChange={handleInputChange}
-                      placeholder="Enter Production"
+                      placeholder="Enter production"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                     />
                   </div>
+
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
                       Date of Harvest
@@ -1382,40 +2204,238 @@ const AddData = () => {
                     <input
                       type="date"
                       name="date_of_harvest"
-                      value={formData.date_of_harvest || ""}
+                      value={formData.date_of_harvest}
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                     />
                   </div>
+
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
-                      Remarks
+                      Remarks <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="remarks"
-                      value={formData.remarks || ""}
+                      value={formData.remarks}
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                      required
                     >
                       <option value="">Select Status</option>
                       <option value="operational">Operational</option>
                       <option value="non-operational">Non-operational</option>
                     </select>
                   </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Geotagged Photo
+                    </label>
+                    <div className="photo-upload-container">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        ref={fileInputRef}
+                      />
+                      <svg
+                        className="w-6 h-6 mx-auto text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-5l-4 4-4-4m-4-5l4-4 4 4 4-4"
+                        ></path>
+                      </svg>
+                      <p className="text-sm text-gray-500">
+                        Select a geotagged photo with coordinates overlaid on
+                        the image
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        The system will extract location data using OCR
+                        technology without uploading the image
+                      </p>
+                    </div>
+                    {isProcessingImage && (
+                      <div className="mt-2 text-center">
+                        <div className="inline-block w-6 h-6 border-2 rounded-full border-t-emerald-500 animate-spin"></div>
+                        <p className="mt-1 text-sm text-gray-600">
+                          Processing image...
+                        </p>
+                      </div>
+                    )}
+                    {photoPreview && (
+                      <div className="mt-2">
+                        <img
+                          src={photoPreview || "/placeholder.svg"}
+                          alt="Photo preview"
+                          className="photo-preview"
+                        />
+                        {ocrResult && (
+                          <div className="p-2 mt-2 text-sm rounded-md bg-gray-50">
+                            <p className="font-medium">Extracted Text:</p>
+                            <p className="text-gray-700 whitespace-pre-wrap">
+                              {ocrResult}
+                            </p>
+                          </div>
+                        )}
+                        {ocrDebug && (
+                          <details className="mt-2">
+                            <summary className="text-sm font-medium text-gray-700 cursor-pointer">
+                              Debug OCR Data
+                            </summary>
+                            <div className="p-2 mt-1 text-xs rounded-md bg-gray-50">
+                              <pre className="whitespace-pre-wrap">
+                                {ocrDebug}
+                              </pre>
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {formData.operator_location_latitude &&
+                    formData.operator_location_longitude && (
+                      <div className="sm:col-span-2">
+                        <label className="block mb-1 text-sm font-medium text-gray-700">
+                          Operator Location Map
+                        </label>
+                        <div className="map-container">
+                          <div className="map-coordinates">
+                            <span className="font-medium">Coordinates:</span>{" "}
+                            {formData.operator_location_latitude},{" "}
+                            {formData.operator_location_longitude}
+                          </div>
+                          <div
+                            className="w-full h-full"
+                            ref={operatorMapRef}
+                          ></div>
+                        </div>
+                        <div className="flex mt-2 space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowOperatorMap(!showOperatorMap)}
+                            className="px-4 py-2 font-medium text-white rounded-md bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          >
+                            {showOperatorMap ? "Hide Map" : "Show Map"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={getOperatorCurrentLocation}
+                            className="px-4 py-2 font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            Get Current Location
+                          </button>
+                        </div>
+                      </div>
+                    )}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Grower Details Section */}
+          {/* Raiser Information Section */}
+          {farmerType === "Raiser" && (
+            <div className="mb-6 overflow-hidden bg-white border border-gray-200 rounded-lg shadow-md">
+              <div className="p-3 font-medium text-white bg-emerald-700">
+                Raiser Information
+              </div>
+              <div className="p-4 bg-emerald-50 hide-scrollbar">
+                {animals.map((animal, index) => (
+                  <div
+                    key={index}
+                    className="p-3 mb-4 border border-gray-300 rounded-md"
+                  >
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <div>
+                        <label className="block mb-1 text-sm font-medium text-gray-700">
+                          Animal Type
+                        </label>
+                        <select
+                          value={animal.animal_type}
+                          onChange={(e) =>
+                            handleAnimalChange(
+                              index,
+                              "animal_type",
+                              e.target.value
+                            )
+                          }
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                        >
+                          <option value="">Select Animal Type</option>
+                          <option value="Cattle">Cattle</option>
+                          <option value="Carabao">Carabao</option>
+                          <option value="Goat">Goat</option>
+                          <option value="Swine">Swine</option>
+                          <option value="Poultry">Poultry</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block mb-1 text-sm font-medium text-gray-700">
+                          Subcategory
+                        </label>
+                        <input
+                          type="text"
+                          value={animal.subcategory}
+                          onChange={(e) =>
+                            handleAnimalChange(
+                              index,
+                              "subcategory",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Enter subcategory"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block mb-1 text-sm font-medium text-gray-700">
+                          Quantity
+                        </label>
+                        <input
+                          type="number"
+                          value={animal.quantity}
+                          onChange={(e) =>
+                            handleAnimalChange(
+                              index,
+                              "quantity",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Enter quantity"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addAnimal}
+                  className="px-4 py-2 font-medium text-white rounded-md bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  Add Animal
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Grower Information Section */}
           {farmerType === "Grower" && (
             <div className="mb-6 overflow-hidden bg-white border border-gray-200 rounded-lg shadow-md">
               <div className="p-3 font-medium text-white bg-emerald-700">
-                Grower Details
+                Grower Information
               </div>
-              <div className="p-4 bg-emerald-50 max-h-[calc(100vh-240px)] overflow-y-auto overflow-x-hidden hide-scrollbar">
-                {/* Additional Grower Fields */}
-                <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2">
+              <div className="p-4 bg-emerald-50 hide-scrollbar">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
                       Farm Address
@@ -1423,75 +2443,41 @@ const AddData = () => {
                     <input
                       type="text"
                       name="farm_address"
-                      value={formData.farm_address || ""}
+                      value={formData.farm_address}
                       onChange={handleInputChange}
-                      placeholder="Enter Farm Address"
+                      placeholder="Enter farm address"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                     />
                   </div>
 
-                  {/* Map Location Section */}
-                  <div className="sm:col-span-2">
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-gray-700">
-                        Farm Location (Map)
-                      </label>
-                      <div className="flex space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowMap(!showMap)}
-                          className="flex items-center px-2 py-1 text-xs text-white rounded bg-emerald-600 hover:bg-emerald-700"
-                        >
-                          {showMap ? "Hide Map" : "Show Map"}
-                        </button>
-                      </div>
-                    </div>
-
-                    {showMap && (
-                      <div className="p-2 mb-4 border border-gray-300 rounded-md">
-                        <p className="mb-2 text-xs text-gray-600">
-                          Click on the map to set the farm location coordinates
-                        </p>
-                        <div className="relative map-container">
-                          <div ref={mapRef} className="w-full h-full"></div>
-                          {formData.farm_location_latitude &&
-                            formData.farm_location_longitude && (
-                              <div className="map-coordinates">
-                                Lat: {formData.farm_location_latitude}, Lng:{" "}
-                                {formData.farm_location_longitude}
-                              </div>
-                            )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
-                      Farm Location (Longitude)
+                      Farm Location Longitude
                     </label>
                     <input
-                      type="text"
+                      type="number"
                       name="farm_location_longitude"
-                      value={formData.farm_location_longitude || ""}
+                      value={formData.farm_location_longitude}
                       onChange={handleInputChange}
-                      placeholder="Enter Longitude (e.g., 125.5456)"
+                      placeholder="Enter farm longitude"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                     />
                   </div>
+
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
-                      Farm Location (Latitude)
+                      Farm Location Latitude
                     </label>
                     <input
-                      type="text"
+                      type="number"
                       name="farm_location_latitude"
-                      value={formData.farm_location_latitude || ""}
+                      value={formData.farm_location_latitude}
                       onChange={handleInputChange}
-                      placeholder="Enter Latitude (e.g., 8.9456)"
+                      placeholder="Enter farm latitude"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                     />
                   </div>
+
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
                       Market Outlet Location
@@ -1499,12 +2485,13 @@ const AddData = () => {
                     <input
                       type="text"
                       name="market_outlet_location"
-                      value={formData.market_outlet_location || ""}
+                      value={formData.market_outlet_location}
                       onChange={handleInputChange}
-                      placeholder="Enter Market Outlet Location"
+                      placeholder="Enter market outlet location"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                     />
                   </div>
+
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
                       Buyer Name
@@ -1512,12 +2499,13 @@ const AddData = () => {
                     <input
                       type="text"
                       name="buyer_name"
-                      value={formData.buyer_name || ""}
+                      value={formData.buyer_name}
                       onChange={handleInputChange}
-                      placeholder="Enter Buyer Name"
+                      placeholder="Enter buyer name"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                     />
                   </div>
+
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
                       Association/Organization
@@ -1525,124 +2513,194 @@ const AddData = () => {
                     <input
                       type="text"
                       name="association_organization"
-                      value={formData.association_organization || ""}
+                      value={formData.association_organization}
                       onChange={handleInputChange}
-                      placeholder="Enter Association or Organization"
+                      placeholder="Enter association/organization"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                     />
                   </div>
-                </div>
 
+                  <div className="sm:col-span-2">
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Geotagged Photo
+                    </label>
+                    <div className="photo-upload-container">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleGrowerPhotoUpload}
+                        ref={fileInputRef}
+                      />
+                      <svg
+                        className="w-6 h-6 mx-auto text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-5l-4 4-4-4m-4-5l4-4 4 4 4-4"
+                        ></path>
+                      </svg>
+                      <p className="text-sm text-gray-500">
+                        Select a geotagged photo with coordinates overlaid on
+                        the image
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        The system will extract location data using OCR
+                        technology without uploading the image
+                      </p>
+                    </div>
+                    {isProcessingImage && (
+                      <div className="mt-2 text-center">
+                        <div className="inline-block w-6 h-6 border-2 rounded-full border-t-emerald-500 animate-spin"></div>
+                        <p className="mt-1 text-sm text-gray-600">
+                          Processing image...
+                        </p>
+                      </div>
+                    )}
+                    {photoPreview && (
+                      <div className="mt-2">
+                        <img
+                          src={photoPreview || "/placeholder.svg"}
+                          alt="Photo preview"
+                          className="photo-preview"
+                        />
+                        {ocrResult && (
+                          <div className="p-2 mt-2 text-sm rounded-md bg-gray-50">
+                            <p className="font-medium">Extracted Text:</p>
+                            <p className="text-gray-700 whitespace-pre-wrap">
+                              {ocrResult}
+                            </p>
+                          </div>
+                        )}
+                        {ocrDebug && (
+                          <details className="mt-2">
+                            <summary className="text-sm font-medium text-gray-700 cursor-pointer">
+                              Debug OCR Data
+                            </summary>
+                            <div className="p-2 mt-1 text-xs rounded-md bg-gray-50">
+                              <pre className="whitespace-pre-wrap">
+                                {ocrDebug}
+                              </pre>
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Farm Location Map
+                    </label>
+                    <div className="map-container">
+                      <div className="map-coordinates">
+                        <span className="font-medium">Coordinates:</span>{" "}
+                        {formData.farm_location_latitude},{" "}
+                        {formData.farm_location_longitude}
+                      </div>
+                      <div className="w-full h-full" ref={mapRef}></div>
+                    </div>
+                    <div className="flex mt-2 space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowMap(!showMap)}
+                        className="px-4 py-2 font-medium text-white rounded-md bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      >
+                        {showMap ? "Hide Map" : "Show Map"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={getCurrentLocation}
+                        className="px-4 py-2 font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        Get Current Location
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleMapInvalidateSize}
+                        className="px-4 py-2 font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        Refresh Map
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Crop Information Section */}
+          {farmerType === "Grower" && (
+            <div className="mb-6 overflow-hidden bg-white border border-gray-200 rounded-lg shadow-md">
+              <div className="p-3 font-medium text-white bg-emerald-700">
+                Crop Information
+              </div>
+              <div className="p-4 bg-emerald-50 hide-scrollbar">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block mb-1 text-sm font-medium text-gray-700">
-                      Crop Type <span className="text-red-500">*</span>
+                      Crop Type
                     </label>
                     <select
                       name="crop_type"
-                      value={formData.crop_type || ""}
+                      value={formData.crop_type}
                       onChange={(e) =>
                         handleSelectChange("crop_type", e.target.value)
                       }
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                      required
                     >
                       <option value="">Select Crop Type</option>
                       <option value="Rice">Rice</option>
                       <option value="Spices">Spices</option>
                       <option value="Legumes">Legumes</option>
+                      <option value="Banana">Banana</option>
                       <option value="Vegetable">Vegetable</option>
                       <option value="High Value Crops">High Value Crops</option>
-                      <option value="Banana">Banana</option>
                     </select>
                   </div>
 
-                  {/* Common fields for all crop types */}
-                  {selectedCrop && (
-                    <div>
-                      <label className="block mb-1 text-sm font-medium text-gray-700">
-                        Area (Hectare) <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        name="area_hectare"
-                        value={formData.area_hectare || ""}
-                        onChange={handleInputChange}
-                        min="0"
-                        step="0.01"
-                        placeholder="Enter Area in Hectares"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                        required
-                      />
-                    </div>
-                  )}
-
-                  {selectedCrop && (
-                    <div>
-                      <label className="block mb-1 text-sm font-medium text-gray-700">
-                        Cropping Intensity{" "}
-                        <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        name="cropping_intensity"
-                        value={formData.cropping_intensity || ""}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                        required
-                      >
-                        <option value="">Select Cropping Intensity</option>
-                        <option value="year_round">Year Round</option>
-                        <option value="quarterly">Quarterly</option>
-                        <option value="seasonal">Seasonal</option>
-                        <option value="annually">Annually</option>
-                        <option value="twice_a_month">Twice a Month</option>
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Month field for all crop types except Rice */}
-                  {selectedCrop && selectedCrop !== "Rice" && (
-                    <div>
-                      <label className="block mb-1 text-sm font-medium text-gray-700">
-                        Month <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        name="month"
-                        value={formData.month || ""}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                        required
-                      >
-                        <option value="">Select Month</option>
-                        <option value="January">January</option>
-                        <option value="February">February</option>
-                        <option value="March">March</option>
-                        <option value="April">April</option>
-                        <option value="May">May</option>
-                        <option value="June">June</option>
-                        <option value="July">July</option>
-                        <option value="August">August</option>
-                        <option value="September">September</option>
-                        <option value="October">October</option>
-                        <option value="November">November</option>
-                        <option value="December">December</option>
-                      </select>
-                    </div>
-                  )}
-
-                  {/* High Value Crops Section */}
-                  {selectedCrop === "High Value Crops" && (
+                  {formData.crop_type === "High Value Crops" && (
                     <>
                       <div>
                         <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Crop <span className="text-red-500">*</span>
+                          Month
+                        </label>
+                        <select
+                          name="month"
+                          value={formData.month}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                        >
+                          <option value="">Select Month</option>
+                          <option value="January">January</option>
+                          <option value="February">February</option>
+                          <option value="March">March</option>
+                          <option value="April">April</option>
+                          <option value="May">May</option>
+                          <option value="June">June</option>
+                          <option value="July">July</option>
+                          <option value="August">August</option>
+                          <option value="September">September</option>
+                          <option value="October">October</option>
+                          <option value="November">November</option>
+                          <option value="December">December</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block mb-1 text-sm font-medium text-gray-700">
+                          High Value Crop
                         </label>
                         <select
                           name="high_value_crop"
-                          value={formData.high_value_crop || ""}
+                          value={formData.high_value_crop}
                           onChange={handleInputChange}
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                          required
                         >
                           <option value="">Select Crop</option>
                           {highValueCropOptions.map((crop) => (
@@ -1652,6 +2710,7 @@ const AddData = () => {
                           ))}
                         </select>
                       </div>
+
                       <div>
                         <label className="block mb-1 text-sm font-medium text-gray-700">
                           Variety/Clone
@@ -1665,9 +2724,45 @@ const AddData = () => {
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                         />
                       </div>
+
                       <div>
                         <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Quantity <span className="text-red-500">*</span>
+                          Area (hectare)
+                        </label>
+                        <input
+                          type="number"
+                          name="area_hectare"
+                          value={formData.area_hectare || ""}
+                          onChange={handleInputChange}
+                          min="0"
+                          step="0.01"
+                          placeholder="Enter Area in Hectares"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block mb-1 text-sm font-medium text-gray-700">
+                          Cropping Intensity
+                        </label>
+                        <select
+                          name="cropping_intensity"
+                          value={formData.cropping_intensity || ""}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                        >
+                          <option value="">Select Cropping Intensity</option>
+                          <option value="year_round">Year Round</option>
+                          <option value="quarterly">Quarterly</option>
+                          <option value="seasonal">Seasonal</option>
+                          <option value="annually">Annually</option>
+                          <option value="twice_a_month">Twice a Month</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block mb-1 text-sm font-medium text-gray-700">
+                          Quantity
                         </label>
                         <input
                           type="number"
@@ -1677,18 +2772,387 @@ const AddData = () => {
                           min="0"
                           placeholder="Enter Quantity"
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                          required
                         />
                       </div>
                     </>
                   )}
 
+                  {formData.crop_type !== "Rice" &&
+                    formData.crop_type !== "High Value Crops" &&
+                    formData.crop_type !== "" && (
+                      <>
+                        <div>
+                          <label className="block mb-1 text-sm font-medium text-gray-700">
+                            Area (hectare)
+                          </label>
+                          <input
+                            type="number"
+                            name="area_hectare"
+                            value={formData.area_hectare || ""}
+                            onChange={handleInputChange}
+                            min="0"
+                            step="0.01"
+                            placeholder="Enter Area in Hectares"
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block mb-1 text-sm font-medium text-gray-700">
+                            Cropping Intensity
+                          </label>
+                          <select
+                            name="cropping_intensity"
+                            value={formData.cropping_intensity || ""}
+                            onChange={handleInputChange}
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                          >
+                            <option value="">Select Cropping Intensity</option>
+                            <option value="year_round">Year Round</option>
+                            <option value="quarterly">Quarterly</option>
+                            <option value="seasonal">Seasonal</option>
+                            <option value="annually">Annually</option>
+                            <option value="twice_a_month">Twice a Month</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+
                   {/* Spices Section */}
-                  {selectedCrop === "Spices" && (
-                    <>
-                      <div className="col-span-1 sm:col-span-2">
-                        <div className="max-h-[500px] overflow-auto p-1 mb-4 hide-scrollbar">
-                          {additionalSpiceDetails.map((spiceDetail, index) => (
+                  {formData.crop_type === "Spices" && (
+                    <div className="col-span-1 sm:col-span-2">
+                      <div className="max-h-[500px] overflow-auto p-1 mb-4 hide-scrollbar">
+                        {additionalSpiceDetails.map((spiceDetail, index) => (
+                          <div
+                            key={index}
+                            className="p-3 mb-3 bg-white border border-gray-300 border-dashed rounded-md"
+                          >
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                              <div>
+                                <label className="block mb-1 text-sm font-medium text-gray-700">
+                                  Spice Type{" "}
+                                  <span className="text-red-500">*</span>
+                                </label>
+                                <select
+                                  value={spiceDetail.spices_type}
+                                  onChange={(e) =>
+                                    handleAdditionalSpiceChange(
+                                      index,
+                                      "spices_type",
+                                      e.target.value
+                                    )
+                                  }
+                                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                  required
+                                >
+                                  <option value="">Select Spice Type</option>
+
+                                  <option value="Ginger">Ginger</option>
+                                  <option value="Onion">Onion</option>
+                                  <option value="Hotpepper">Hotpepper</option>
+                                  <option value="Sweet Pepper">
+                                    Sweet Pepper
+                                  </option>
+                                  <option value="Turmeric">Turmeric</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block mb-1 text-sm font-medium text-gray-700">
+                                  Quantity{" "}
+                                  <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                  type="number"
+                                  value={spiceDetail.quantity}
+                                  onChange={(e) =>
+                                    handleAdditionalSpiceChange(
+                                      index,
+                                      "quantity",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="Enter Quantity"
+                                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                  required
+                                />
+                              </div>
+                              <div className="flex items-end">
+                                {additionalSpiceDetails.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleRemoveAdditionalSpice(index)
+                                    }
+                                    className="flex items-center justify-center w-full px-3 py-2 text-sm text-white bg-red-600 rounded-md hover:bg-red-700"
+                                  >
+                                    <svg
+                                      className="w-4 h-4 mr-1"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth="2"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                      ></path>
+                                    </svg>
+                                    Remove
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddAdditionalSpice}
+                        className="flex items-center justify-center w-full px-4 py-2 border border-dashed rounded-md border-emerald-700 text-emerald-700 hover:bg-emerald-50"
+                      >
+                        <svg
+                          className="w-4 h-4 mr-2"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                          ></path>
+                        </svg>
+                        Add Spice Entry
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Legumes Section */}
+                  {formData.crop_type === "Legumes" && (
+                    <div className="col-span-1 sm:col-span-2">
+                      <div className="max-h-[500px] overflow-auto p-1 mb-4 hide-scrollbar">
+                        {additionalLegumesDetails.map((legumeDetail, index) => (
+                          <div
+                            key={index}
+                            className="p-3 mb-3 bg-white border border-gray-300 border-dashed rounded-md"
+                          >
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                              <div>
+                                <label className="block mb-1 text-sm font-medium text-gray-700">
+                                  Legume Type{" "}
+                                  <span className="text-red-500">*</span>
+                                </label>
+                                <select
+                                  value={legumeDetail.legumes_type}
+                                  onChange={(e) =>
+                                    handleAdditionalLegumesChange(
+                                      index,
+                                      "legumes_type",
+                                      e.target.value
+                                    )
+                                  }
+                                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                  required
+                                >
+                                  <option value="">Select Legume Type</option>
+                                  <option value="Mung Bean">Mung Bean</option>
+                                  <option value="Peanut">Peanut</option>
+                                  <option value="Soybean">Soybean</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block mb-1 text-sm font-medium text-gray-700">
+                                  Quantity{" "}
+                                  <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                  type="number"
+                                  value={legumeDetail.quantity}
+                                  onChange={(e) =>
+                                    handleAdditionalLegumesChange(
+                                      index,
+                                      "quantity",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="Enter Quantity"
+                                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                  required
+                                />
+                              </div>
+                              <div className="flex items-end">
+                                {additionalLegumesDetails.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleRemoveAdditionalLegumes(index)
+                                    }
+                                    className="flex items-center justify-center w-full px-3 py-2 text-sm text-white bg-red-600 rounded-md hover:bg-red-700"
+                                  >
+                                    <svg
+                                      className="w-4 h-4 mr-1"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth="2"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                      ></path>
+                                    </svg>
+                                    Remove
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddAdditionalLegumes}
+                        className="flex items-center justify-center w-full px-4 py-2 border border-dashed rounded-md border-emerald-700 text-emerald-700 hover:bg-emerald-50"
+                      >
+                        <svg
+                          className="w-4 h-4 mr-2"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                          ></path>
+                        </svg>
+                        Add Legume Entry
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Banana Section */}
+                  {formData.crop_type === "Banana" && (
+                    <div className="col-span-1 sm:col-span-2">
+                      <div className="max-h-[500px] overflow-auto p-1 mb-4 hide-scrollbar">
+                        {additionalBananaDetails.map((bananaDetail, index) => (
+                          <div
+                            key={index}
+                            className="p-3 mb-3 bg-white border border-gray-300 border-dashed rounded-md"
+                          >
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                              <div>
+                                <label className="block mb-1 text-sm font-medium text-gray-700">
+                                  Banana Type{" "}
+                                  <span className="text-red-500">*</span>
+                                </label>
+                                <select
+                                  value={bananaDetail.banana_type}
+                                  onChange={(e) =>
+                                    handleAdditionalBananaChange(
+                                      index,
+                                      "banana_type",
+                                      e.target.value
+                                    )
+                                  }
+                                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                  required
+                                >
+                                  <option value="">Select Banana Type</option>
+                                  <option value="Lakatan">Lakatan</option>
+                                  <option value="Latundan">Latundan</option>
+                                  <option value="Cardava">Cardava</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block mb-1 text-sm font-medium text-gray-700">
+                                  Quantity{" "}
+                                  <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                  type="number"
+                                  value={bananaDetail.quantity}
+                                  onChange={(e) =>
+                                    handleAdditionalBananaChange(
+                                      index,
+                                      "quantity",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="Enter Quantity"
+                                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                  required
+                                />
+                              </div>
+                              <div className="flex items-end">
+                                {additionalBananaDetails.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleRemoveAdditionalBanana(index)
+                                    }
+                                    className="flex items-center justify-center w-full px-3 py-2 text-sm text-white bg-red-600 rounded-md hover:bg-red-700"
+                                  >
+                                    <svg
+                                      className="w-4 h-4 mr-1"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth="2"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                      ></path>
+                                    </svg>
+                                    Remove
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddAdditionalBanana}
+                        className="flex items-center justify-center w-full px-4 py-2 border border-dashed rounded-md border-emerald-700 text-emerald-700 hover:bg-emerald-50"
+                      >
+                        <svg
+                          className="w-4 h-4 mr-2"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                          ></path>
+                        </svg>
+                        Add Banana Entry
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Vegetable Section */}
+                  {formData.crop_type === "Vegetable" && (
+                    <div className="col-span-1 sm:col-span-2">
+                      <div className="max-h-[500px] overflow-auto p-1 mb-4 hide-scrollbar">
+                        {additionalVegetableDetails.map(
+                          (vegetableDetail, index) => (
                             <div
                               key={index}
                               className="p-3 mb-3 bg-white border border-gray-300 border-dashed rounded-md"
@@ -1696,33 +3160,60 @@ const AddData = () => {
                               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                 <div>
                                   <label className="block mb-1 text-sm font-medium text-gray-700">
-                                    Spice Type{" "}
+                                    Vegetable Type{" "}
                                     <span className="text-red-500">*</span>
                                   </label>
                                   <select
-                                    value={spiceDetail.spices_type}
+                                    value={vegetableDetail.vegetable_type}
                                     onChange={(e) =>
-                                      handleAdditionalSpiceChange(
+                                      handleAdditionalVegetableChange(
                                         index,
-                                        "spices_type",
+                                        "vegetable_type",
                                         e.target.value
                                       )
                                     }
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                                     required
                                   >
-                                    <option value="">Select Spice Type</option>
-                                    <option value="Black Pepper">
-                                      Black Pepper
+                                    <option value="">
+                                      Select Vegetable Type
                                     </option>
-                                    <option value="Ginger">Ginger</option>
-                                    <option value="Turmeric">Turmeric</option>
-                                    <option value="Lemongrass">
-                                      Lemongrass
+                                    <option value="Eggplant">Eggplant</option>
+                                    <option value="Ampalaya">Ampalaya</option>
+                                    <option value="Okra">Okra</option>
+                                    <option value="Pole Sitao">
+                                      Pole Sitao
                                     </option>
-                                    <option value="Chili">Chili</option>
+                                    <option value="Squash">Squash</option>
+                                    <option value="Tomato">Tomato</option>
+                                    <option value="Other Crop (specify)">
+                                      Other Crop (specify)
+                                    </option>
                                   </select>
                                 </div>
+                                {vegetableDetail.vegetable_type ===
+                                  "Other Crop (specify)" && (
+                                  <div>
+                                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                                      Specify Vegetable{" "}
+                                      <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={vegetableDetail.other_vegetable}
+                                      onChange={(e) =>
+                                        handleAdditionalVegetableChange(
+                                          index,
+                                          "other_vegetable",
+                                          e.target.value
+                                        )
+                                      }
+                                      placeholder="Specify Vegetable"
+                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                                      required
+                                    />
+                                  </div>
+                                )}
                                 <div>
                                   <label className="block mb-1 text-sm font-medium text-gray-700">
                                     Quantity{" "}
@@ -1730,9 +3221,9 @@ const AddData = () => {
                                   </label>
                                   <input
                                     type="number"
-                                    value={spiceDetail.quantity}
+                                    value={vegetableDetail.quantity}
                                     onChange={(e) =>
-                                      handleAdditionalSpiceChange(
+                                      handleAdditionalVegetableChange(
                                         index,
                                         "quantity",
                                         e.target.value
@@ -1744,11 +3235,11 @@ const AddData = () => {
                                   />
                                 </div>
                                 <div className="flex items-end">
-                                  {additionalSpiceDetails.length > 1 && (
+                                  {additionalVegetableDetails.length > 1 && (
                                     <button
                                       type="button"
                                       onClick={() =>
-                                        handleRemoveAdditionalSpice(index)
+                                        handleRemoveAdditionalVegetable(index)
                                       }
                                       className="flex items-center justify-center w-full px-3 py-2 text-sm text-white bg-red-600 rounded-md hover:bg-red-700"
                                     >
@@ -1772,419 +3263,111 @@ const AddData = () => {
                                 </div>
                               </div>
                             </div>
-                          ))}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleAddAdditionalSpice}
-                          className="flex items-center justify-center w-full px-4 py-2 border border-dashed rounded-md border-emerald-700 text-emerald-700 hover:bg-emerald-50"
-                        >
-                          <svg
-                            className="w-4 h-4 mr-2"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                            ></path>
-                          </svg>
-                          Add Spice Entry
-                        </button>
+                          )
+                        )}
                       </div>
-                    </>
-                  )}
-
-                  {/* Legumes Section */}
-                  {selectedCrop === "Legumes" && (
-                    <>
-                      <div className="col-span-1 sm:col-span-2">
-                        <div className="max-h-[500px] overflow-auto p-1 mb-4 hide-scrollbar">
-                          {additionalLegumesDetails.map(
-                            (legumeDetail, index) => (
-                              <div
-                                key={index}
-                                className="p-3 mb-3 bg-white border border-gray-300 border-dashed rounded-md"
-                              >
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                                  <div>
-                                    <label className="block mb-1 text-sm font-medium text-gray-700">
-                                      Legume Type{" "}
-                                      <span className="text-red-500">*</span>
-                                    </label>
-                                    <select
-                                      value={legumeDetail.legumes_type}
-                                      onChange={(e) =>
-                                        handleAdditionalLegumesChange(
-                                          index,
-                                          "legumes_type",
-                                          e.target.value
-                                        )
-                                      }
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                                      required
-                                    >
-                                      <option value="">
-                                        Select Legume Type
-                                      </option>
-                                      <option value="Mung Bean">
-                                        Mung Bean
-                                      </option>
-                                      <option value="Peanut">Peanut</option>
-                                      <option value="Soybean">Soybean</option>
-                                      <option value="Pigeon Pea">
-                                        Pigeon Pea
-                                      </option>
-                                      <option value="Cowpea">Cowpea</option>
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label className="block mb-1 text-sm font-medium text-gray-700">
-                                      Quantity{" "}
-                                      <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={legumeDetail.quantity}
-                                      onChange={(e) =>
-                                        handleAdditionalLegumesChange(
-                                          index,
-                                          "quantity",
-                                          e.target.value
-                                        )
-                                      }
-                                      placeholder="Enter Quantity"
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                                      required
-                                    />
-                                  </div>
-                                  <div className="flex items-end">
-                                    {additionalLegumesDetails.length > 1 && (
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleRemoveAdditionalLegumes(index)
-                                        }
-                                        className="flex items-center justify-center w-full px-3 py-2 text-sm text-white bg-red-600 rounded-md hover:bg-red-700"
-                                      >
-                                        <svg
-                                          className="w-4 h-4 mr-1"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          viewBox="0 0 24 24"
-                                          xmlns="http://www.w3.org/2000/svg"
-                                        >
-                                          <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth="2"
-                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                          ></path>
-                                        </svg>
-                                        Remove
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            )
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleAddAdditionalLegumes}
-                          className="flex items-center justify-center w-full px-4 py-2 border border-dashed rounded-md border-emerald-700 text-emerald-700 hover:bg-emerald-50"
+                      <button
+                        type="button"
+                        onClick={handleAddAdditionalVegetable}
+                        className="flex items-center justify-center w-full px-4 py-2 border border-dashed rounded-md border-emerald-700 text-emerald-700 hover:bg-emerald-50"
+                      >
+                        <svg
+                          className="w-4 h-4 mr-2"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          xmlns="http://www.w3.org/2000/svg"
                         >
-                          <svg
-                            className="w-4 h-4 mr-2"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                            ></path>
-                          </svg>
-                          Add Legume Entry
-                        </button>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Banana Section */}
-                  {selectedCrop === "Banana" && (
-                    <>
-                      <div className="col-span-1 sm:col-span-2">
-                        <div className="max-h-[500px] overflow-auto p-1 mb-4 hide-scrollbar">
-                          {additionalBananaDetails.map(
-                            (bananaDetail, index) => (
-                              <div
-                                key={index}
-                                className="p-3 mb-3 bg-white border border-gray-300 border-dashed rounded-md"
-                              >
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                                  <div>
-                                    <label className="block mb-1 text-sm font-medium text-gray-700">
-                                      Banana Type{" "}
-                                      <span className="text-red-500">*</span>
-                                    </label>
-                                    <select
-                                      value={bananaDetail.banana_type}
-                                      onChange={(e) =>
-                                        handleAdditionalBananaChange(
-                                          index,
-                                          "banana_type",
-                                          e.target.value
-                                        )
-                                      }
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                                      required
-                                    >
-                                      <option value="">
-                                        Select Banana Type
-                                      </option>
-                                      <option value="Lakatan">Lakatan</option>
-                                      <option value="Latundan">Latundan</option>
-                                      <option value="Cardava">Cardava</option>
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label className="block mb-1 text-sm font-medium text-gray-700">
-                                      Quantity{" "}
-                                      <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={bananaDetail.quantity}
-                                      onChange={(e) =>
-                                        handleAdditionalBananaChange(
-                                          index,
-                                          "quantity",
-                                          e.target.value
-                                        )
-                                      }
-                                      placeholder="Enter Quantity"
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                                      required
-                                    />
-                                  </div>
-                                  <div className="flex items-end">
-                                    {additionalBananaDetails.length > 1 && (
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleRemoveAdditionalBanana(index)
-                                        }
-                                        className="flex items-center justify-center w-full px-3 py-2 text-sm text-white bg-red-600 rounded-md hover:bg-red-700"
-                                      >
-                                        <svg
-                                          className="w-4 h-4 mr-1"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          viewBox="0 0 24 24"
-                                          xmlns="http://www.w3.org/2000/svg"
-                                        >
-                                          <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth="2"
-                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                          ></path>
-                                        </svg>
-                                        Remove
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            )
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleAddAdditionalBanana}
-                          className="flex items-center justify-center w-full px-4 py-2 border border-dashed rounded-md border-emerald-700 text-emerald-700 hover:bg-emerald-50"
-                        >
-                          <svg
-                            className="w-4 h-4 mr-2"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                            ></path>
-                          </svg>
-                          Add Banana Entry
-                        </button>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Vegetable Section */}
-                  {selectedCrop === "Vegetable" && (
-                    <>
-                      <div className="col-span-1 sm:col-span-2">
-                        <div className="max-h-[500px] overflow-auto p-1 mb-4 hide-scrollbar">
-                          {additionalVegetableDetails.map(
-                            (vegetableDetail, index) => (
-                              <div
-                                key={index}
-                                className="p-3 mb-3 bg-white border border-gray-300 border-dashed rounded-md"
-                              >
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                                  <div>
-                                    <label className="block mb-1 text-sm font-medium text-gray-700">
-                                      Vegetable Type{" "}
-                                      <span className="text-red-500">*</span>
-                                    </label>
-                                    <select
-                                      value={vegetableDetail.vegetable_type}
-                                      onChange={(e) =>
-                                        handleAdditionalVegetableChange(
-                                          index,
-                                          "vegetable_type",
-                                          e.target.value
-                                        )
-                                      }
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                                      required
-                                    >
-                                      <option value="">
-                                        Select Vegetable Type
-                                      </option>
-                                      <option value="Leafy Vegetables">
-                                        Leafy Vegetables
-                                      </option>
-                                      <option value="Root Vegetables">
-                                        Root Vegetables
-                                      </option>
-                                      <option value="Fruit Vegetables">
-                                        Fruit Vegetables
-                                      </option>
-                                      <option value="Tomato">Tomato</option>
-                                      <option value="Eggplant">Eggplant</option>
-                                      <option value="Okra">Okra</option>
-                                      <option value="Other Crop (specify)">
-                                        Other Crop (specify)
-                                      </option>
-                                    </select>
-                                  </div>
-                                  {vegetableDetail.vegetable_type ===
-                                    "Other Crop (specify)" && (
-                                    <div>
-                                      <label className="block mb-1 text-sm font-medium text-gray-700">
-                                        Specify Vegetable{" "}
-                                        <span className="text-red-500">*</span>
-                                      </label>
-                                      <input
-                                        type="text"
-                                        value={vegetableDetail.other_vegetable}
-                                        onChange={(e) =>
-                                          handleAdditionalVegetableChange(
-                                            index,
-                                            "other_vegetable",
-                                            e.target.value
-                                          )
-                                        }
-                                        placeholder="Specify Vegetable"
-                                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                                        required
-                                      />
-                                    </div>
-                                  )}
-                                  <div>
-                                    <label className="block mb-1 text-sm font-medium text-gray-700">
-                                      Quantity{" "}
-                                      <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={vegetableDetail.quantity}
-                                      onChange={(e) =>
-                                        handleAdditionalVegetableChange(
-                                          index,
-                                          "quantity",
-                                          e.target.value
-                                        )
-                                      }
-                                      placeholder="Enter Quantity"
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                                      required
-                                    />
-                                  </div>
-                                  <div className="flex items-end">
-                                    {additionalVegetableDetails.length > 1 && (
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleRemoveAdditionalVegetable(index)
-                                        }
-                                        className="flex items-center justify-center w-full px-3 py-2 text-sm text-white bg-red-600 rounded-md hover:bg-red-700"
-                                      >
-                                        <svg
-                                          className="w-4 h-4 mr-1"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          viewBox="0 0 24 24"
-                                          xmlns="http://www.w3.org/2000/svg"
-                                        >
-                                          <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth="2"
-                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                          ></path>
-                                        </svg>
-                                        Remove
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            )
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleAddAdditionalVegetable}
-                          className="flex items-center justify-center w-full px-4 py-2 border border-dashed rounded-md border-emerald-700 text-emerald-700 hover:bg-emerald-50"
-                        >
-                          <svg
-                            className="w-4 h-4 mr-2"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                            ></path>
-                          </svg>
-                          Add Vegetable Entry
-                        </button>
-                      </div>
-                    </>
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                          ></path>
+                        </svg>
+                        Add Vegetable Entry
+                      </button>
+                    </div>
                   )}
 
                   {/* Rice Details */}
-                  {selectedCrop === "Rice" && (
+                  {formData.crop_type === "Rice" && (
                     <>
+                      <div>
+                        <label className="block mb-1 text-sm font-medium text-gray-700">
+                          Area Type
+                        </label>
+                        <select
+                          name="area_type"
+                          value={formData.area_type}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                        >
+                          <option value="">Select Area Type</option>
+                          <option value="Irrigated">Irrigated</option>
+                          <option value="Rainfed">Rainfed</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block mb-1 text-sm font-medium text-gray-700">
+                          Seed Type
+                        </label>
+                        <select
+                          name="seed_type"
+                          value={formData.seed_type}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                        >
+                          <option value="">Select Seed Type</option>
+                          <option value="Certified">Certified</option>
+                          <option value="Good Seed">Good Seed</option>
+                          <option value="Hybrid">Hybrid</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block mb-1 text-sm font-medium text-gray-700">
+                          Area Harvested
+                        </label>
+                        <input
+                          type="number"
+                          name="area_harvested"
+                          value={formData.area_harvested}
+                          onChange={handleInputChange}
+                          placeholder="Enter area harvested"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block mb-1 text-sm font-medium text-gray-700">
+                          Production
+                        </label>
+                        <input
+                          type="number"
+                          name="production"
+                          value={formData.production}
+                          onChange={handleInputChange}
+                          placeholder="Enter production"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block mb-1 text-sm font-medium text-gray-700">
+                          Average Yield
+                        </label>
+                        <input
+                          type="number"
+                          name="ave_yield"
+                          value={formData.ave_yield}
+                          onChange={handleInputChange}
+                          placeholder="Enter average yield"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                        />
+                      </div>
+
                       <div className="col-span-1 sm:col-span-2">
                         <div className="max-h-[500px] overflow-auto p-1 mb-4 hide-scrollbar">
                           {additionalRiceDetails.map((riceDetail, index) => (
@@ -2213,6 +3396,7 @@ const AddData = () => {
                                     <option value="">Select Area Type</option>
                                     <option value="Irrigated">Irrigated</option>
                                     <option value="Rainfed">Rainfed</option>
+                                    <option value="Upland">Upland</option>
                                   </select>
                                 </div>
                                 <div>
@@ -2233,15 +3417,9 @@ const AddData = () => {
                                     required
                                   >
                                     <option value="">Select Seed Type</option>
-                                    <option value="Hybrid Seeds">
-                                      Hybrid Seeds
-                                    </option>
-                                    <option value="Certified Seeds">
-                                      Certified Seeds
-                                    </option>
-                                    <option value="Good Seeds">
-                                      Good Seeds
-                                    </option>
+                                    <option value="Certified">Certified</option>
+                                    <option value="Good Seed">Good Seed</option>
+                                    <option value="Hybrid">Hybrid</option>
                                   </select>
                                 </div>
                                 <div>
@@ -2364,16 +3542,15 @@ const AddData = () => {
             </div>
           )}
 
-          {/* Submit Button - Fixed at bottom on mobile */}
-          <div className="fixed bottom-0 left-0 right-0 z-10 p-4 bg-white border-t border-gray-200 md:static md:bg-transparent md:border-0 md:p-0 md:mt-6">
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex items-center justify-center w-full h-12 px-6 py-2 text-base text-white rounded-md shadow-md bg-emerald-700 hover:bg-emerald-800 md:w-auto"
-            >
-              {loading ? (
+          <button
+            type="submit"
+            disabled={loading || isProcessingImage}
+            className="fixed bottom-0 left-0 right-0 z-10 p-4 text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-gray-400 disabled:cursor-not-allowed md:static md:w-auto md:rounded-md md:px-6 md:py-2"
+          >
+            {loading ? (
+              <>
                 <svg
-                  className="w-5 h-5 text-white animate-spin"
+                  className="inline-block w-5 h-5 mr-2 animate-spin"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -2392,27 +3569,14 @@ const AddData = () => {
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-              ) : (
-                <>
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-                    ></path>
-                  </svg>
-                  Submit
-                </>
-              )}
-            </button>
-          </div>
+                Submitting...
+              </>
+            ) : isProcessingImage ? (
+              "Processing Image..."
+            ) : (
+              "Submit"
+            )}
+          </button>
         </form>
       </div>
     </div>

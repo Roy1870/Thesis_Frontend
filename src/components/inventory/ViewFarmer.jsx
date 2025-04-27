@@ -19,6 +19,14 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [viewingRemarks, setViewingRemarks] = useState(null);
   const [cropSubTab, setCropSubTab] = useState("regular"); // "regular" or "highValue"
+  // Add state for user role
+  const [userRole, setUserRole] = useState("");
+
+  // Load user role from localStorage
+  useEffect(() => {
+    const role = localStorage.getItem("role") || "";
+    setUserRole(role);
+  }, []);
 
   // Replace the fetchFarmerDetails function with a version that uses the passed data
   const fetchFarmerDetails = async (farmerId) => {
@@ -544,48 +552,55 @@ const ViewFarmer = ({ farmer, onClose, colors }) => {
             Back
           </button>
           <div className="flex gap-2">
-            <button
-              onClick={() => handleEdit(farmerData)}
-              className="inline-flex items-center rounded-md h-[30px] sm:h-[34px] shadow-sm bg-[#5A8C79] hover:bg-green-600 text-white px-2 sm:px-3 py-1 text-xs sm:text-sm"
-              style={{
-                backgroundColor: colors.warning,
-                borderColor: colors.warning,
-              }}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-3 h-3 mr-1 sm:w-4 sm:h-4"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-              </svg>
-              Edit
-            </button>
-            <button
-              onClick={() => {
-                if (
-                  confirm("Delete this farmer? This action cannot be undone.")
-                ) {
-                  handleDelete(farmerData.farmer_id);
-                }
-              }}
-              className="inline-flex items-center rounded-md h-[30px] sm:h-[34px] shadow-sm bg-red-600 hover:bg-red-700 text-white px-2 sm:px-3 py-1 text-xs sm:text-sm"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-3 h-3 mr-1 sm:w-4 sm:h-4"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Delete
-            </button>
+            {/* Only show edit and delete buttons if user is not a planner */}
+            {userRole !== "planner" && (
+              <>
+                <button
+                  onClick={() => handleEdit(farmerData)}
+                  className="inline-flex items-center rounded-md h-[30px] sm:h-[34px] shadow-sm bg-[#5A8C79] hover:bg-green-600 text-white px-2 sm:px-3 py-1 text-xs sm:text-sm"
+                  style={{
+                    backgroundColor: colors.warning,
+                    borderColor: colors.warning,
+                  }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-3 h-3 mr-1 sm:w-4 sm:h-4"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  </svg>
+                  Edit
+                </button>
+                <button
+                  onClick={() => {
+                    if (
+                      confirm(
+                        "Delete this farmer? This action cannot be undone."
+                      )
+                    ) {
+                      handleDelete(farmerData.farmer_id);
+                    }
+                  }}
+                  className="inline-flex items-center rounded-md h-[30px] sm:h-[34px] shadow-sm bg-red-600 hover:bg-red-700 text-white px-2 sm:px-3 py-1 text-xs sm:text-sm"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-3 h-3 mr-1 sm:w-4 sm:h-4"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  Delete
+                </button>
+              </>
+            )}
           </div>
         </div>
 

@@ -38,7 +38,7 @@ function Analytics() {
     setRefreshing,
     setLastRefresh,
     dataCache,
-    updateDataCache,
+    updateDataCache,  
   } = useRefreshStore();
   const [currentCategory, setCurrentCategory] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);

@@ -37,6 +37,7 @@ const Sidebar = () => {
   const [loading, setLoading] = useState(true);
   const [prefetchedRoutes, setPrefetchedRoutes] = useState({}); // Track which routes have been prefetched
   const navigate = useNavigate();
+  const [userRole, setUserRole] = useState(localStorage.getItem("role") || "");
 
   // Update selected key when location changes
   useEffect(() => {
@@ -86,6 +87,9 @@ const Sidebar = () => {
           localStorage.setItem("userId", userData.id.toString());
           localStorage.setItem("userName", userData.name);
           localStorage.setItem("role", userData.role);
+
+          // Set user role from API response
+          setUserRole(userData.role || "");
         }
       } catch (err) {
         console.error("Error fetching user data:", err);
@@ -319,27 +323,29 @@ const Sidebar = () => {
               {(!collapsed || mobile) && <span>Dashboard</span>}
             </button>
           </li>
-          <li>
-            <button
-              onClick={() => handleMenuClick("/add-data")}
-              className={`w-full flex items-center px-4 py-2 text-white hover:bg-[#5A8C79] ${
-                selectedKey === "/add-data" ? "bg-[#5A8C79]" : ""
-              }`}
-              onMouseEnter={() => {
-                // Prefetch on hover
-                if (!prefetchedRoutes["/add-data"]) {
-                  prefetchRouteData("/add-data");
-                  setPrefetchedRoutes((prev) => ({
-                    ...prev,
-                    ["/add-data"]: true,
-                  }));
-                }
-              }}
-            >
-              <FormOutlined className="mr-3" />
-              {(!collapsed || mobile) && <span>Data Entry</span>}
-            </button>
-          </li>
+          {localStorage.getItem("role") !== "planner" && (
+            <li>
+              <button
+                onClick={() => handleMenuClick("/add-data")}
+                className={`w-full flex items-center px-4 py-2 text-white hover:bg-[#5A8C79] ${
+                  selectedKey === "/add-data" ? "bg-[#5A8C79]" : ""
+                }`}
+                onMouseEnter={() => {
+                  // Prefetch on hover
+                  if (!prefetchedRoutes["/add-data"]) {
+                    prefetchRouteData("/add-data");
+                    setPrefetchedRoutes((prev) => ({
+                      ...prev,
+                      ["/add-data"]: true,
+                    }));
+                  }
+                }}
+              >
+                <FormOutlined className="mr-3" />
+                {(!collapsed || mobile) && <span>Data Entry</span>}
+              </button>
+            </li>
+          )}
           <li>
             <button
               onClick={() => handleMenuClick("/inventory")}

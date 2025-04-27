@@ -104,6 +104,9 @@ const Inventory = () => {
     cropType: "",
   });
 
+  // User role state
+  const [userRole, setUserRole] = useState("");
+
   // New refresh state
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(new Date());
@@ -230,6 +233,12 @@ const Inventory = () => {
     allData.length,
     loading,
   ]);
+
+  // Load user role from localStorage on mount
+  useEffect(() => {
+    const role = localStorage.getItem("role") || "";
+    setUserRole(role);
+  }, []);
 
   // Paginate data function - memoized with useCallback
   const paginateData = useCallback(() => {
@@ -967,11 +976,6 @@ const Inventory = () => {
     setCurrentPage(1);
   }, []);
 
-  const handleReset = useCallback((clearFilters) => {
-    clearFilters();
-    setSearchText("");
-  }, []);
-
   // Add a new state for tracking background refreshes
   const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
 
@@ -1460,20 +1464,24 @@ const Inventory = () => {
                 >
                   <EyeIcon className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
                 </button>
-                <button
-                  onClick={() => handleEdit(farmer)}
-                  className="text-[#FFA000] hover:text-opacity-70"
-                  title="Edit"
-                >
-                  <PencilIcon className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
-                </button>
-                <button
-                  onClick={() => setShowDeleteConfirm(farmer.farmer_id)}
-                  className="text-[#D32F2F] hover:text-opacity-70"
-                  title="Delete"
-                >
-                  <TrashIcon className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
-                </button>
+                {userRole !== "planner" && (
+                  <>
+                    <button
+                      onClick={() => handleEdit(farmer)}
+                      className="text-[#FFA000] hover:text-opacity-70"
+                      title="Edit"
+                    >
+                      <PencilIcon className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteConfirm(farmer.farmer_id)}
+                      className="text-[#D32F2F] hover:text-opacity-70"
+                      title="Delete"
+                    >
+                      <TrashIcon className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                    </button>
+                  </>
+                )}
               </div>
             </td>
           </tr>
@@ -1771,6 +1779,7 @@ const Inventory = () => {
     searchText,
     searchedColumn,
     selectedDataType,
+    userRole,
   ]);
 
   // Cleanup on unmount
