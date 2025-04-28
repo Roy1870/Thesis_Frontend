@@ -1358,7 +1358,9 @@ const AddData = () => {
           formattedData.association_organization =
             values.association_organization;
       }
+
       const currentUser = localStorage.getItem("userName") || "System";
+
       // Handle livestock records for Raiser type
       if (farmerType === "Raiser") {
         const livestockRecords = [];
@@ -1374,7 +1376,7 @@ const AddData = () => {
               animal_type: animalType,
               subcategory: subcategory,
               quantity: Number.parseInt(quantity, 10),
-              updated_by: currentUser, // You can replace this with the actual user name or ID
+              updated_by: currentUser,
             });
           }
         }
@@ -1396,7 +1398,8 @@ const AddData = () => {
           production_kg: values.production || "",
           date_of_harvest: values.date_of_harvest || "",
           remarks: values.remarks || "",
-          geotagged_photo_url: values.geotagged_photo_url || "",
+          operator_location_longitude: values.operator_location_longitude || "",
+          operator_location_latitude: values.operator_location_latitude || "",
         };
 
         // Only add operators array if at least one required field is provided
@@ -1649,6 +1652,8 @@ const AddData = () => {
         response = await farmerAPI.createFarmer(formattedData);
       }
 
+      console.log("API Response:", response);
+
       if (response) {
         setMessage({
           type: "success",
@@ -1715,7 +1720,7 @@ const AddData = () => {
       console.error("Error submitting data:", error);
       setMessage({
         type: "error",
-        content: "An error occurred while submitting the data.",
+        content: `An error occurred while submitting the data: ${error.message}`,
       });
     } finally {
       setLoading(false);
@@ -3348,81 +3353,6 @@ const AddData = () => {
                   {/* Rice Details */}
                   {formData.crop_type === "Rice" && (
                     <>
-                      <div>
-                        <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Area Type
-                        </label>
-                        <select
-                          name="area_type"
-                          value={formData.area_type}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                        >
-                          <option value="">Select Area Type</option>
-                          <option value="Irrigated">Irrigated</option>
-                          <option value="Rainfed">Rainfed</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Seed Type
-                        </label>
-                        <select
-                          name="seed_type"
-                          value={formData.seed_type}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                        >
-                          <option value="">Select Seed Type</option>
-                          <option value="Certified">Certified</option>
-                          <option value="Good Seed">Good Seed</option>
-                          <option value="Hybrid">Hybrid</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Area Harvested
-                        </label>
-                        <input
-                          type="number"
-                          name="area_harvested"
-                          value={formData.area_harvested}
-                          onChange={handleInputChange}
-                          placeholder="Enter area harvested"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Production
-                        </label>
-                        <input
-                          type="number"
-                          name="production"
-                          value={formData.production}
-                          onChange={handleInputChange}
-                          placeholder="Enter production"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block mb-1 text-sm font-medium text-gray-700">
-                          Average Yield
-                        </label>
-                        <input
-                          type="number"
-                          name="ave_yield"
-                          value={formData.ave_yield}
-                          onChange={handleInputChange}
-                          placeholder="Enter average yield"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-                        />
-                      </div>
-
                       <div className="col-span-1 sm:col-span-2">
                         <div className="max-h-[500px] overflow-auto p-1 mb-4 hide-scrollbar">
                           {additionalRiceDetails.map((riceDetail, index) => (
@@ -3600,7 +3530,7 @@ const AddData = () => {
           <button
             type="submit"
             disabled={loading || isProcessingImage}
-            className="fixed bottom-0 left-0 right-0 z-10 p-4 text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-gray-400 disabled:cursor-not-allowed md:static md:w-auto md:rounded-md md:px-6 md:py-2"
+            className="fixed bottom-0 left-0 right-0 z-10 p-4 text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-gray-400 disabled:cursor-not-allowed md:static md:w-auto md:rounded-md:px-6 md:py-2"
           >
             {loading ? (
               <>
