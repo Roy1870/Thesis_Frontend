@@ -1,46 +1,26 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-
+import { useState, useEffect } from "react";
 import {
   farmerAPI,
   livestockAPI,
   operatorAPI,
   prefetchRouteData,
 } from "./services/api";
-import {
-  BarChart2,
-  TrendingUp,
-  Sprout,
-  Award,
-  Calendar,
-  Activity,
-  ArrowUp,
-  ArrowDown,
-  User,
-  MilkIcon as Cow,
-  Fish,
-  RefreshCw,
-} from "lucide-react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  Legend,
-} from "recharts";
-
-// At the top of the file, import the shared store
 import { useRefreshStore } from "./shared-store";
+import { RefreshCw } from "lucide-react";
+
+// Import dashboard components
+import DashboardHeader from "./dashboard/dashboard-header";
+import DashboardStats from "./dashboard/dashboard-stats";
+import TopPerformers from "./dashboard/top-performers";
+import RecentHarvests from "./dashboard/recent-harvests";
+import { processRawData } from "./utils/data-processor";
+import CategoryBreakdown from "./dashboard/category-breakdown";
+import CategoryDetails from "./dashboard/category-details";
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
-  // REPLACE these lines:
-  // const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
-  // const [lastRefresh, setLastRefresh] = useState(new Date());
-
-  // WITH:
   const {
     isRefreshing,
     lastRefresh,
@@ -49,8 +29,6 @@ export default function Dashboard() {
     dataCache,
     updateDataCache,
   } = useRefreshStore();
-  // Use isRefreshing instead of isBackgroundRefreshing in your component
-  // And replace all instances of setIsBackgroundRefreshing with setRefreshing
   const [error, setError] = useState(null);
   const [rawData, setRawData] = useState({
     farmers: [],
@@ -72,439 +50,17 @@ export default function Dashboard() {
     totalArea: 0,
     farmerTypeDistribution: [],
     categoryData: {
-      livestock: {
-        total: 0,
-        items: [],
-      },
-      rice: {
-        total: 0,
-        items: [],
-      },
-      banana: {
-        total: 0,
-        items: [],
-      },
-      legumes: {
-        total: 0,
-        items: [],
-      },
-      spices: {
-        total: 0,
-        items: [],
-      },
-      fish: {
-        total: 0,
-        items: [],
-      },
-      highValueCrops: {
-        total: 0,
-        items: [],
-      },
+      livestock: { total: 0, items: [] },
+      rice: { total: 0, items: [] },
+      banana: { total: 0, items: [] },
+      legumes: { total: 0, items: [] },
+      spices: { total: 0, items: [] },
+      fish: { total: 0, items: [] },
+      highValueCrops: { total: 0, items: [] },
     },
   });
 
-  // Add this state variable near the other state declarations
-  const [selectedDataType, setSelectedDataType] = useState("Total");
-  const [selectedMonthlyDataType, setSelectedMonthlyDataType] =
-    useState("Total");
-  // Add these state variables near the other state declarations (after the selectedMonthlyDataType state)
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedBarangayMonth, setSelectedBarangayMonth] = useState("All");
-  const [selectedBarangayYear, setSelectedBarangayYear] = useState(
-    new Date().getFullYear()
-  );
-  const [currentBarangayDataIndex, setCurrentBarangayDataIndex] = useState(0);
-
-  // Add this new function to the component to get data by type:
-  const getBarangayDataByType = useCallback(
-    (dataType, month = selectedBarangayMonth, year = selectedBarangayYear) => {
-      // If no data is available, return empty array
-      if (!rawData || Object.values(rawData).every((arr) => arr.length === 0)) {
-        return [];
-      }
-
-      const barangayMap = {};
-
-      // Helper function to add data to the barangay map
-      const addToBarangayMap = (item, value, barangay, date) => {
-        if (isNaN(value) || value <= 0) return;
-
-        // Skip if date is not provided
-        if (!date) return;
-
-        // Filter by month and year
-        const itemDate = new Date(date);
-        const itemYear = itemDate.getFullYear();
-        const itemMonth = itemDate.toLocaleString("en-US", { month: "short" });
-
-        // Skip if year doesn't match
-        if (year !== itemYear) return;
-
-        // Skip if month doesn't match (unless "All" is selected)
-        if (month !== "All" && month !== itemMonth) return;
-
-        barangay = barangay || item.barangay || "Unknown";
-
-        if (!barangayMap[barangay]) {
-          barangayMap[barangay] = 0;
-        }
-
-        barangayMap[barangay] += value;
-      };
-
-      // Process data based on selected type
-      if (dataType === "Total" || dataType === "Livestock") {
-        // Add livestock data
-        rawData.livestock.forEach((livestock) => {
-          const quantity = Number.parseInt(livestock.quantity || 0);
-          if (dataType === "Total" || dataType === "Livestock") {
-            addToBarangayMap(
-              livestock,
-              quantity,
-              livestock.barangay,
-              livestock.created_at
-            );
-          }
-        });
-      }
-
-      if (dataType === "Total" || dataType === "Rice") {
-        // Add rice data
-        rawData.rice.forEach((rice) => {
-          const production = Number.parseFloat(
-            rice.production || rice.yield_amount || 0
-          );
-          if (dataType === "Total" || dataType === "Rice") {
-            addToBarangayMap(
-              rice,
-              production,
-              rice.barangay,
-              rice.harvest_date
-            );
-          }
-        });
-      }
-
-      if (dataType === "Total" || dataType === "Crops") {
-        // Add crops data (including high value crops)
-        rawData.crops.forEach((crop) => {
-          const production = Number.parseFloat(
-            crop.yield_amount || crop.production || crop.quantity || 0
-          );
-          if (dataType === "Total" || dataType === "Crops") {
-            addToBarangayMap(
-              crop,
-              production,
-              crop.barangay,
-              crop.harvest_date
-            );
-          }
-        });
-
-        // Add high value crops
-        rawData.highValueCrops.forEach((crop) => {
-          const production = Number.parseFloat(
-            crop.yield_amount || crop.production || crop.quantity || 0
-          );
-          if (dataType === "Total" || dataType === "Crops") {
-            addToBarangayMap(
-              crop,
-              production,
-              crop.barangay,
-              crop.harvest_date
-            );
-          }
-        });
-      }
-
-      if (dataType === "Total" || dataType === "Fish") {
-        // Add fish data from operators
-        rawData.operators.forEach((operator) => {
-          const production = Number.parseFloat(operator.production_kg || 0);
-          if (dataType === "Total" || dataType === "Fish") {
-            addToBarangayMap(
-              operator,
-              production,
-              operator.barangay,
-              operator.date_of_harvest
-            );
-          }
-        });
-      }
-
-      // Convert to array format for chart
-      return Object.entries(barangayMap)
-        .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 8); // Top 8 barangays
-    },
-    [rawData, selectedBarangayMonth, selectedBarangayYear]
-  );
-
-  // Add this function near the getBarangayDataByType function
-  const getMonthlyDataByType = useCallback(
-    (dataType, year = selectedYear) => {
-      // If no data is available, return empty array
-      if (!rawData || Object.values(rawData).every((arr) => arr.length === 0)) {
-        return [];
-      }
-
-      const monthlyProductionMap = {
-        Jan: 0,
-        Feb: 0,
-        Mar: 0,
-        Apr: 0,
-        May: 0,
-        Jun: 0,
-        Jul: 0,
-        Aug: 0,
-        Sep: 0,
-        Oct: 0,
-        Nov: 0,
-        Dec: 0,
-      };
-
-      // Process data based on selected type
-      if (dataType === "Total" || dataType === "Rice") {
-        // Add rice production to monthly data
-        rawData.rice.forEach((rice) => {
-          if (rice.harvest_date) {
-            const harvestDate = new Date(rice.harvest_date);
-            // Filter by year
-            if (harvestDate.getFullYear() === year) {
-              const month = harvestDate.toLocaleString("en-US", {
-                month: "short",
-              });
-              const production = Number.parseFloat(
-                rice.production || rice.yield_amount || 0
-              );
-              if (!isNaN(production) && production > 0) {
-                monthlyProductionMap[month] =
-                  (monthlyProductionMap[month] || 0) + production;
-              }
-            }
-          }
-        });
-      }
-
-      if (dataType === "Total" || dataType === "Crops") {
-        // Add crop production to monthly data
-        rawData.crops.forEach((crop) => {
-          if (crop.harvest_date) {
-            const harvestDate = new Date(crop.harvest_date);
-            // Filter by year
-            if (harvestDate.getFullYear() === year) {
-              const month = harvestDate.toLocaleString("en-US", {
-                month: "short",
-              });
-              const production = Number.parseFloat(
-                crop.yield_amount || crop.production || crop.quantity || 0
-              );
-              if (!isNaN(production) && production > 0) {
-                monthlyProductionMap[month] =
-                  (monthlyProductionMap[month] || 0) + production;
-              }
-            }
-          }
-        });
-
-        // Add high value crops to monthly data
-        rawData.highValueCrops.forEach((crop) => {
-          if (crop.harvest_date) {
-            const harvestDate = new Date(crop.harvest_date);
-            // Filter by year
-            if (harvestDate.getFullYear() === year) {
-              const month = harvestDate.toLocaleString("en-US", {
-                month: "short",
-              });
-              const production = Number.parseFloat(
-                crop.yield_amount || crop.production || crop.quantity || 0
-              );
-              if (!isNaN(production) && production > 0) {
-                monthlyProductionMap[month] =
-                  (monthlyProductionMap[month] || 0) + production;
-              }
-            }
-          }
-        });
-      }
-
-      if (dataType === "Total" || dataType === "Fish") {
-        // Add fish production to monthly data
-        rawData.operators.forEach((operator) => {
-          if (operator.date_of_harvest) {
-            const harvestDate = new Date(operator.date_of_harvest);
-            // Filter by year
-            if (harvestDate.getFullYear() === year) {
-              const month = harvestDate.toLocaleString("en-US", {
-                month: "short",
-              });
-              const production = Number.parseFloat(operator.production_kg || 0);
-              if (!isNaN(production) && production > 0) {
-                monthlyProductionMap[month] =
-                  (monthlyProductionMap[month] || 0) + production;
-              }
-            }
-          }
-        });
-      }
-
-      // In the getMonthlyDataByType function, replace the livestock section with this:
-      if (dataType === "Total" || dataType === "Livestock") {
-        // Add livestock data to monthly data
-        rawData.livestock.forEach((livestock) => {
-          if (livestock.created_at) {
-            const addedDate = new Date(livestock.created_at);
-            // Filter by year
-            if (addedDate.getFullYear() === year) {
-              const month = addedDate.toLocaleString("en-US", {
-                month: "short",
-              });
-              const quantity = Number.parseInt(livestock.quantity || 0);
-              if (!isNaN(quantity) && quantity > 0) {
-                monthlyProductionMap[month] =
-                  (monthlyProductionMap[month] || 0) + quantity;
-              }
-            }
-          }
-        });
-      }
-
-      // Convert monthly production to array for chart
-      const monthOrder = [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ];
-      return monthOrder.map((month) => ({
-        name: month,
-        production: monthlyProductionMap[month] || 0,
-      }));
-    },
-    [rawData, selectedYear]
-  );
-
-  // Add this function to get available years from the data
-  const getAvailableYears = useCallback(() => {
-    const years = new Set();
-    const currentYear = new Date().getFullYear();
-
-    // Add current and previous year as defaults
-    years.add(currentYear);
-    years.add(currentYear - 1);
-
-    // Extract years from rice data
-    rawData.rice.forEach((rice) => {
-      if (rice.harvest_date) {
-        const year = new Date(rice.harvest_date).getFullYear();
-        years.add(year);
-      }
-    });
-
-    // Extract years from crops data
-    rawData.crops.forEach((crop) => {
-      if (crop.harvest_date) {
-        const year = new Date(crop.harvest_date).getFullYear();
-        years.add(year);
-      }
-    });
-
-    // Extract years from high value crops data
-    rawData.highValueCrops.forEach((crop) => {
-      if (crop.harvest_date) {
-        const year = new Date(crop.harvest_date).getFullYear();
-        years.add(year);
-      }
-    });
-
-    // Extract years from operators data
-    rawData.operators.forEach((operator) => {
-      if (operator.date_of_harvest) {
-        const year = new Date(operator.date_of_harvest).getFullYear();
-        years.add(year);
-      }
-    });
-
-    // Extract years from livestock data
-    rawData.livestock.forEach((livestock) => {
-      if (livestock.created_at) {
-        const year = new Date(livestock.created_at).getFullYear();
-        years.add(year);
-      }
-    });
-
-    // Convert Set to sorted array
-    return Array.from(years).sort((a, b) => b - a);
-  }, [rawData]);
-
-  // Ref for cleanup
-  const abortControllerRef = useRef(null);
-
-  // Theme colors - memoized to prevent recreating on each render
-  const colors = useMemo(
-    () => ({
-      primary: "#6A9C89",
-      primaryLight: "#8DB5A5",
-      primaryDark: "#4A7C69",
-      secondary: "#E6F5E4",
-      accent: "#4F6F7D",
-      accentLight: "#6F8F9D",
-      error: "#D32F2F",
-      warning: "#FFA000",
-      success: "#388E3C",
-      info: "#0288D1",
-      textDark: "#333333",
-      textLight: "#666666",
-      border: "#E0E0E0",
-      background: "#F5F7F9",
-      cardBg: "#FFFFFF",
-      raiser: "#8884d8",
-      operator: "#82ca9d",
-      grower: "#ffc658",
-    }),
-    []
-  );
-
-  // Colors for pie chart - memoized
-  const COLORS = useMemo(
-    () => [
-      colors.primary,
-      colors.accent,
-      colors.success,
-      colors.warning,
-      colors.info,
-      "#8884d8",
-      colors.primaryLight,
-      colors.accentLight,
-    ],
-    [colors]
-  );
-
-  // Get current date with month name and year - memoized
-  const formattedDate = useMemo(() => {
-    const currentDate = new Date();
-    const options = { year: "numeric", month: "long", day: "numeric" };
-    return currentDate.toLocaleDateString("en-US", options);
-  }, []);
-
-  // Format number with commas - memoized
-  const formatNumber = useCallback((num) => {
-    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  }, []);
-
-  // In the Dashboard component, update the useEffect that fetches data to check the cache first
-  // Find the useEffect with fetchAllData and add this code before fetchAllData:
-
-  // Fetch data with AbortController for cleanup
+  // Fetch data on component mount
   useEffect(() => {
     // Check if we have data in the cache first
     if (Object.values(dataCache).some((arr) => arr.length > 0)) {
@@ -526,48 +82,37 @@ export default function Dashboard() {
   // Process raw data when it changes
   useEffect(() => {
     if (Object.values(rawData).every((arr) => arr.length === 0)) return;
-    processData();
+    const processedData = processRawData(rawData);
+    setDashboardData(processedData);
   }, [rawData]);
 
-  // Prefetch data for other routes when dashboard is loaded
+  // Prefetch data for other routes
   useEffect(() => {
-    // Prefetch inventory data when dashboard is loaded
     prefetchRouteData("/inventory");
 
-    // Prefetch analytics data with a delay to avoid overwhelming the network
     const analyticsTimer = setTimeout(() => {
       prefetchRouteData("/analytics");
-    }, 5000); // 5 second delay
+    }, 5000);
 
     return () => {
       clearTimeout(analyticsTimer);
     };
   }, []);
 
-  // Add polling mechanism to check for data changes
+  // Set up polling for data updates
   useEffect(() => {
-    // Set up polling interval to check for new data
     const pollInterval = setInterval(() => {
-      // Only poll if not already refreshing
       if (!isRefreshing) {
-        // Create a new AbortController for this request
-        if (abortControllerRef.current) {
-          abortControllerRef.current.abort();
-        }
-        abortControllerRef.current = new AbortController();
-        const signal = abortControllerRef.current.signal;
-
-        // Set background refreshing state
         setRefreshing(true);
 
-        // Fetch fresh data
+        const controller = new AbortController();
+        const signal = controller.signal;
+
         fetchAllData(signal, true)
           .then(() => {
-            // Update last refresh timestamp
             setLastRefresh(new Date());
           })
           .catch((err) => {
-            // Only log error if not an abort error
             if (err.name !== "AbortError") {
               console.error("Error during auto-refresh:", err);
             }
@@ -583,25 +128,22 @@ export default function Dashboard() {
     };
   }, [isRefreshing, setRefreshing, setLastRefresh]);
 
-  // Fetch all data using optimized approach with signal for cancellation
+  // Fetch all data
   const fetchAllData = async (signal, forceRefresh = false) => {
     try {
-      // Check if this is an initial load (no data yet)
       const isInitialLoad = Object.values(rawData).every(
         (arr) => arr.length === 0
       );
 
-      // Only show full loading state when there's no data yet
       if (isInitialLoad) {
         setLoading(true);
       } else {
-        // For subsequent loads, use background refreshing
         setRefreshing(true);
       }
 
       setError(null);
 
-      // Use Promise.all to fetch data in parallel
+      // Fetch data in parallel
       const [farmersResponse, livestockResponse, operatorsResponse] =
         await Promise.all([
           farmerAPI.getAllFarmers(1, 1000, "", [], signal),
@@ -630,7 +172,7 @@ export default function Dashboard() {
         farmersMap[farmer.farmer_id] = farmer;
       });
 
-      // Extract crops from farmers - process in batches for better performance
+      // Extract crops from farmers
       const crops = [];
       const rice = [];
       const highValueCrops = [];
@@ -717,7 +259,7 @@ export default function Dashboard() {
         }
       });
 
-      // Enrich livestock records with farmer information using the map for faster lookup
+      // Enrich livestock records with farmer information
       const enrichedLivestock = livestock.map((record) => {
         const farmer = farmersMap[record.farmer_id];
         return {
@@ -730,7 +272,7 @@ export default function Dashboard() {
         };
       });
 
-      // Enrich operators with farmer information using the map for faster lookup
+      // Enrich operators with farmer information
       const enrichedOperators = operators.map((record) => {
         const farmer = farmersMap[record.farmer_id];
         return {
@@ -744,39 +286,33 @@ export default function Dashboard() {
       });
 
       // Store all the fetched and processed data
-      setRawData({
+      const newData = {
         farmers,
         livestock: enrichedLivestock,
         operators: enrichedOperators,
         crops,
         rice,
         highValueCrops,
-      });
+      };
 
-      // Add this line after setting rawData:
-      // Add this line to update the shared store
-      updateDataCache({
-        farmers,
-        livestock: enrichedLivestock,
-        operators: enrichedOperators,
-        crops,
-        rice,
-        highValueCrops,
-      });
+      setRawData(newData);
+      updateDataCache(newData);
 
-      // Always turn off loading states when done
+      // Turn off loading states
       setLoading(false);
       setRefreshing(false);
 
       // Update last refresh timestamp
       setLastRefresh(new Date());
+
+      return newData;
     } catch (error) {
-      // Only set error if not an abort error (which happens during cleanup)
+      // Only set error if not an abort error
       if (error.name !== "AbortError") {
         console.error("Error fetching data:", error);
         setError(error.message);
 
-        // Check if this is an initial load (no data yet)
+        // Check if this is an initial load
         const isInitialLoad = Object.values(rawData).every(
           (arr) => arr.length === 0
         );
@@ -788,1022 +324,12 @@ export default function Dashboard() {
           setRefreshing(false);
         }
       }
+      throw error;
     }
   };
 
-  // Add a function to handle real-time updates from API changes
-  const handleDataChange = useCallback(() => {
-    // Only refresh if not already refreshing
-    if (!isRefreshing) {
-      // Create a new AbortController for this request
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      abortControllerRef.current = new AbortController();
-      const signal = abortControllerRef.current.signal;
-
-      // Set background refreshing state
-      setRefreshing(true);
-
-      // Fetch fresh data with explicit background refresh flag
-      fetchAllData(signal, true)
-        .then(() => {
-          setLastRefresh(new Date());
-        })
-        .catch((err) => {
-          if (err.name !== "AbortError") {
-            console.error("Error during data change refresh:", err);
-          }
-        })
-        .finally(() => {
-          setRefreshing(false);
-        });
-    }
-  }, [isRefreshing, setRefreshing, setLastRefresh]);
-
-  // Process all data for dashboard - memoized to prevent unnecessary recalculations
-  const processData = useCallback(() => {
-    try {
-      // Process data for each category
-      const categoryData = {
-        livestock: processLivestockData(),
-        rice: processRiceData(),
-        banana: processBananaData(),
-        legumes: processLegumesData(),
-        spices: processSpicesData(),
-        fish: processFishData(),
-        highValueCrops: processHighValueCropsData(),
-      };
-
-      // Calculate total production across all categories
-      const totalProduction = Object.values(categoryData).reduce(
-        (sum, category) => sum + category.total,
-        0
-      );
-
-      // Process data for crop production pie chart
-      const cropProduction = [];
-      Object.entries(categoryData).forEach(([category, data]) => {
-        if (data.total > 0) {
-          cropProduction.push({
-            name: getCategoryName(category),
-            value: data.total,
-          });
-        }
-      });
-
-      // Process data for monthly production
-      const monthlyProductionMap = {
-        Jan: 0,
-        Feb: 0,
-        Mar: 0,
-        Apr: 0,
-        May: 0,
-        Jun: 0,
-        Jul: 0,
-        Aug: 0,
-        Sep: 0,
-        Oct: 0,
-        Nov: 0,
-        Dec: 0,
-      };
-
-      // Add rice production to monthly data
-      rawData.rice.forEach((rice) => {
-        if (rice.harvest_date) {
-          const harvestDate = new Date(rice.harvest_date);
-          const month = harvestDate.toLocaleString("en-US", { month: "short" });
-          const production = Number.parseFloat(
-            rice.production || rice.yield_amount || 0
-          );
-          if (!isNaN(production) && production > 0) {
-            monthlyProductionMap[month] =
-              (monthlyProductionMap[month] || 0) + production;
-          }
-        }
-      });
-
-      // Add crop production to monthly data
-      rawData.crops.forEach((crop) => {
-        if (crop.harvest_date) {
-          const harvestDate = new Date(crop.harvest_date);
-          const month = harvestDate.toLocaleString("en-US", { month: "short" });
-          const production = Number.parseFloat(
-            crop.yield_amount || crop.production || crop.quantity || 0
-          );
-          if (!isNaN(production) && production > 0) {
-            monthlyProductionMap[month] =
-              (monthlyProductionMap[month] || 0) + production;
-          }
-        }
-      });
-
-      // Add high value crops to monthly data
-      rawData.highValueCrops.forEach((crop) => {
-        if (crop.harvest_date) {
-          const harvestDate = new Date(crop.harvest_date);
-          const month = harvestDate.toLocaleString("en-US", { month: "short" });
-          const production = Number.parseFloat(
-            crop.yield_amount || crop.production || crop.quantity || 0
-          );
-          if (!isNaN(production) && production > 0) {
-            monthlyProductionMap[month] =
-              (monthlyProductionMap[month] || 0) + production;
-          }
-        }
-      });
-
-      // Add fish production to monthly data
-      rawData.operators.forEach((operator) => {
-        if (operator.date_of_harvest) {
-          const harvestDate = new Date(operator.date_of_harvest);
-          const month = harvestDate.toLocaleString("en-US", { month: "short" });
-          const production = Number.parseFloat(operator.production_kg || 0);
-          if (!isNaN(production) && production > 0) {
-            monthlyProductionMap[month] =
-              (monthlyProductionMap[month] || 0) + production;
-          }
-        }
-      });
-
-      // Convert monthly production to array for chart
-      const monthOrder = [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ];
-      const monthlyProduction = monthOrder.map((month) => ({
-        name: month,
-        production: monthlyProductionMap[month] || 0,
-      }));
-
-      // Process data for production by barangay
-      const barangayProductionMap = {};
-
-      // Add all sources of production to barangay map
-      const addToBarangayMap = (item, production) => {
-        if (isNaN(production) || production <= 0) return;
-
-        const barangay = item.barangay || "Unknown";
-        barangayProductionMap[barangay] =
-          (barangayProductionMap[barangay] || 0) + production;
-      };
-
-      // Process all data sources in parallel using batch processing
-      // Rice production
-      for (let i = 0; i < rawData.rice.length; i++) {
-        const rice = rawData.rice[i];
-        const production = Number.parseFloat(
-          rice.production || rice.yield_amount || 0
-        );
-        addToBarangayMap(rice, production);
-      }
-
-      // Crop production
-      for (let i = 0; i < rawData.crops.length; i++) {
-        const crop = rawData.crops[i];
-        const production = Number.parseFloat(
-          crop.yield_amount || crop.production || crop.quantity || 0
-        );
-        addToBarangayMap(crop, production);
-      }
-
-      // High value crop production
-      for (let i = 0; i < rawData.highValueCrops.length; i++) {
-        const crop = rawData.highValueCrops[i];
-        const production = Number.parseFloat(
-          crop.yield_amount || crop.production || crop.quantity || 0
-        );
-        addToBarangayMap(crop, production);
-      }
-
-      // Livestock production
-      for (let i = 0; i < rawData.livestock.length; i++) {
-        const livestock = rawData.livestock[i];
-        const quantity = Number.parseInt(livestock.quantity || 0);
-        addToBarangayMap(livestock, quantity);
-      }
-
-      // Operator production
-      for (let i = 0; i < rawData.operators.length; i++) {
-        const operator = rawData.operators[i];
-        const production = Number.parseFloat(operator.production_kg || 0);
-        addToBarangayMap(operator, production);
-      }
-
-      // Convert barangay production to array for chart
-      const productionByBarangay = Object.entries(barangayProductionMap)
-        .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 8); // Top 8 barangays
-
-      // Get top performing crops
-      const allItems = [];
-
-      // Combine all items from all categories
-      Object.entries(categoryData).forEach(([category, data]) => {
-        data.items.forEach((item) => {
-          // Add category information to each item
-          allItems.push({
-            ...item,
-            category: category, // Add category field to track the source
-          });
-        });
-      });
-
-      // Sort by value and take top 5
-      const topPerformingItems = allItems
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 5);
-
-      // Calculate total area
-      let totalArea = 0;
-
-      // Add rice area
-      rawData.rice.forEach((rice) => {
-        const area = Number.parseFloat(rice.area_harvested || rice.area || 0);
-        if (!isNaN(area) && area > 0) {
-          totalArea += area;
-        }
-      });
-
-      // Add crop area
-      rawData.crops.forEach((crop) => {
-        const area = Number.parseFloat(crop.area_hectare || crop.area || 0);
-        if (!isNaN(area) && area > 0) {
-          totalArea += area;
-        }
-      });
-
-      // Add high value crop area
-      rawData.highValueCrops.forEach((crop) => {
-        const area = Number.parseFloat(crop.area_hectare || crop.area || 0);
-        if (!isNaN(area) && area > 0) {
-          totalArea += area;
-        }
-      });
-
-      // Add operator area
-      rawData.operators.forEach((operator) => {
-        const area =
-          Number.parseFloat(operator.productive_area_sqm || 0) / 10000; // Convert sqm to hectares
-        if (!isNaN(area) && area > 0) {
-          totalArea += area;
-        }
-      });
-
-      // Calculate production trend (year over year)
-      const currentYear = new Date().getFullYear();
-      const lastYear = currentYear - 1;
-      let currentYearProduction = 0;
-      let lastYearProduction = 0;
-
-      // Function to add to yearly production
-      const addToYearlyProduction = (date, production) => {
-        if (!date || isNaN(production) || production <= 0) return;
-
-        const year = new Date(date).getFullYear();
-        if (year === currentYear) {
-          currentYearProduction += production;
-        } else if (year === lastYear) {
-          lastYearProduction += production;
-        }
-      };
-
-      // Process all data sources in parallel for yearly production
-      // Rice production
-      for (let i = 0; i < rawData.rice.length; i++) {
-        const rice = rawData.rice[i];
-        const production = Number.parseFloat(
-          rice.production || rice.yield_amount || 0
-        );
-        addToYearlyProduction(rice.harvest_date || rice.created_at, production);
-      }
-
-      // Crop production
-      for (let i = 0; i < rawData.crops.length; i++) {
-        const crop = rawData.crops[i];
-        const production = Number.parseFloat(
-          crop.yield_amount || crop.production || crop.quantity || 0
-        );
-        addToYearlyProduction(crop.harvest_date || crop.created_at, production);
-      }
-
-      // High value crop production
-      for (let i = 0; i < rawData.highValueCrops.length; i++) {
-        const crop = rawData.highValueCrops[i];
-        const production = Number.parseFloat(
-          crop.yield_amount || crop.production || crop.quantity || 0
-        );
-        addToYearlyProduction(crop.harvest_date || crop.created_at, production);
-      }
-
-      // Operator production
-      for (let i = 0; i < rawData.operators.length; i++) {
-        const operator = rawData.operators[i];
-        const production = Number.parseFloat(operator.production_kg || 0);
-        addToYearlyProduction(
-          operator.date_of_harvest || operator.created_at,
-          production
-        );
-      }
-
-      // Calculate production trend percentage
-      const productionTrend =
-        lastYearProduction > 0
-          ? ((currentYearProduction - lastYearProduction) /
-              lastYearProduction) *
-            100
-          : 0;
-
-      // Prepare recent harvests data
-      const allHarvests = [];
-
-      // Add rice harvests
-      rawData.rice.forEach((rice) => {
-        const production = Number.parseFloat(
-          rice.production || rice.yield_amount || 0
-        );
-        if (production > 0) {
-          allHarvests.push({
-            id: rice.id || Math.random().toString(),
-            farmer_id: rice.farmer_id,
-            farmer_name: rice.farmer_name,
-            type: "Grower",
-            crop_type: rice.variety || rice.seed_type || "Rice",
-            yield_amount: production,
-            area: Number.parseFloat(rice.area_harvested || rice.area || 0),
-            yield_per_hectare:
-              rice.area_harvested > 0
-                ? (
-                    production / Number.parseFloat(rice.area_harvested || 1)
-                  ).toFixed(2)
-                : "N/A",
-            harvest_date: new Date(
-              rice.harvest_date || rice.created_at || new Date()
-            ),
-            barangay: rice.barangay,
-          });
-        }
-      });
-
-      // Add crop harvests
-      rawData.crops.forEach((crop) => {
-        const yield_amount = Number.parseFloat(
-          crop.yield_amount || crop.production || crop.quantity || 0
-        );
-        if (yield_amount > 0) {
-          allHarvests.push({
-            id: crop.id || Math.random().toString(),
-            farmer_id: crop.farmer_id,
-            farmer_name: crop.farmer_name,
-            type: "Grower",
-            crop_type: crop.crop_type || crop.crop_value || "Crop",
-            yield_amount: yield_amount,
-            area: Number.parseFloat(crop.area_hectare || crop.area || 0),
-            yield_per_hectare:
-              crop.area_hectare > 0
-                ? (
-                    yield_amount / Number.parseFloat(crop.area_hectare || 1)
-                  ).toFixed(2)
-                : "N/A",
-            harvest_date: new Date(
-              crop.harvest_date || crop.created_at || new Date()
-            ),
-            barangay: crop.barangay,
-          });
-        }
-      });
-
-      // Add high value crop harvests
-      rawData.highValueCrops.forEach((crop) => {
-        const yield_amount = Number.parseFloat(
-          crop.yield_amount || crop.production || crop.quantity || 0
-        );
-        if (yield_amount > 0) {
-          allHarvests.push({
-            id: crop.id || Math.random().toString(),
-            farmer_id: crop.farmer_id,
-            farmer_name: crop.farmer_name,
-            type: "Grower",
-            crop_type: crop.crop_value || "High Value Crop",
-            yield_amount: yield_amount,
-            area: Number.parseFloat(crop.area_hectare || crop.area || 0),
-            yield_per_hectare:
-              crop.area_hectare > 0
-                ? (
-                    yield_amount / Number.parseFloat(crop.area_hectare || 1)
-                  ).toFixed(2)
-                : "N/A",
-            harvest_date: new Date(
-              crop.harvest_date || crop.created_at || new Date()
-            ),
-            barangay: crop.barangay,
-          });
-        }
-      });
-
-      // Add operator harvests
-      rawData.operators.forEach((operator) => {
-        const production = Number.parseFloat(operator.production_kg || 0);
-        if (production > 0) {
-          allHarvests.push({
-            id: operator.id || Math.random().toString(),
-            farmer_id: operator.farmer_id,
-            farmer_name: operator.farmer_name,
-            type: "Operator",
-            crop_type: operator.cultured_species || "Fish",
-            yield_amount: production,
-            area: Number.parseFloat(operator.productive_area_sqm || 0) / 10000, // Convert sqm to hectares
-            yield_per_hectare:
-              operator.productive_area_sqm > 0
-                ? (
-                    (production * 10000) /
-                    Number.parseFloat(operator.productive_area_sqm || 1)
-                  ).toFixed(2)
-                : "N/A",
-            harvest_date: new Date(
-              operator.date_of_harvest || operator.created_at || new Date()
-            ),
-            barangay: operator.barangay,
-          });
-        }
-      });
-
-      // Sort harvests by date (most recent first) and take top 5
-      const recentHarvests = allHarvests
-        .sort((a, b) => b.harvest_date - a.harvest_date)
-        .slice(0, 5);
-
-      // Process farmer type distribution
-      const farmerTypeCount = {
-        Raiser: 0,
-        Operator: 0,
-        Grower: 0,
-      };
-
-      // Create lookup sets for faster checking
-      const livestockFarmerIds = new Set(
-        rawData.livestock.map((record) => record.farmer_id)
-      );
-
-      const operatorFarmerIds = new Set(
-        rawData.operators.map((record) => record.farmer_id)
-      );
-
-      const cropFarmerIds = new Set([
-        ...rawData.crops.map((record) => record.farmer_id),
-        ...rawData.rice.map((record) => record.farmer_id),
-        ...rawData.highValueCrops.map((record) => record.farmer_id),
-      ]);
-
-      // Count farmers by type using the lookup sets
-      rawData.farmers.forEach((farmer) => {
-        if (livestockFarmerIds.has(farmer.farmer_id)) farmerTypeCount.Raiser++;
-        if (operatorFarmerIds.has(farmer.farmer_id)) farmerTypeCount.Operator++;
-        if (cropFarmerIds.has(farmer.farmer_id)) farmerTypeCount.Grower++;
-      });
-
-      // Convert to array for chart
-      const farmerTypeDistribution = Object.entries(farmerTypeCount)
-        .map(([name, value]) => ({ name, value }))
-        .filter((item) => item.value > 0);
-
-      // Update dashboard data
-      setDashboardData({
-        totalProduction,
-        cropProduction,
-        monthlyProduction,
-        productionByBarangay,
-        topPerformingItems,
-        recentHarvests,
-        productionTrend,
-        totalFarmers: rawData.farmers.length,
-        totalArea,
-        farmerTypeDistribution,
-        categoryData,
-      });
-    } catch (error) {
-      console.error("Error processing data:", error);
-      setError("Error processing data: " + error.message);
-    }
-  }, [rawData]);
-
-  // Process livestock data - memoized
-  const processLivestockData = useCallback(() => {
-    const livestock = rawData.livestock || [];
-    const animalTypeMap = {};
-
-    livestock.forEach((record) => {
-      const animalType = record.animal_type || "Unknown";
-      const quantity = Number.parseInt(record.quantity) || 0;
-
-      animalTypeMap[animalType] = (animalTypeMap[animalType] || 0) + quantity;
-    });
-
-    const items = Object.entries(animalTypeMap)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
-
-    const total = items.reduce((sum, item) => sum + item.value, 0);
-
-    return {
-      total,
-      items,
-    };
-  }, [rawData.livestock]);
-
-  // Process rice data - memoized
-  const processRiceData = useCallback(() => {
-    const riceData = rawData.rice || [];
-    const varietyMap = {};
-
-    riceData.forEach((rice) => {
-      // Use variety if available, otherwise use seed_type
-      const variety = rice.variety || rice.seed_type || "Unknown Rice";
-
-      // Try to get production from different possible fields
-      let production = 0;
-      if (rice.production && !isNaN(Number.parseFloat(rice.production))) {
-        production = Number.parseFloat(rice.production);
-      } else if (
-        rice.yield_amount &&
-        !isNaN(Number.parseFloat(rice.yield_amount))
-      ) {
-        production = Number.parseFloat(rice.yield_amount);
-      } else if (rice.yield && !isNaN(Number.parseFloat(rice.yield))) {
-        production = Number.parseFloat(rice.yield);
-      }
-
-      varietyMap[variety] = (varietyMap[variety] || 0) + production;
-    });
-
-    const items = Object.entries(varietyMap)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
-
-    const total = items.reduce((sum, item) => sum + item.value, 0);
-
-    return {
-      total,
-      items,
-    };
-  }, [rawData.rice]);
-
-  // Process banana data - memoized
-  const processBananaData = useCallback(() => {
-    const crops = rawData.crops || [];
-    const bananaVarietyMap = {};
-
-    // Filter banana crops
-    const bananaCrops = crops.filter(
-      (crop) =>
-        (crop.crop_type && crop.crop_type.toLowerCase().includes("banana")) ||
-        (crop.crop_value && crop.crop_value.toLowerCase().includes("banana")) ||
-        isBananaVariety(crop.crop_type) ||
-        isBananaVariety(crop.crop_value)
-    );
-
-    bananaCrops.forEach((crop) => {
-      // Get variety from crop_value, variety_clone, or from parsed production_data
-      let variety = crop.crop_value || crop.variety_clone || "Unknown Banana";
-
-      // Try to parse production_data if it's a string
-      let productionData = {};
-      if (crop.production_data && typeof crop.production_data === "string") {
-        try {
-          productionData = JSON.parse(crop.production_data);
-          // If crop value is in production_data, use it
-          if (productionData.crop) {
-            variety = productionData.crop;
-          }
-        } catch (e) {
-          // Silent error - continue with empty production data
-          productionData = {};
-        }
-      } else if (
-        crop.production_data &&
-        typeof crop.production_data === "object"
-      ) {
-        productionData = crop.production_data;
-        if (productionData.crop) {
-          variety = productionData.crop;
-        }
-      }
-
-      // Try to get quantity from different possible fields
-      let production = 0;
-
-      // First check if quantity is in production_data
-      if (
-        productionData.quantity &&
-        !isNaN(Number.parseFloat(productionData.quantity))
-      ) {
-        production = Number.parseFloat(productionData.quantity);
-      }
-      // Then check other possible fields
-      else if (crop.quantity && !isNaN(Number.parseFloat(crop.quantity))) {
-        production = Number.parseFloat(crop.quantity);
-      } else if (
-        crop.yield_amount &&
-        !isNaN(Number.parseFloat(crop.yield_amount))
-      ) {
-        production = Number.parseFloat(crop.yield_amount);
-      } else if (
-        crop.production &&
-        !isNaN(Number.parseFloat(crop.production))
-      ) {
-        production = Number.parseFloat(crop.production);
-      }
-
-      if (variety && production > 0) {
-        bananaVarietyMap[variety] =
-          (bananaVarietyMap[variety] || 0) + production;
-      }
-    });
-
-    const items = Object.entries(bananaVarietyMap)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
-
-    const total = items.reduce((sum, item) => sum + item.value, 0);
-
-    return {
-      total,
-      items,
-    };
-  }, [rawData.crops]);
-
-  // Process legumes data - memoized
-  const processLegumesData = useCallback(() => {
-    const crops = rawData.crops || [];
-    const legumesTypeMap = {};
-
-    // Filter legume crops
-    const legumeCrops = crops.filter(
-      (crop) =>
-        (crop.crop_type && isLegume(crop.crop_type.toLowerCase())) ||
-        (crop.crop_value && isLegume(crop.crop_value.toLowerCase()))
-    );
-
-    legumeCrops.forEach((crop) => {
-      // Get crop type from crop_value, crop_type, or from parsed production_data
-      let type = crop.crop_value || crop.crop_type || "Unknown Legume";
-
-      // Try to parse production_data if it's a string
-      let productionData = {};
-      if (crop.production_data && typeof crop.production_data === "string") {
-        try {
-          productionData = JSON.parse(crop.production_data);
-          // If crop value is in production_data, use it
-          if (productionData.crop) {
-            type = productionData.crop;
-          }
-        } catch (e) {
-          // Silent error - continue with empty production data
-          productionData = {};
-        }
-      } else if (
-        crop.production_data &&
-        typeof crop.production_data === "object"
-      ) {
-        productionData = crop.production_data;
-        if (productionData.crop) {
-          type = productionData.crop;
-        }
-      }
-
-      // Try to get quantity from different possible fields
-      let production = 0;
-
-      // First check if quantity is in production_data
-      if (
-        productionData.quantity &&
-        !isNaN(Number.parseFloat(productionData.quantity))
-      ) {
-        production = Number.parseFloat(productionData.quantity);
-      }
-      // Then check other possible fields
-      else if (crop.quantity && !isNaN(Number.parseFloat(crop.quantity))) {
-        production = Number.parseFloat(crop.quantity);
-      } else if (
-        crop.yield_amount &&
-        !isNaN(Number.parseFloat(crop.yield_amount))
-      ) {
-        production = Number.parseFloat(crop.yield_amount);
-      } else if (
-        crop.production &&
-        !isNaN(Number.parseFloat(crop.production))
-      ) {
-        production = Number.parseFloat(crop.production);
-      }
-
-      if (type && production > 0) {
-        legumesTypeMap[type] = (legumesTypeMap[type] || 0) + production;
-      }
-    });
-
-    const items = Object.entries(legumesTypeMap)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
-
-    const total = items.reduce((sum, item) => sum + item.value, 0);
-
-    return {
-      total,
-      items,
-    };
-  }, [rawData.crops]);
-
-  // Process spices data - memoized
-  const processSpicesData = useCallback(() => {
-    const crops = rawData.crops || [];
-    const spicesTypeMap = {};
-
-    // Filter spice crops
-    const spiceCrops = crops.filter(
-      (crop) =>
-        (crop.crop_type && isSpice(crop.crop_type.toLowerCase())) ||
-        (crop.crop_value && isSpice(crop.crop_value.toLowerCase()))
-    );
-
-    spiceCrops.forEach((crop) => {
-      // Get crop type from crop_value, crop_type, or from parsed production_data
-      let type = crop.crop_value || crop.crop_type || "Unknown Spice";
-
-      // Try to parse production_data if it's a string
-      let productionData = {};
-      if (crop.production_data && typeof crop.production_data === "string") {
-        try {
-          productionData = JSON.parse(crop.production_data);
-          // If crop value is in production_data, use it
-          if (productionData.crop) {
-            type = productionData.crop;
-          }
-        } catch (e) {
-          // Silent error - continue with empty production data
-          productionData = {};
-        }
-      } else if (
-        crop.production_data &&
-        typeof crop.production_data === "object"
-      ) {
-        productionData = crop.production_data;
-        if (productionData.crop) {
-          type = productionData.crop;
-        }
-      }
-
-      // Try to get quantity from different possible fields
-      let production = 0;
-
-      // First check if quantity is in production_data
-      if (
-        productionData.quantity &&
-        !isNaN(Number.parseFloat(productionData.quantity))
-      ) {
-        production = Number.parseFloat(productionData.quantity);
-      }
-      // Then check other possible fields
-      else if (crop.quantity && !isNaN(Number.parseFloat(crop.quantity))) {
-        production = Number.parseFloat(crop.quantity);
-      } else if (
-        crop.yield_amount &&
-        !isNaN(Number.parseFloat(crop.yield_amount))
-      ) {
-        production = Number.parseFloat(crop.yield_amount);
-      } else if (
-        crop.production &&
-        !isNaN(Number.parseFloat(crop.production))
-      ) {
-        production = Number.parseFloat(crop.production);
-      }
-
-      if (type && production > 0) {
-        spicesTypeMap[type] = (spicesTypeMap[type] || 0) + production;
-      }
-    });
-
-    const items = Object.entries(spicesTypeMap)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
-
-    const total = items.reduce((sum, item) => sum + item.value, 0);
-
-    return {
-      total,
-      items,
-    };
-  }, [rawData.crops]);
-
-  // Process fish data - memoized
-  const processFishData = useCallback(() => {
-    // Combine data from crops and operators (for fish)
-    const crops = rawData.crops || [];
-    const operators = rawData.operators || [];
-    const fishTypeMap = {};
-
-    // Filter fish crops
-    const fishCrops = crops.filter(
-      (crop) =>
-        (crop.crop_type && isFish(crop.crop_type.toLowerCase())) ||
-        (crop.crop_value && isFish(crop.crop_value.toLowerCase()))
-    );
-
-    fishCrops.forEach((crop) => {
-      const type = crop.crop_value || crop.crop_type || "Unknown Fish";
-      const production = Number.parseFloat(
-        crop.yield_amount || crop.production || crop.quantity || 0
-      );
-
-      fishTypeMap[type] = (fishTypeMap[type] || 0) + production;
-    });
-
-    // Add fish data from operators
-    operators.forEach((operator) => {
-      if (operator.cultured_species) {
-        const species = operator.cultured_species;
-        const production = Number.parseFloat(operator.production_kg || 0);
-
-        fishTypeMap[species] = (fishTypeMap[species] || 0) + production;
-      }
-    });
-
-    const items = Object.entries(fishTypeMap)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
-
-    const total = items.reduce((sum, item) => sum + item.value, 0);
-
-    return {
-      total,
-      items,
-    };
-  }, [rawData.crops, rawData.operators]);
-
-  // Process high value crops data - memoized
-  const processHighValueCropsData = useCallback(() => {
-    const highValueCrops = rawData.highValueCrops || [];
-    const cropTypeMap = {};
-
-    highValueCrops.forEach((crop) => {
-      // Get crop type from crop_value or from parsed production_data
-      let cropType = crop.crop_value || "Unknown HVC";
-
-      // Try to parse production_data if it's a string
-      let productionData = {};
-      if (crop.production_data && typeof crop.production_data === "string") {
-        try {
-          productionData = JSON.parse(crop.production_data);
-          // If crop value is in production_data, use it
-          if (productionData.crop) {
-            cropType = productionData.crop;
-          }
-        } catch (e) {
-          // Silent error - continue with empty production data
-          productionData = {};
-        }
-      } else if (
-        crop.production_data &&
-        typeof crop.production_data === "object"
-      ) {
-        productionData = crop.production_data;
-        if (productionData.crop) {
-          cropType = productionData.crop;
-        }
-      }
-
-      // Try to get quantity from different possible fields
-      let quantity = 0;
-
-      // First check if quantity is in production_data
-      if (
-        productionData.quantity &&
-        !isNaN(Number.parseFloat(productionData.quantity))
-      ) {
-        quantity = Number.parseFloat(productionData.quantity);
-      }
-      // Then check other possible fields
-      else if (crop.quantity && !isNaN(Number.parseFloat(crop.quantity))) {
-        quantity = Number.parseFloat(crop.quantity);
-      } else if (
-        crop.yield_amount &&
-        !isNaN(Number.parseFloat(crop.yield_amount))
-      ) {
-        quantity = Number.parseFloat(crop.yield_amount);
-      } else if (
-        crop.production &&
-        !isNaN(Number.parseFloat(crop.production))
-      ) {
-        quantity = Number.parseFloat(crop.production);
-      }
-
-      if (cropType && quantity > 0) {
-        cropTypeMap[cropType] = (cropTypeMap[cropType] || 0) + quantity;
-      }
-    });
-
-    const items = Object.entries(cropTypeMap)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
-
-    const total = items.reduce((sum, item) => sum + item.value, 0);
-
-    return {
-      total,
-      items,
-    };
-  }, [rawData.highValueCrops]);
-
-  // Helper functions to categorize crops - memoized
-  const isBananaVariety = useCallback((cropType) => {
-    if (!cropType) return false;
-    const bananaVarieties = [
-      "lakatan",
-      "latundan",
-      "saba",
-      "cavendish",
-      "señorita",
-    ];
-    return bananaVarieties.some((variety) =>
-      cropType.toLowerCase().includes(variety)
-    );
-  }, []);
-
-  const isLegume = useCallback((cropType) => {
-    if (!cropType) return false;
-    const legumes = [
-      "mung bean",
-      "peanut",
-      "soybean",
-      "cowpea",
-      "pigeon pea",
-      "beans",
-      "legume",
-      "legumes",
-    ];
-    return (
-      cropType.toLowerCase() === "legumes" ||
-      legumes.some((legume) => cropType.toLowerCase().includes(legume))
-    );
-  }, []);
-
-  const isSpice = useCallback((cropType) => {
-    if (!cropType) return false;
-    const spices = [
-      "ginger",
-      "turmeric",
-      "pepper",
-      "chili",
-      "lemongrass",
-      "spice",
-      "spices",
-    ];
-    return (
-      cropType.toLowerCase() === "spices" ||
-      spices.some((spice) => cropType.toLowerCase().includes(spice))
-    );
-  }, []);
-
-  const isFish = useCallback((cropType) => {
-    if (!cropType) return false;
-    const fishTypes = [
-      "tilapia",
-      "milkfish",
-      "catfish",
-      "carp",
-      "shrimp",
-      "fish",
-    ];
-    return fishTypes.some((fish) => cropType.includes(fish));
-  }, []);
-
-  // Get category name for display - memoized
-  const getCategoryName = useCallback((category) => {
-    const categoryNames = {
-      livestock: "Livestock & Poultry",
-      rice: "Rice",
-      banana: "Banana",
-      legumes: "Legumes",
-      spices: "Spices",
-      fish: "Fish",
-      highValueCrops: "High Value Crops",
-    };
-
-    return categoryNames[category] || category;
-  }, []);
-
   // Helper function to parse production_data
-  const parseProductionData = useCallback((crop) => {
+  const parseProductionData = (crop) => {
     let productionData = {};
     if (crop.production_data && typeof crop.production_data === "string") {
       try {
@@ -1818,149 +344,35 @@ export default function Dashboard() {
       productionData = crop.production_data;
     }
     return productionData;
-  }, []);
+  };
+
+  // Handle manual refresh
+  const handleRefresh = () => {
+    if (!isRefreshing) {
+      setRefreshing(true);
+
+      const controller = new AbortController();
+      const signal = controller.signal;
+
+      fetchAllData(signal, true)
+        .then(() => {
+          setLastRefresh(new Date());
+        })
+        .catch((err) => {
+          if (err.name !== "AbortError") {
+            console.error("Error during manual refresh:", err);
+          }
+        })
+        .finally(() => {
+          setRefreshing(false);
+        });
+    }
+  };
 
   if (loading && Object.values(rawData).every((arr) => arr.length === 0)) {
     return (
       <div className="p-5 bg-[#F5F7F9] min-h-screen overflow-y-auto">
-        {/* Dashboard Header Skeleton */}
-        <div className="mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="w-64 h-8 mb-2 bg-gray-200 rounded animate-pulse"></div>
-              <div className="w-48 h-5 bg-gray-200 rounded animate-pulse"></div>
-            </div>
-            <div className="mt-4 md:mt-0">
-              <div className="w-32 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
-            </div>
-          </div>
-
-          {/* Production Trend Indicator Skeleton */}
-          <div className="inline-flex items-center p-3 mt-4 bg-white border border-gray-100 rounded-lg shadow-sm">
-            <div className="w-5 h-5 mr-2 bg-gray-200 rounded animate-pulse"></div>
-            <div className="w-32 h-5 mr-2 bg-gray-200 rounded animate-pulse"></div>
-            <div className="w-24 h-5 bg-gray-200 rounded animate-pulse"></div>
-          </div>
-        </div>
-
-        {/* Top Stats Cards Skeleton */}
-        <div className="grid grid-cols-1 gap-6 mb-8 sm:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="p-6 bg-white shadow-md rounded-xl">
-              <div className="flex items-center mb-4">
-                <div className="w-10 h-10 p-2 mr-4 bg-gray-200 rounded animate-pulse"></div>
-                <div>
-                  <div className="w-32 h-5 mb-2 bg-gray-200 rounded animate-pulse"></div>
-                  <div className="w-24 bg-gray-200 rounded h-7 animate-pulse"></div>
-                </div>
-              </div>
-              <div className="w-48 h-5 bg-gray-200 rounded animate-pulse"></div>
-            </div>
-          ))}
-        </div>
-
-        {/* Farmer Type Distribution Skeleton */}
-        <div className="p-6 mb-8 bg-white border border-gray-100 shadow-md rounded-xl">
-          <div className="w-48 h-6 mb-6 bg-gray-200 rounded animate-pulse"></div>
-          <div className="h-[320px] bg-gray-100 rounded animate-pulse"></div>
-        </div>
-
-        {/* Secondary Stats Row Skeleton */}
-        <div className="grid grid-cols-1 gap-6 mb-8 sm:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="p-6 bg-white border border-gray-100 shadow-md rounded-xl"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-40 h-6 bg-gray-200 rounded animate-pulse"></div>
-                <div className="w-8 h-8 p-2 bg-gray-200 rounded-lg animate-pulse"></div>
-              </div>
-              <div className="w-32 h-8 mb-2 bg-gray-200 rounded animate-pulse"></div>
-              <div className="w-48 h-5 bg-gray-200 rounded animate-pulse"></div>
-            </div>
-          ))}
-        </div>
-
-        {/* Charts Row Skeleton */}
-        <div className="grid grid-cols-1 gap-6 mb-8 lg:grid-cols-2">
-          {[1, 2].map((i) => (
-            <div
-              key={i}
-              className="p-6 bg-white border border-gray-100 shadow-md rounded-xl"
-            >
-              <div className="w-48 h-6 mb-6 bg-gray-200 rounded animate-pulse"></div>
-              <div className="h-[320px] bg-gray-100 rounded animate-pulse"></div>
-            </div>
-          ))}
-        </div>
-
-        {/* Barangay Production Distribution Skeleton */}
-        <div className="p-6 mb-8 bg-white border border-gray-100 shadow-md rounded-xl">
-          <div className="w-48 h-6 mb-6 bg-gray-200 rounded animate-pulse"></div>
-          <div className="h-[400px] bg-gray-100 rounded animate-pulse"></div>
-        </div>
-
-        {/* Top Performing Items Skeleton */}
-        <div className="p-6 mb-8 bg-white border border-gray-100 shadow-md rounded-xl">
-          <div className="flex items-center justify-between mb-6">
-            <div className="w-48 h-6 bg-gray-200 rounded animate-pulse"></div>
-            <div className="w-32 h-6 bg-gray-200 rounded-full animate-pulse"></div>
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className="p-4 border border-gray-100 rounded-lg bg-gray-50"
-              >
-                <div className="flex items-center mb-2">
-                  <div className="w-8 h-8 mr-2 bg-gray-200 rounded-full animate-pulse"></div>
-                  <div className="w-20 h-5 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-                <div className="mt-2">
-                  <div className="w-16 h-6 mb-1 bg-gray-200 rounded animate-pulse"></div>
-                  <div className="w-12 h-4 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-                <div className="w-full h-2 mt-3 bg-gray-200 rounded-full animate-pulse"></div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Recent Harvests Skeleton */}
-        <div className="p-6 bg-white border border-gray-100 shadow-md rounded-xl">
-          <div className="flex items-center justify-between mb-6">
-            <div className="w-40 h-6 bg-gray-200 rounded animate-pulse"></div>
-            <div className="w-32 h-5 bg-gray-200 rounded animate-pulse"></div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead>
-                <tr>
-                  {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-                    <th key={i} className="px-6 py-3 bg-gray-50">
-                      <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <tr
-                    key={i}
-                    className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                  >
-                    {[1, 2, 3, 4, 5, 6, 7].map((j) => (
-                      <td key={j} className="px-6 py-4">
-                        <div className="h-5 bg-gray-200 rounded animate-pulse"></div>
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DashboardSkeleton />
       </div>
     );
   }
@@ -1970,6 +382,13 @@ export default function Dashboard() {
       <div className="flex items-center justify-center h-screen bg-[#F5F7F9]">
         <div className="flex flex-col items-center p-8 bg-white rounded-lg shadow-lg">
           <p className="text-lg font-medium text-red-700">Error: {error}</p>
+          <button
+            onClick={handleRefresh}
+            className="flex items-center px-4 py-2 mt-4 text-white bg-blue-600 rounded-md hover:bg-blue-700"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -1977,543 +396,235 @@ export default function Dashboard() {
 
   return (
     <div className="p-5 bg-[#F5F7F9] min-h-screen overflow-y-auto">
-      {/* Dashboard Header */}
-      <div className="mb-10">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <DashboardHeader
+        formattedDate={new Date().toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })}
+        isRefreshing={isRefreshing}
+        lastRefresh={lastRefresh}
+        onRefresh={handleRefresh}
+      />
+
+      <DashboardStats dashboardData={dashboardData} />
+      <CategoryBreakdown categoryData={dashboardData.categoryData} />
+
+      {/* Add a link to the analytics page */}
+      <div className="p-6 mb-8 text-center bg-white border border-gray-100 shadow-sm rounded-xl">
+        <h3 className="mb-3 text-xl font-semibold text-gray-800">
+          Charts & Analytics
+        </h3>
+        <p className="mb-4 text-gray-600">
+          All charts have been moved to the Analytics page for a more
+          comprehensive view of your agricultural data.
+        </p>
+        <a
+          href="/analytics"
+          className="inline-flex items-center px-4 py-2 text-white transition-colors bg-[#6A9C89] rounded-md hover:bg-[#5A8C79]"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-5 h-5 mr-2"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M3 3v18h18" />
+            <path d="M18 17V9" />
+            <path d="M13 17V5" />
+            <path d="M8 17v-3" />
+          </svg>
+          View Analytics
+        </a>
+      </div>
+
+      {/* Add the CategoryDetails component */}
+      <CategoryDetails categoryData={dashboardData.categoryData} />
+
+      <TopPerformers topPerformingItems={dashboardData.topPerformingItems} />
+
+      <RecentHarvests recentHarvests={dashboardData.recentHarvests} />
+    </div>
+  );
+}
+
+// Helper function to format numbers with commas
+function formatNumber(num) {
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+// Dashboard skeleton component for loading state
+function DashboardSkeleton() {
+  return (
+    <>
+      {/* Dashboard Header Skeleton */}
+      <div className="mb-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-[#333333]">
-              Agricultural Production Dashboard
-            </h2>
-            <p className="text-[#666666] mt-1">
-              Overview of all farmer types and production as of {formattedDate}
-            </p>
+            <div className="w-64 h-8 mb-2 bg-gray-200 rounded animate-pulse"></div>
+            <div className="w-48 h-5 bg-gray-200 rounded animate-pulse"></div>
           </div>
-
-          {/* Background refresh indicator */}
-          {isRefreshing && (
-            <div className="inline-flex items-center p-2 mt-2 ml-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-md shadow-sm">
-              <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" />
-              <span>Updating data...</span>
-            </div>
-          )}
-
-          {/* Last refresh time indicator */}
-
           <div className="mt-4 md:mt-0">
-            <div className="inline-flex items-center px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-sm">
-              <Calendar className="w-4 h-4 mr-2 text-[#6A9C89]" />
-              <span className="text-sm font-medium">{formattedDate}</span>
-            </div>
+            <div className="w-32 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
           </div>
-        </div>
-        <div className="inline-flex items-center p-2 mt-2 ml-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-md">
-          <span>Last updated: {lastRefresh.toLocaleTimeString()}</span>
-        </div>
-      </div>
-      {/* Top Stats Cards */}
-      <div className="grid grid-cols-1 gap-4 mb-8 xs:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-gradient-to-br from-[#6A9C89] to-[#4A7C69] rounded-xl text-white p-6 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] duration-300 border border-[#8DB5A5]/20">
-          <div className="flex items-center mb-4">
-            <div className="p-2 mr-4 bg-white rounded-lg bg-opacity-20">
-              <BarChart2 className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-white opacity-80">
-                Total Production
-              </p>
-              <p className="text-xl font-bold sm:text-2xl">
-                {formatNumber(dashboardData.totalProduction.toFixed(2))}
-              </p>
-            </div>
-          </div>
-          <p className="mt-2 text-sm text-white opacity-80">
-            Metric tons of produce across all categories
-          </p>
         </div>
 
-        <div className="bg-gradient-to-br from-[#4F6F7D] to-[#3A5A68] rounded-xl text-white p-6 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] duration-300 border border-[#6F8F9D]/20">
-          <div className="flex items-center mb-4">
-            <div className="p-2 mr-4 bg-white rounded-lg bg-opacity-20">
-              <TrendingUp className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-white opacity-80">
-                Average Yield
-              </p>
-              <p className="text-xl font-bold sm:text-2xl">
-                {dashboardData.recentHarvests.length > 0
-                  ? (
-                      dashboardData.recentHarvests.reduce(
-                        (sum, harvest) =>
-                          sum +
-                          (harvest.yield_per_hectare !== "N/A"
-                            ? Number.parseFloat(harvest.yield_per_hectare)
-                            : 0),
-                        0
-                      ) /
-                      dashboardData.recentHarvests.filter(
-                        (h) => h.yield_per_hectare !== "N/A"
-                      ).length
-                    ).toFixed(2)
-                  : "0.00"}
-              </p>
-            </div>
-          </div>
-          <p className="mt-2 text-sm text-white opacity-80">
-            Tons per hectare across all farms
-          </p>
-        </div>
-
-        <div className="bg-gradient-to-br from-[#388E3C] to-[#2E7D32] rounded-xl text-white p-6 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] duration-300 border border-[#4CAF50]/20">
-          <div className="flex items-center mb-4">
-            <div className="p-2 mr-4 bg-white rounded-lg bg-opacity-20">
-              <Sprout className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-white opacity-80">
-                Total Area
-              </p>
-              <p className="text-xl font-bold sm:text-2xl">
-                {formatNumber(dashboardData.totalArea.toFixed(2))}
-              </p>
-            </div>
-          </div>
-          <p className="mt-2 text-sm text-white opacity-80">
-            Hectares of cultivated land and water
-          </p>
-        </div>
-
-        <div className="bg-gradient-to-br from-[#0288D1] to-[#0277BD] rounded-xl text-white p-6 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] duration-300 border border-[#29B6F6]/20">
-          <div className="flex items-center mb-4">
-            <div className="p-2 mr-4 bg-white rounded-lg bg-opacity-20">
-              <Award className="w-6 h-6" />
-            </div>
-            <div>
-              {dashboardData.topPerformingItems &&
-              dashboardData.topPerformingItems.length > 0 ? (
-                <>
-                  <p className="text-sm font-medium text-white opacity-80">
-                    Top{" "}
-                    {getCategoryName(
-                      dashboardData.topPerformingItems[0].category
-                    ).replace(" & Poultry", "")}
-                  </p>
-                  <p className="text-xl font-bold sm:text-2xl">
-                    {dashboardData.topPerformingItems[0].name}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm font-medium text-white opacity-80">
-                    Top Producer
-                  </p>
-                  <p className="text-xl font-bold sm:text-2xl">None</p>
-                </>
-              )}
-            </div>
-          </div>
-          <p className="mt-2 text-sm text-white opacity-80">
-            {dashboardData.topPerformingItems &&
-            dashboardData.topPerformingItems.length > 0
-              ? `${formatNumber(
-                  dashboardData.topPerformingItems[0].value.toFixed(2)
-                )} ${
-                  dashboardData.topPerformingItems[0].category === "livestock"
-                    ? "heads"
-                    : "tons"
-                }`
-              : "No production data available"}
-          </p>
+        {/* Production Trend Indicator Skeleton */}
+        <div className="inline-flex items-center p-3 mt-4 bg-white border border-gray-100 rounded-lg shadow-sm">
+          <div className="w-5 h-5 mr-2 bg-gray-200 rounded animate-pulse"></div>
+          <div className="w-32 h-5 mr-2 bg-gray-200 rounded animate-pulse"></div>
+          <div className="w-24 h-5 bg-gray-200 rounded animate-pulse"></div>
         </div>
       </div>
 
-      {/* Farmer Type Distribution */}
-      <div className="p-6 mb-8 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
-        <h4 className="mb-6 text-lg font-semibold text-gray-800">
-          Farmer Type Distribution
-        </h4>
-        {dashboardData.farmerTypeDistribution &&
-        dashboardData.farmerTypeDistribution.length > 0 ? (
-          <div className="flex flex-col items-center justify-center md:flex-row">
-            <div className="w-full md:w-2/3 h-[280px] sm:h-[320px] mt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={dashboardData.farmerTypeDistribution}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={false} // Remove inline labels for cleaner look
-                  >
-                    {dashboardData.farmerTypeDistribution.map(
-                      (entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={
-                            entry.name === "Raiser"
-                              ? colors.raiser
-                              : entry.name === "Operator"
-                              ? colors.operator
-                              : colors.grower
-                          }
-                        />
-                      )
-                    )}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value, name) => [
-                      `${formatNumber(value)} farmers`,
-                      name,
-                    ]}
-                    contentStyle={{
-                      backgroundColor: "rgba(255, 255, 255, 0.9)",
-                      borderRadius: "8px",
-                      border: "1px solid #E0E0E0",
-                      boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-                    }}
-                  />
-                  <Legend
-                    layout="horizontal"
-                    verticalAlign="bottom"
-                    align="center"
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Add a separate legend/stats section for better readability */}
-            <div className="grid w-full grid-cols-2 gap-2 mt-4 text-sm md:w-1/3 md:mt-0 sm:grid-cols-3 md:grid-cols-1">
-              {dashboardData.farmerTypeDistribution.map((entry, index) => {
-                const totalFarmers =
-                  dashboardData.farmerTypeDistribution.reduce(
-                    (sum, item) => sum + item.value,
-                    0
-                  );
-                const color =
-                  entry.name === "Raiser"
-                    ? colors.raiser
-                    : entry.name === "Operator"
-                    ? colors.operator
-                    : colors.grower;
-
-                return (
-                  <div
-                    key={index}
-                    className="flex items-center p-2 rounded-md hover:bg-gray-50"
-                  >
-                    <div
-                      className="w-3 h-3 mr-2 rounded-sm"
-                      style={{ backgroundColor: color }}
-                    ></div>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{entry.name}</span>
-                      <span className="text-gray-600">
-                        {formatNumber(entry.value)} farmers
-                        <span className="ml-1 text-xs text-gray-500">
-                          ({((entry.value / totalFarmers) * 100).toFixed(1)}%)
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-[280px] sm:h-[320px] text-gray-400">
-            <svg
-              className="w-16 h-16 mb-4 text-gray-300"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              ></path>
-            </svg>
-            <p className="text-lg font-medium">No farmer type data available</p>
-            <p className="mt-2 text-sm text-gray-400">
-              Add farmer data to see distribution
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Secondary Stats Row */}
-      <div className="grid grid-cols-1 gap-6 mb-8 sm:grid-cols-3">
-        <div className="p-6 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">
-              Registered Farmers
-            </h3>
-            <div className="p-2 rounded-lg bg-blue-50">
-              <User className="w-5 h-5 text-blue-600" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-gray-900 sm:text-3xl">
-            {formatNumber(dashboardData.totalFarmers)}
-          </p>
-          <p className="mt-2 text-sm text-gray-500">
-            Active agricultural producers
-          </p>
-        </div>
-
-        <div className="p-6 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">
-              Livestock Count
-            </h3>
-            <div className="p-2 rounded-lg bg-purple-50">
-              <Cow className="w-5 h-5 text-purple-600" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-gray-900 sm:text-3xl">
-            {formatNumber(dashboardData.categoryData.livestock.total)}
-          </p>
-          <p className="mt-2 text-sm text-gray-500">
-            Total heads of livestock and poultry
-          </p>
-        </div>
-
-        <div className="p-6 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">
-              Aquaculture Production
-            </h3>
-            <div className="p-2 rounded-lg bg-cyan-50">
-              <Fish className="w-5 h-5 text-cyan-600" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-gray-900 sm:text-3xl">
-            {formatNumber(dashboardData.categoryData.fish.total.toFixed(2))}
-          </p>
-          <p className="mt-2 text-sm text-gray-500">
-            Metric tons of fish and seafood
-          </p>
-        </div>
-      </div>
-
-      {/* Top Performing Items - Full Width */}
-      <div className="mb-8 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h4 className="text-lg font-semibold text-gray-800">
-              Top Performing Items
-            </h4>
-            <span className="px-4 py-2 text-sm font-medium text-green-800 bg-green-100 rounded-full">
-              By Production Volume
-            </span>
-          </div>
-
-          {dashboardData.topPerformingItems.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-              {dashboardData.topPerformingItems.map((item, index) => (
-                <div
-                  key={index}
-                  className="p-6 transition-all duration-200 border border-gray-100 rounded-lg bg-gray-50 hover:shadow-md hover:bg-white"
-                >
-                  <div className="flex items-center mb-4">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${
-                        index === 0
-                          ? "bg-yellow-100 text-yellow-700"
-                          : index === 1
-                          ? "bg-gray-200 text-gray-700"
-                          : index === 2
-                          ? "bg-amber-100 text-amber-700"
-                          : index === 3
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-green-100 text-green-700"
-                      }`}
-                    >
-                      {index + 1}
-                    </div>
-                    <h5
-                      className="text-base font-medium text-gray-800"
-                      title={item.name}
-                    >
-                      {item.name}
-                    </h5>
-                  </div>
-                  <div className="mt-2">
-                    <div className="text-2xl font-bold text-gray-900">
-                      {formatNumber(item.value.toFixed(2))}
-                    </div>
-                    <div className="mb-3 text-sm text-gray-500">
-                      {item.category === "livestock" ? "heads" : "metric tons"}
-                    </div>
-                  </div>
-                  <div className="w-full h-2 overflow-hidden bg-gray-200 rounded-full">
-                    <div
-                      className="h-2 bg-green-600 rounded-full"
-                      style={{
-                        width: `${
-                          (item.value /
-                            dashboardData.topPerformingItems[0].value) *
-                          100
-                        }%`,
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-[200px] text-gray-400">
-              <svg
-                className="w-12 h-12 mb-3 text-gray-300"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                ></path>
-              </svg>
-              <p>No production data available</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Recent Harvests - Full Width */}
-      <div className="mb-8 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h4 className="text-lg font-semibold text-gray-800">
-              Recent Harvests
-            </h4>
-            <a
-              href="/inventory"
-              className="text-sm font-medium text-[#6A9C89] hover:underline"
-            >
-              View All Records →
-            </a>
-          </div>
-
-          {dashboardData.recentHarvests.length > 0 ? (
-            <div className="-mx-6 overflow-x-auto">
-              <div className="inline-block min-w-full px-6 align-middle">
-                <table className="min-w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                        Farmer
-                      </th>
-                      <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                        Type
-                      </th>
-                      <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                        Product
-                      </th>
-                      <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                        Yield
-                      </th>
-                      <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                        Area (ha)
-                      </th>
-                      <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                        Yield/ha
-                      </th>
-                      <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                        Harvest Date
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {dashboardData.recentHarvests.map((harvest, index) => (
-                      <tr
-                        key={harvest.id}
-                        className="transition-colors duration-150 hover:bg-gray-50"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 text-green-600 bg-green-100 rounded-full">
-                              {harvest.farmer_name.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">
-                                {harvest.farmer_name}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                {harvest.barangay}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-3 py-1 text-sm font-medium text-green-700 bg-green-100 rounded-full">
-                            {harvest.type}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-3 py-1 text-sm font-medium text-green-700 bg-green-100 rounded-full">
-                            {harvest.crop_type}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                          {harvest.yield_amount.toFixed(2)}{" "}
-                          {harvest.type === "Raiser" ? "heads" : "tons"}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
-                          {harvest.area.toFixed(2)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`text-sm font-medium ${
-                              harvest.yield_per_hectare !== "N/A" &&
-                              Number(harvest.yield_per_hectare) > 5
-                                ? "text-green-600"
-                                : "text-gray-600"
-                            }`}
-                          >
-                            {harvest.yield_per_hectare}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
-                          {harvest.harvest_date.toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+      {/* Top Stats Cards Skeleton */}
+      <div className="grid grid-cols-1 gap-6 mb-8 sm:grid-cols-2 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="p-6 bg-white shadow-md rounded-xl">
+            <div className="flex items-center mb-4">
+              <div className="w-10 h-10 p-2 mr-4 bg-gray-200 rounded animate-pulse"></div>
+              <div>
+                <div className="w-32 h-5 mb-2 bg-gray-200 rounded animate-pulse"></div>
+                <div className="w-24 bg-gray-200 rounded h-7 animate-pulse"></div>
               </div>
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-              <svg
-                className="w-16 h-16 mb-4 text-gray-300"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
+            <div className="w-48 h-5 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+        ))}
+      </div>
+
+      {/* Category Breakdown Skeleton */}
+      <div className="mb-8 bg-white border border-gray-100 shadow-md rounded-xl">
+        <div className="p-6">
+          <div className="w-48 h-6 mb-6 bg-gray-200 rounded animate-pulse"></div>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="p-4 border border-gray-100 rounded-lg bg-gray-50"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                ></path>
-              </svg>
-              <p className="text-lg font-medium">No recent harvests</p>
-              <p className="mt-2 text-sm text-gray-400">
-                Add harvest data to see recent activity
-              </p>
-            </div>
-          )}
+                <div className="flex items-center mb-4">
+                  <div className="w-8 h-8 mr-3 bg-gray-200 rounded-lg animate-pulse"></div>
+                  <div className="w-24 h-5 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+                <div className="w-20 mb-1 bg-gray-200 rounded h-7 animate-pulse"></div>
+                <div className="w-32 h-4 mb-5 bg-gray-200 rounded animate-pulse"></div>
+                <div className="space-y-3">
+                  {[1, 2, 3].map((j) => (
+                    <div key={j}>
+                      <div className="flex justify-between mb-1">
+                        <div className="w-20 h-4 bg-gray-200 rounded animate-pulse"></div>
+                        <div className="w-12 h-4 bg-gray-200 rounded animate-pulse"></div>
+                      </div>
+                      <div className="w-full h-1.5 bg-gray-200 rounded-full animate-pulse"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Charts Link Skeleton */}
+      <div className="p-6 mb-8 bg-white border border-gray-100 shadow-md rounded-xl">
+        <div className="w-40 h-6 mx-auto mb-3 bg-gray-200 rounded animate-pulse"></div>
+        <div className="w-3/4 h-4 mx-auto mb-4 bg-gray-200 rounded animate-pulse"></div>
+        <div className="w-32 h-10 mx-auto bg-gray-200 rounded-md animate-pulse"></div>
+      </div>
+
+      {/* Category Details Skeleton */}
+      <div className="mb-8 bg-white border border-gray-100 shadow-md rounded-xl">
+        <div className="p-6">
+          <div className="w-48 h-6 mb-6 bg-gray-200 rounded animate-pulse"></div>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="p-4 border border-gray-100 rounded-lg bg-gray-50"
+              >
+                <div className="w-32 h-5 mb-3 bg-gray-200 rounded animate-pulse"></div>
+                <div className="space-y-2">
+                  {[1, 2, 3, 4].map((j) => (
+                    <div key={j} className="flex items-center justify-between">
+                      <div className="w-24 h-4 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="w-16 h-4 bg-gray-200 rounded animate-pulse"></div>
+                    </div>
+                  ))}
+                  <div className="pt-2 mt-2 border-t border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div className="w-20 h-4 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="w-16 h-4 bg-gray-200 rounded animate-pulse"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Top Performing Items Skeleton */}
+      <div className="p-6 mb-8 bg-white border border-gray-100 shadow-md rounded-xl">
+        <div className="flex items-center justify-between mb-6">
+          <div className="w-48 h-6 bg-gray-200 rounded animate-pulse"></div>
+          <div className="w-32 h-6 bg-gray-200 rounded-full animate-pulse"></div>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div
+              key={i}
+              className="p-4 border border-gray-100 rounded-lg bg-gray-50"
+            >
+              <div className="flex items-center mb-2">
+                <div className="w-8 h-8 mr-2 bg-gray-200 rounded-full animate-pulse"></div>
+                <div className="w-20 h-5 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+              <div className="mt-2">
+                <div className="w-16 h-6 mb-1 bg-gray-200 rounded animate-pulse"></div>
+                <div className="w-12 h-4 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+              <div className="w-full h-2 mt-3 bg-gray-200 rounded-full animate-pulse"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Recent Harvests Skeleton */}
+      <div className="p-6 bg-white border border-gray-100 shadow-md rounded-xl">
+        <div className="flex items-center justify-between mb-6">
+          <div className="w-40 h-6 bg-gray-200 rounded animate-pulse"></div>
+          <div className="w-32 h-5 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead>
+              <tr>
+                {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                  <th key={i} className="px-6 py-3 bg-gray-50">
+                    <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                  {[1, 2, 3, 4, 5, 6, 7].map((j) => (
+                    <td key={j} className="px-6 py-4">
+                      <div className="h-5 bg-gray-200 rounded animate-pulse"></div>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
   );
 }
