@@ -37,6 +37,10 @@ export default function DashboardStats({ dashboardData }) {
     Grower: "#4CAF50",
     Raiser: "#8884d8",
     Operator: "#2196F3",
+    "Grower & Raiser": "#9C27B0",
+    "Grower & Operator": "#FF9800",
+    "Raiser & Operator": "#E91E63",
+    "Grower, Raiser & Operator": "#795548",
   };
 
   // Dummy rawData for fallback
@@ -180,107 +184,67 @@ export default function DashboardStats({ dashboardData }) {
                 </p>
               </div>
 
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-600">
-                    Active Farmers
-                  </span>
-                  <span className="text-sm font-semibold text-gray-800">
-                    {formatNumber(
-                      Math.round(
-                        (dashboardData?.totalFarmers ||
-                          rawData?.farmers?.length ||
-                          0) * 0.85
-                      )
-                    )}
-                  </span>
+              {/* Farmer Type Distribution */}
+              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
+                <div className="flex items-center mb-3">
+                  <PieChart className="w-4 h-4 mr-2 text-gray-600" />
+                  <h5 className="text-sm font-medium text-gray-700">
+                    Farmer Type Distribution
+                  </h5>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-600">
-                    Barangays Covered
-                  </span>
-                  <span className="text-sm font-semibold text-gray-800">
-                    {formatNumber(
-                      dashboardData?.productionByBarangay?.length || 0
-                    )}
-                  </span>
-                </div>
+                {dashboardData?.farmerTypeDistribution &&
+                dashboardData?.farmerTypeDistribution.length > 0 ? (
+                  <div className="space-y-2">
+                    {dashboardData?.farmerTypeDistribution.map(
+                      (type, index) => {
+                        // Calculate percentage
+                        const totalFarmers =
+                          dashboardData?.farmerTypeDistribution.reduce(
+                            (sum, item) => sum + (item.value || 0),
+                            0
+                          );
+                        const percentage =
+                          totalFarmers > 0
+                            ? ((type.value / totalFarmers) * 100).toFixed(1)
+                            : 0;
 
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-600">
-                    Crop Varieties
-                  </span>
-                  <span className="text-sm font-semibold text-gray-800">
-                    {formatNumber(
-                      Object.values(dashboardData?.categoryData || {}).reduce(
-                        (acc, category) => acc + (category?.items?.length || 0),
-                        0
-                      )
-                    )}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Farmer Type Distribution */}
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
-              <div className="flex items-center mb-3">
-                <PieChart className="w-4 h-4 mr-2 text-gray-600" />
-                <h5 className="text-sm font-medium text-gray-700">
-                  Farmer Type Distribution
-                </h5>
-              </div>
-
-              {dashboardData?.farmerTypeDistribution &&
-              dashboardData?.farmerTypeDistribution.length > 0 ? (
-                <div className="space-y-2">
-                  {dashboardData?.farmerTypeDistribution.map((type, index) => {
-                    // Calculate percentage
-                    const totalFarmers =
-                      dashboardData?.farmerTypeDistribution.reduce(
-                        (sum, item) => sum + (item.value || 0),
-                        0
-                      );
-                    const percentage =
-                      totalFarmers > 0
-                        ? ((type.value / totalFarmers) * 100).toFixed(1)
-                        : 0;
-
-                    return (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between"
-                      >
-                        <div className="flex items-center">
+                        return (
                           <div
-                            className="w-3 h-3 mr-2 rounded-sm"
-                            style={{
-                              backgroundColor:
-                                farmerTypeColors[type.name] || "#6A9C89",
-                            }}
-                          ></div>
-                          <span className="text-sm text-gray-600">
-                            {type.name}
-                          </span>
-                        </div>
-                        <div className="flex items-center">
-                          <span className="mr-2 text-sm font-semibold text-gray-800">
-                            {formatNumber(type.value || 0)}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            ({percentage}%)
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">
-                  No farmer type data available
-                </p>
-              )}
+                            key={index}
+                            className="flex items-center justify-between"
+                          >
+                            <div className="flex items-center">
+                              <div
+                                className="w-3 h-3 mr-2 rounded-sm"
+                                style={{
+                                  backgroundColor:
+                                    farmerTypeColors[type.name] || "#6A9C89",
+                                }}
+                              ></div>
+                              <span className="text-sm text-gray-600">
+                                {type.name}
+                              </span>
+                            </div>
+                            <div className="flex items-center">
+                              <span className="mr-2 text-sm font-semibold text-gray-800">
+                                {formatNumber(type.value || 0)}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                ({percentage}%)
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    No farmer type data available
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>

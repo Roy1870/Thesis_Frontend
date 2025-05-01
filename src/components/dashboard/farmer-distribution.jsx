@@ -13,11 +13,15 @@ export default function FarmerDistribution({ farmerTypeDistribution }) {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
-  // Colors for the pie chart
+  // Colors for the pie chart - expanded to include all possible farmer types
   const COLORS = {
-    Raiser: "#8884d8",
-    Operator: "#82ca9d",
-    Grower: "#ffc658",
+    Grower: "#8884d8",
+    Raiser: "#82ca9d",
+    Operator: "#ffc658",
+    "Grower & Raiser": "#ff8042",
+    "Grower & Operator": "#0088fe",
+    "Raiser & Operator": "#00c49f",
+    "All Types": "#ff5252",
   };
 
   return (

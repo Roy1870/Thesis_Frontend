@@ -521,9 +521,6 @@ function processHighValueCropsData(highValueCrops = []) {
   };
 }
 
-// Update the main processRawData function to handle sorting
-// Add this function right before the return statement in processRawData
-
 // Add sorting functionality to the processed data
 function sortProcessedData(data, sortField, sortOrder) {
   if (!sortField || !data || !Array.isArray(data)) return data;
@@ -627,9 +624,13 @@ export function processRawData(rawData, filters = {}) {
         cropProduction.push({
           name: getCategoryName(category),
           value: data.total,
+          category: category, // Add the category key for reference
         });
       }
     });
+
+    // Sort crop production by value (descending)
+    cropProduction.sort((a, b) => b.value - a.value);
 
     // Process data for monthly production
     const monthlyProductionMap = {
@@ -1225,37 +1226,75 @@ export function processRawData(rawData, filters = {}) {
     }
 
     // Process farmer type distribution with proper filtering
-    const farmerTypeCount = {
-      Raiser: 0,
-      Operator: 0,
-      Grower: 0,
-    };
-
     // Create sets for faster farmer ID lookups
     const allLivestockFarmerIds = new Set(
-      rawData.livestock.map((record) => record.farmer_id)
+      rawData.livestock.map((record) => record.farmer_id).filter(Boolean)
     );
     const allOperatorFarmerIds = new Set(
-      rawData.operators.map((record) => record.farmer_id)
+      rawData.operators.map((record) => record.farmer_id).filter(Boolean)
     );
-    const allCropFarmerIds = new Set([
-      ...rawData.crops.map((record) => record.farmer_id),
-      ...rawData.rice.map((record) => record.farmer_id),
-      ...rawData.highValueCrops.map((record) => record.farmer_id),
-    ]);
+    const allCropFarmerIds = new Set(
+      [
+        ...rawData.crops.map((record) => record.farmer_id),
+        ...rawData.rice.map((record) => record.farmer_id),
+        ...rawData.highValueCrops.map((record) => record.farmer_id),
+      ].filter(Boolean)
+    );
 
-    // Count farmers by type using the lookup sets - always use the full dataset for "All" filters
+    // Process farmer type distribution with specific mixed types
+    const farmerTypeCount = {
+      Grower: 0,
+      Raiser: 0,
+      Operator: 0,
+      "Grower & Raiser": 0,
+      "Grower & Operator": 0,
+      "Raiser & Operator": 0,
+      "All Types": 0,
+    };
+
+    // Count farmers by type, accounting for mixed types
+    let totalFarmersCount = 0;
+
+    // When using "All months" and "All years" filters, we should count all farmers
+    // regardless of their activity dates
     rawData.farmers.forEach((farmer) => {
-      if (allLivestockFarmerIds.has(farmer.farmer_id)) farmerTypeCount.Raiser++;
-      if (allOperatorFarmerIds.has(farmer.farmer_id))
+      if (!farmer.farmer_id) return;
+
+      // Check which types this farmer belongs to
+      const isGrowerType = allCropFarmerIds.has(farmer.farmer_id);
+      const isRaiserType = allLivestockFarmerIds.has(farmer.farmer_id);
+      const isOperatorType = allOperatorFarmerIds.has(farmer.farmer_id);
+
+      // Skip farmers with no activity in any category
+      if (!isGrowerType && !isRaiserType && !isOperatorType) {
+        return;
+      }
+
+      totalFarmersCount++;
+
+      // Determine the farmer's category based on their types
+      if (isGrowerType && isRaiserType && isOperatorType) {
+        farmerTypeCount["All Types"]++;
+      } else if (isGrowerType && isRaiserType) {
+        farmerTypeCount["Grower & Raiser"]++;
+      } else if (isGrowerType && isOperatorType) {
+        farmerTypeCount["Grower & Operator"]++;
+      } else if (isRaiserType && isOperatorType) {
+        farmerTypeCount["Raiser & Operator"]++;
+      } else if (isGrowerType) {
+        farmerTypeCount.Grower++;
+      } else if (isRaiserType) {
+        farmerTypeCount.Raiser++;
+      } else if (isOperatorType) {
         farmerTypeCount.Operator++;
-      if (allCropFarmerIds.has(farmer.farmer_id)) farmerTypeCount.Grower++;
+      }
     });
 
     // Convert to array for chart
     let farmerTypeDistribution = Object.entries(farmerTypeCount)
       .map(([name, value]) => ({ name, value }))
-      .filter((item) => item.value > 0);
+      .filter((item) => item.value > 0)
+      .sort((a, b) => b.value - a.value); // Sort by value in descending order
 
     // Apply custom sorting to farmer type distribution if needed
     if (filters.sortField === "farmerType") {
@@ -1270,112 +1309,6 @@ export function processRawData(rawData, filters = {}) {
         "value",
         filters.sortOrder
       );
-    }
-
-    // For "All" filters, use the total number of farmers
-    let totalFarmersCount = rawData.farmers.length;
-
-    // Create sets to hold farmer IDs for each category
-    const livestockFarmerIds = new Set();
-    const operatorFarmerIds = new Set();
-    const cropFarmerIds = new Set();
-
-    // Populate the sets with farmer IDs that match the selected filters
-    rawData.livestock.forEach((livestock) => {
-      const createdAt = new Date(livestock.created_at);
-      const itemYear = createdAt.getFullYear();
-      const monthNames = [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ];
-      const itemMonth = monthNames[createdAt.getMonth()];
-
-      if (
-        (selectedYear === "All" || itemYear === Number(selectedYear)) &&
-        (selectedMonth === "All" || itemMonth === selectedMonth)
-      ) {
-        livestockFarmerIds.add(livestock.farmer_id);
-      }
-    });
-
-    rawData.operators.forEach((operator) => {
-      const dateOfHarvest = new Date(operator.date_of_harvest);
-      const itemYear = dateOfHarvest.getFullYear();
-      const monthNames = [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ];
-      const itemMonth = monthNames[dateOfHarvest.getMonth()];
-
-      if (
-        (selectedYear === "All" || itemYear === Number(selectedYear)) &&
-        (selectedMonth === "All" || itemMonth === selectedMonth)
-      ) {
-        operatorFarmerIds.add(operator.farmer_id);
-      }
-    });
-    [...rawData.crops, ...rawData.rice, ...rawData.highValueCrops].forEach(
-      (crop) => {
-        const harvestDate = new Date(crop.harvest_date || crop.created_at);
-        const itemYear = harvestDate.getFullYear();
-        const monthNames = [
-          "Jan",
-          "Feb",
-          "Mar",
-          "Apr",
-          "May",
-          "Jun",
-          "Jul",
-          "Aug",
-          "Sep",
-          "Oct",
-          "Nov",
-          "Dec",
-        ];
-        const itemMonth = monthNames[harvestDate.getMonth()];
-
-        if (
-          (selectedYear === "All" || itemYear === Number(selectedYear)) &&
-          (selectedMonth === "All" || itemMonth === selectedMonth)
-        ) {
-          cropFarmerIds.add(crop.farmer_id);
-        }
-      }
-    );
-
-    // For specific filters, count farmers with activity in the selected period
-    if (selectedYear !== "All" || selectedMonth !== "All") {
-      // Create a set of all farmer IDs that have activity in the selected period
-      const activeFarmerIds = new Set([
-        ...Array.from(livestockFarmerIds),
-        ...Array.from(operatorFarmerIds),
-        ...Array.from(cropFarmerIds),
-      ]);
-
-      // If we have active farmers, use that count
-      if (activeFarmerIds.size > 0) {
-        totalFarmersCount = activeFarmerIds.size;
-      }
     }
 
     // Return processed dashboard data
