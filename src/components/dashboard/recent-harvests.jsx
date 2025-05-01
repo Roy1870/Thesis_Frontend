@@ -1,4 +1,7 @@
 export default function RecentHarvests({ recentHarvests }) {
+  // Check if we have any data to display
+  const hasData = recentHarvests && recentHarvests.length > 0;
+
   // Helper function to format numbers with commas
   const formatNumber = (num) => {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -19,7 +22,7 @@ export default function RecentHarvests({ recentHarvests }) {
           </a>
         </div>
 
-        {recentHarvests.length > 0 ? (
+        {hasData ? (
           <div className="-mx-6 overflow-x-auto">
             <div className="inline-block min-w-full px-6 align-middle">
               <table className="min-w-full">
@@ -123,9 +126,11 @@ export default function RecentHarvests({ recentHarvests }) {
                 d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               ></path>
             </svg>
-            <p className="text-lg font-medium">No recent harvests</p>
+            <p className="text-lg font-medium">
+              No recent harvests for the selected filters
+            </p>
             <p className="mt-2 text-sm text-gray-400">
-              Add harvest data to see recent activity
+              Try adjusting your filter criteria
             </p>
           </div>
         )}

@@ -14,10 +14,13 @@ import { RefreshCw } from "lucide-react";
 import DashboardHeader from "./dashboard/dashboard-header";
 import DashboardStats from "./dashboard/dashboard-stats";
 import TopPerformers from "./dashboard/top-performers";
-import RecentHarvests from "./dashboard/recent-harvests";
 import { processRawData } from "./utils/data-processor";
 import CategoryBreakdown from "./dashboard/category-breakdown";
 import CategoryDetails from "./dashboard/category-details";
+import GlobalFilter from "./dashboard/global-filter";
+
+// Import the filter utilities
+import { filterArrayByDate } from "./utils/filter-utils";
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
@@ -60,6 +63,36 @@ export default function Dashboard() {
     },
   });
 
+  // Global filter state
+  const [selectedYear, setSelectedYear] = useState("All");
+  const [selectedMonth, setSelectedMonth] = useState("All");
+  const [availableYears, setAvailableYears] = useState([]);
+
+  // State to hold filtered data
+  const [filteredData, setFilteredData] = useState({
+    totalProduction: 0,
+    cropProduction: [],
+    monthlyProduction: [],
+    productionByBarangay: [],
+    topPerformingItems: [],
+    recentHarvests: [],
+    productionTrend: 0,
+    totalFarmers: 0,
+    totalArea: 0,
+    farmerTypeDistribution: [],
+    categoryData: {
+      livestock: { total: 0, items: [] },
+      rice: { total: 0, items: [] },
+      banana: { total: 0, items: [] },
+      legumes: { total: 0, items: [] },
+      spices: { total: 0, items: [] },
+      fish: { total: 0, items: [] },
+      highValueCrops: { total: 0, items: [] },
+    },
+  });
+
+  const [isFiltering, setIsFiltering] = useState(false);
+
   // Fetch data on component mount
   useEffect(() => {
     // Check if we have data in the cache first
@@ -84,19 +117,184 @@ export default function Dashboard() {
     if (Object.values(rawData).every((arr) => arr.length === 0)) return;
     const processedData = processRawData(rawData);
     setDashboardData(processedData);
+
+    // Extract available years from the data
+    const years = extractAvailableYears(rawData);
+    setAvailableYears(years);
   }, [rawData]);
+
+  // Initialize filtered data when dashboard data changes
+  useEffect(() => {
+    if (Object.keys(dashboardData).length === 0) return;
+
+    // Initial filtering based on current filter settings
+    updateFilteredData();
+  }, [dashboardData]);
+
+  // Add useEffect to immediately update filtered data when filters change
+  useEffect(() => {
+    console.log("Filters changed, updating filtered data...");
+    updateFilteredData();
+  }, [selectedYear, selectedMonth, rawData, dashboardData]);
+
+  // Function to update filtered data
+  const updateFilteredData = () => {
+    setIsFiltering(true);
+
+    // Small timeout to allow UI to update with loading state if needed
+    setTimeout(() => {
+      try {
+        // If both filters are set to "All", use the original data
+        if (selectedYear === "All" && selectedMonth === "All") {
+          setFilteredData(dashboardData);
+          setIsFiltering(false);
+          return;
+        }
+
+        // Apply filters to raw data first
+        const filteredRawData = {
+          ...rawData,
+          farmers: rawData.farmers, // Keep all farmers regardless of filter
+          rice: filterArrayByDate(
+            rawData.rice,
+            selectedYear,
+            selectedMonth,
+            "harvest_date"
+          ),
+          crops: filterArrayByDate(
+            rawData.crops,
+            selectedYear,
+            selectedMonth,
+            "harvest_date"
+          ),
+          highValueCrops: filterArrayByDate(
+            rawData.highValueCrops,
+            selectedYear,
+            selectedMonth,
+            "harvest_date"
+          ),
+          livestock: filterArrayByDate(
+            rawData.livestock,
+            selectedYear,
+            selectedMonth,
+            "created_at"
+          ),
+          operators: filterArrayByDate(
+            rawData.operators,
+            selectedYear,
+            selectedMonth,
+            "date_of_harvest"
+          ),
+        };
+
+        // Process the filtered raw data
+        const filteredProcessedData = processRawData(filteredRawData, {
+          year: selectedYear,
+          month: selectedMonth,
+        });
+
+        // Update filtered data state with all dashboard data
+        setFilteredData(filteredProcessedData);
+      } catch (err) {
+        console.error("Error during filtering:", err);
+        // If filtering fails, use unfiltered data
+        setFilteredData(dashboardData);
+      } finally {
+        setIsFiltering(false);
+      }
+    }, 10); // Very small timeout just to let the UI thread breathe
+  };
+
+  // Extract available years from raw data
+  const extractAvailableYears = (data) => {
+    const years = new Set();
+    const currentYear = new Date().getFullYear();
+
+    // Add current and previous year as defaults
+    years.add(currentYear);
+    years.add(currentYear - 1);
+
+    // Extract years from various data sources
+    const extractYearFromDate = (dateString) => {
+      if (!dateString) return;
+      try {
+        const year = new Date(dateString).getFullYear();
+        if (!isNaN(year)) years.add(year);
+      } catch (e) {
+        // Ignore invalid dates
+      }
+    };
+
+    // Process farmers data
+    data.farmers.forEach((farmer) => {
+      extractYearFromDate(farmer.created_at);
+    });
+
+    // Process crops data
+    data.crops.forEach((crop) => {
+      extractYearFromDate(crop.harvest_date || crop.created_at);
+    });
+
+    // Process rice data
+    data.rice.forEach((rice) => {
+      extractYearFromDate(rice.harvest_date || rice.created_at);
+    });
+
+    // Process livestock data
+    data.livestock.forEach((livestock) => {
+      extractYearFromDate(livestock.created_at);
+    });
+
+    // Process high value crops data
+    data.highValueCrops.forEach((crop) => {
+      extractYearFromDate(crop.harvest_date || crop.created_at);
+    });
+
+    // Convert Set to sorted array (descending)
+    return Array.from(years).sort((a, b) => b - a);
+  };
+
+  // Helper function to get category icon
+  const getCategoryIcon = (category) => {
+    // This is a placeholder - in a real app you'd return actual icons
+    // Return a placeholder based on category
+    return category;
+  };
+
+  // Helper function to get category color
+  const getCategoryColor = (category) => {
+    const colors = {
+      livestock: "#4CAF50",
+      rice: "#FFC107",
+      banana: "#FF9800",
+      legumes: "#8BC34A",
+      spices: "#FF5722",
+      fish: "#2196F3",
+      highValueCrops: "#9C27B0",
+    };
+
+    return colors[category] || "#6A9C89"; // Default color
+  };
 
   // Prefetch data for other routes
   useEffect(() => {
-    prefetchRouteData("/inventory");
+    try {
+      prefetchRouteData("/inventory").catch((err) => {
+        console.warn("Failed to prefetch inventory data:", err);
+      });
 
-    const analyticsTimer = setTimeout(() => {
-      prefetchRouteData("/analytics");
-    }, 5000);
+      const analyticsTimer = setTimeout(() => {
+        prefetchRouteData("/analytics").catch((err) => {
+          console.warn("Failed to prefetch analytics data:", err);
+        });
+      }, 5000);
 
-    return () => {
-      clearTimeout(analyticsTimer);
-    };
+      return () => {
+        clearTimeout(analyticsTimer);
+      };
+    } catch (err) {
+      console.warn("Error in prefetch setup:", err);
+    }
   }, []);
 
   // Set up polling for data updates
@@ -143,28 +341,51 @@ export default function Dashboard() {
 
       setError(null);
 
-      // Fetch data in parallel
-      const [farmersResponse, livestockResponse, operatorsResponse] =
-        await Promise.all([
-          farmerAPI.getAllFarmers(1, 1000, "", [], signal),
-          livestockAPI.getAllLivestockRecords(1, 1000, "", signal),
-          operatorAPI.getAllOperators(1, 1000, "", signal),
-        ]);
+      // Fetch data in parallel with error handling for each request
+      const results = await Promise.allSettled([
+        farmerAPI.getAllFarmers(1, 1000, "", [], signal),
+        livestockAPI.getAllLivestockRecords(1, 1000, "", signal),
+        operatorAPI.getAllOperators(1, 1000, "", signal),
+      ]);
 
-      // Process farmers data
-      const farmers = Array.isArray(farmersResponse)
-        ? farmersResponse
-        : farmersResponse.data || [];
+      // Process results with fallbacks for failed requests
+      const farmers =
+        results[0].status === "fulfilled"
+          ? Array.isArray(results[0].value)
+            ? results[0].value
+            : results[0].value?.data || []
+          : rawData.farmers.length > 0
+          ? rawData.farmers
+          : [];
 
-      // Process livestock data
-      const livestock = Array.isArray(livestockResponse)
-        ? livestockResponse
-        : livestockResponse.data || [];
+      const livestock =
+        results[1].status === "fulfilled"
+          ? Array.isArray(results[1].value)
+            ? results[1].value
+            : results[1].value?.data || []
+          : rawData.livestock.length > 0
+          ? rawData.livestock
+          : [];
 
-      // Process operators data
-      const operators = Array.isArray(operatorsResponse)
-        ? operatorsResponse
-        : operatorsResponse.data || [];
+      const operators =
+        results[2].status === "fulfilled"
+          ? Array.isArray(results[2].value)
+            ? results[2].value
+            : results[2].value?.data || []
+          : rawData.operators.length > 0
+          ? rawData.operators
+          : [];
+
+      // Log any failed requests
+      results.forEach((result, index) => {
+        if (result.status === "rejected") {
+          const endpoints = ["farmers", "livestock", "operators"];
+          console.warn(
+            `Failed to fetch ${endpoints[index]} data:`,
+            result.reason
+          );
+        }
+      });
 
       // Create a map for faster farmer lookups
       const farmersMap = {};
@@ -369,6 +590,13 @@ export default function Dashboard() {
     }
   };
 
+  // Handle global filter change
+  const handleGlobalFilterChange = ({ year, month }) => {
+    console.log(`Global filter changed: Year=${year}, Month=${month}`);
+    // The state is already updated by the child component
+    // The useEffect above will handle the filtering
+  };
+
   if (loading && Object.values(rawData).every((arr) => arr.length === 0)) {
     return (
       <div className="p-5 bg-[#F5F7F9] min-h-screen overflow-y-auto">
@@ -407,47 +635,71 @@ export default function Dashboard() {
         onRefresh={handleRefresh}
       />
 
-      <DashboardStats dashboardData={dashboardData} />
-      <CategoryBreakdown categoryData={dashboardData.categoryData} />
+      {/* Global Filter */}
+      <GlobalFilter
+        availableYears={availableYears}
+        selectedYear={selectedYear}
+        setSelectedYear={setSelectedYear}
+        selectedMonth={selectedMonth}
+        setSelectedMonth={setSelectedMonth}
+        onFilterChange={handleGlobalFilterChange}
+      />
 
-      {/* Add a link to the analytics page */}
-      <div className="p-6 mb-8 text-center bg-white border border-gray-100 shadow-sm rounded-xl">
-        <h3 className="mb-3 text-xl font-semibold text-gray-800">
-          Charts & Analytics
-        </h3>
-        <p className="mb-4 text-gray-600">
-          All charts have been moved to the Analytics page for a more
-          comprehensive view of your agricultural data.
-        </p>
-        <a
-          href="/analytics"
-          className="inline-flex items-center px-4 py-2 text-white transition-colors bg-[#6A9C89] rounded-md hover:bg-[#5A8C79]"
+      {/* Filter Status Indicator */}
+      {(selectedYear !== "All" || selectedMonth !== "All") && (
+        <div
+          className={`p-4 mb-6 ${
+            isFiltering
+              ? "bg-green-50 border-green-200"
+              : "bg-yellow-50 border-yellow-200"
+          } border rounded-lg transition-colors duration-300`}
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="w-5 h-5 mr-2"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M3 3v18h18" />
-            <path d="M18 17V9" />
-            <path d="M13 17V5" />
-            <path d="M8 17v-3" />
-          </svg>
-          View Analytics
-        </a>
-      </div>
+          <div className="flex items-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className={`w-5 h-5 mr-2 ${
+                isFiltering ? "text-green-600" : "text-yellow-600"
+              }`}
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <p
+              className={`text-sm ${
+                isFiltering ? "text-green-700" : "text-yellow-700"
+              }`}
+            >
+              <span className="font-medium">
+                {isFiltering ? "Updating..." : "Filter Active:"}
+              </span>{" "}
+              {!isFiltering && (
+                <>
+                  Currently showing data for{" "}
+                  {selectedYear === "All"
+                    ? "all years"
+                    : `year ${selectedYear}`}
+                  {selectedMonth === "All" ? "" : `, month ${selectedMonth}`}.
+                  All dashboard sections are filtered.
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Pass the filtered data to DashboardStats */}
+      <DashboardStats dashboardData={filteredData} />
+      <CategoryBreakdown categoryData={filteredData.categoryData} />
 
       {/* Add the CategoryDetails component */}
-      <CategoryDetails categoryData={dashboardData.categoryData} />
+      <CategoryDetails categoryData={filteredData.categoryData} />
 
-      <TopPerformers topPerformingItems={dashboardData.topPerformingItems} />
-
-      <RecentHarvests recentHarvests={dashboardData.recentHarvests} />
+      <TopPerformers topPerformingItems={filteredData.topPerformingItems} />
     </div>
   );
 }
@@ -478,6 +730,17 @@ function DashboardSkeleton() {
           <div className="w-5 h-5 mr-2 bg-gray-200 rounded animate-pulse"></div>
           <div className="w-32 h-5 mr-2 bg-gray-200 rounded animate-pulse"></div>
           <div className="w-24 h-5 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+      </div>
+
+      {/* Global Filter Skeleton */}
+      <div className="p-4 mb-6 bg-white border border-gray-100 shadow-sm rounded-xl">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <div className="w-5 h-5 mr-2 bg-gray-200 rounded animate-pulse"></div>
+            <div className="w-32 h-6 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+          <div className="w-24 h-8 bg-gray-200 rounded-md animate-pulse"></div>
         </div>
       </div>
 
@@ -528,13 +791,6 @@ function DashboardSkeleton() {
             ))}
           </div>
         </div>
-      </div>
-
-      {/* Charts Link Skeleton */}
-      <div className="p-6 mb-8 bg-white border border-gray-100 shadow-md rounded-xl">
-        <div className="w-40 h-6 mx-auto mb-3 bg-gray-200 rounded animate-pulse"></div>
-        <div className="w-3/4 h-4 mx-auto mb-4 bg-gray-200 rounded animate-pulse"></div>
-        <div className="w-32 h-10 mx-auto bg-gray-200 rounded-md animate-pulse"></div>
       </div>
 
       {/* Category Details Skeleton */}
@@ -591,38 +847,6 @@ function DashboardSkeleton() {
               <div className="w-full h-2 mt-3 bg-gray-200 rounded-full animate-pulse"></div>
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* Recent Harvests Skeleton */}
-      <div className="p-6 bg-white border border-gray-100 shadow-md rounded-xl">
-        <div className="flex items-center justify-between mb-6">
-          <div className="w-40 h-6 bg-gray-200 rounded animate-pulse"></div>
-          <div className="w-32 h-5 bg-gray-200 rounded animate-pulse"></div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead>
-              <tr>
-                {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-                  <th key={i} className="px-6 py-3 bg-gray-50">
-                    <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[1, 2, 3, 4, 5].map((i) => (
-                <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                  {[1, 2, 3, 4, 5, 6, 7].map((j) => (
-                    <td key={j} className="px-6 py-4">
-                      <div className="h-5 bg-gray-200 rounded animate-pulse"></div>
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </div>
     </>

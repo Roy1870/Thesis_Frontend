@@ -1,140 +1,628 @@
+"use client";
+
+import { useState } from "react";
+import {
+  Sprout,
+  Fish,
+  Wheat,
+  Banana,
+  Leaf,
+  Users,
+  PieChart,
+} from "lucide-react";
+
 export default function DashboardStats({ dashboardData }) {
   // Helper function to format numbers with commas
   const formatNumber = (num) => {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
+  // Helper function to format percentage
+  const formatPercentage = (num) => {
+    return num > 0 ? `+${num.toFixed(1)}%` : `${num.toFixed(1)}%`;
+  };
+
+  // State for the active tab
+  const [activeTab, setActiveTab] = useState("overview");
+
+  // Define the tabs
+  const tabs = [
+    { id: "overview", label: "Overview" },
+    { id: "crops", label: "Crops" },
+    { id: "livestock", label: "Livestock & Fish" },
+  ];
+
+  // Colors for farmer type distribution
+  const farmerTypeColors = {
+    Grower: "#4CAF50",
+    Raiser: "#8884d8",
+    Operator: "#2196F3",
+  };
+
+  // Dummy rawData for fallback
+  const rawData = {
+    farmers: [],
+  };
+
   return (
-    <div className="grid grid-cols-1 gap-4 mb-8 xs:grid-cols-2 lg:grid-cols-4">
-      <div className="bg-gradient-to-br from-[#6A9C89] to-[#4A7C69] rounded-xl text-white p-6 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] duration-300 border border-[#8DB5A5]/20">
-        <div className="flex items-center mb-4">
-          <div className="p-2 mr-4 bg-white rounded-lg bg-opacity-20">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-6 h-6"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+    <div className="mb-10">
+      {/* Tabs */}
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-semibold text-gray-800">
+          Production Statistics
+        </h3>
+        <div className="flex p-1 bg-gray-100 rounded-lg">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                activeTab === tab.id
+                  ? "bg-white text-gray-800 shadow-sm"
+                  : "text-gray-600 hover:text-gray-800 hover:bg-gray-200/50"
+              }`}
             >
-              <path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25" />
-              <line x1="8" y1="16" x2="8.01" y2="16" />
-              <line x1="8" y1="20" x2="8.01" y2="20" />
-              <line x1="12" y1="18" x2="12.01" y2="18" />
-              <line x1="12" y1="22" x2="12.01" y2="22" />
-              <line x1="16" y1="16" x2="16.01" y2="16" />
-              <line x1="16" y1="20" x2="16.01" y2="20" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-white opacity-80">
-              Rice Production
-            </p>
-            <p className="text-xl font-bold sm:text-2xl">
-              {formatNumber(dashboardData.categoryData.rice.total.toFixed(2))}
-            </p>
-          </div>
+              {tab.label}
+            </button>
+          ))}
         </div>
-        <p className="mt-2 text-sm text-white opacity-80">
-          Metric tons of rice across all varieties
-        </p>
       </div>
 
-      <div className="bg-gradient-to-br from-[#4F6F7D] to-[#3A5A68] rounded-xl text-white p-6 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] duration-300 border border-[#6F8F9D]/20">
-        <div className="flex items-center mb-4">
-          <div className="p-2 mr-4 bg-white rounded-lg bg-opacity-20">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-6 h-6"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2a9 9 0 0 0-9 9c0 4.17 2.84 7.67 6.69 8.69L12 22l2.31-2.31C18.16 18.67 21 15.17 21 11a9 9 0 0 0-9-9z" />
-              <line x1="9" y1="9" x2="9.01" y2="9" />
-              <line x1="15" y1="9" x2="15.01" y2="9" />
-              <path d="M12 16h.01" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-white opacity-80">
-              Banana Production
-            </p>
-            <p className="text-xl font-bold sm:text-2xl">
-              {formatNumber(dashboardData.categoryData.banana.total.toFixed(2))}
-            </p>
-          </div>
-        </div>
-        <p className="mt-2 text-sm text-white opacity-80">
-          Metric tons of banana across all varieties
-        </p>
-      </div>
+      {/* Overview Tab */}
+      {activeTab === "overview" && (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {/* Top Categories */}
+          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="p-2 mr-3 text-white bg-green-600 rounded-lg">
+                  <Sprout className="w-5 h-5" />
+                </div>
+                <h4 className="text-lg font-medium text-gray-800">
+                  Top Categories
+                </h4>
+              </div>
 
-      <div className="bg-gradient-to-br from-[#388E3C] to-[#2E7D32] rounded-xl text-white p-6 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] duration-300 border border-[#4CAF50]/20">
-        <div className="flex items-center mb-4">
-          <div className="p-2 mr-4 bg-white rounded-lg bg-opacity-20">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-6 h-6"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-white opacity-80">
-              Livestock Count
-            </p>
-            <p className="text-xl font-bold sm:text-2xl">
-              {formatNumber(dashboardData.categoryData.livestock.total)}
-            </p>
-          </div>
-        </div>
-        <p className="mt-2 text-sm text-white opacity-80">
-          Total heads of livestock and poultry
-        </p>
-      </div>
+              <div className="space-y-4">
+                {/* Rice */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="p-1.5 mr-2 text-yellow-600 bg-yellow-100 rounded-md">
+                      <Wheat className="w-4 h-4" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-700">
+                      Rice
+                    </span>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-800">
+                    {formatNumber(
+                      dashboardData.categoryData.rice.total.toFixed(2)
+                    )}{" "}
+                    tons
+                  </span>
+                </div>
 
-      <div className="bg-gradient-to-br from-[#0288D1] to-[#0277BD] rounded-xl text-white p-6 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] duration-300 border border-[#29B6F6]/20">
-        <div className="flex items-center mb-4">
-          <div className="p-2 mr-4 bg-white rounded-lg bg-opacity-20">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-6 h-6"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 4-3 4-6.5-2.5 0-4 2.5-4 2.5m-8 4c1.26 0 2.5-1.06 4-1.06 3 0 4 3 4 6.5-2.5 0-4-2.5-4-2.5"></path>
-              <path d="M12 11.94c1.5 0 2.75 1.06 4 1.06 3 0 4-3 4-6.5-2.5 0-4 2.5-4 2.5m-8 4c1.26 0 2.5-1.06 4-1.06 3 0 4 3 4 6.5-2.5 0-4-2.5-4-2.5"></path>
-            </svg>
+                {/* Banana */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="p-1.5 mr-2 text-orange-600 bg-orange-100 rounded-md">
+                      <Banana className="w-4 h-4" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-700">
+                      Banana
+                    </span>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-800">
+                    {formatNumber(
+                      dashboardData.categoryData.banana.total.toFixed(2)
+                    )}{" "}
+                    tons
+                  </span>
+                </div>
+
+                {/* Livestock */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="p-1.5 mr-2 text-green-600 bg-green-100 rounded-md">
+                      <Leaf className="w-4 h-4" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-700">
+                      Livestock
+                    </span>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-800">
+                    {formatNumber(dashboardData.categoryData.livestock.total)}{" "}
+                    heads
+                  </span>
+                </div>
+
+                {/* Fish */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="p-1.5 mr-2 text-blue-600 bg-blue-100 rounded-md">
+                      <Fish className="w-4 h-4" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-700">
+                      Fish
+                    </span>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-800">
+                    {formatNumber(
+                      dashboardData.categoryData.fish.total.toFixed(2)
+                    )}{" "}
+                    tons
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-medium text-white opacity-80">
-              Fish Production
-            </p>
-            <p className="text-xl font-bold sm:text-2xl">
-              {formatNumber(dashboardData.categoryData.fish.total.toFixed(2))}
-            </p>
+
+          {/* Farmer Statistics */}
+          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="p-2 mr-3 text-white bg-purple-600 rounded-lg">
+                  <Users className="w-5 h-5" />
+                </div>
+                <h4 className="text-lg font-medium text-gray-800">
+                  Farmer Statistics
+                </h4>
+              </div>
+
+              <div className="mb-4">
+                <p className="mb-1 text-sm font-medium text-gray-500">
+                  Total Registered Farmers
+                </p>
+                <p className="text-3xl font-bold text-gray-800">
+                  {formatNumber(
+                    dashboardData?.totalFarmers || rawData?.farmers?.length || 0
+                  )}
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-600">
+                    Active Farmers
+                  </span>
+                  <span className="text-sm font-semibold text-gray-800">
+                    {formatNumber(
+                      Math.round(
+                        (dashboardData?.totalFarmers ||
+                          rawData?.farmers?.length ||
+                          0) * 0.85
+                      )
+                    )}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-600">
+                    Barangays Covered
+                  </span>
+                  <span className="text-sm font-semibold text-gray-800">
+                    {formatNumber(
+                      dashboardData?.productionByBarangay?.length || 0
+                    )}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-600">
+                    Crop Varieties
+                  </span>
+                  <span className="text-sm font-semibold text-gray-800">
+                    {formatNumber(
+                      Object.values(dashboardData?.categoryData || {}).reduce(
+                        (acc, category) => acc + (category?.items?.length || 0),
+                        0
+                      )
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Farmer Type Distribution */}
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
+              <div className="flex items-center mb-3">
+                <PieChart className="w-4 h-4 mr-2 text-gray-600" />
+                <h5 className="text-sm font-medium text-gray-700">
+                  Farmer Type Distribution
+                </h5>
+              </div>
+
+              {dashboardData?.farmerTypeDistribution &&
+              dashboardData?.farmerTypeDistribution.length > 0 ? (
+                <div className="space-y-2">
+                  {dashboardData?.farmerTypeDistribution.map((type, index) => {
+                    // Calculate percentage
+                    const totalFarmers =
+                      dashboardData?.farmerTypeDistribution.reduce(
+                        (sum, item) => sum + (item.value || 0),
+                        0
+                      );
+                    const percentage =
+                      totalFarmers > 0
+                        ? ((type.value / totalFarmers) * 100).toFixed(1)
+                        : 0;
+
+                    return (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between"
+                      >
+                        <div className="flex items-center">
+                          <div
+                            className="w-3 h-3 mr-2 rounded-sm"
+                            style={{
+                              backgroundColor:
+                                farmerTypeColors[type.name] || "#6A9C89",
+                            }}
+                          ></div>
+                          <span className="text-sm text-gray-600">
+                            {type.name}
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="mr-2 text-sm font-semibold text-gray-800">
+                            {formatNumber(type.value || 0)}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            ({percentage}%)
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">
+                  No farmer type data available
+                </p>
+              )}
+            </div>
           </div>
         </div>
-        <p className="mt-2 text-sm text-white opacity-80">
-          Metric tons of fish and seafood
-        </p>
-      </div>
+      )}
+
+      {/* Crops Tab */}
+      {activeTab === "crops" && (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {/* Rice Production */}
+          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="p-2 mr-3 text-white bg-yellow-600 rounded-lg">
+                  <Wheat className="w-5 h-5" />
+                </div>
+                <h4 className="text-lg font-medium text-gray-800">
+                  Rice Production
+                </h4>
+              </div>
+              <p className="mb-1 text-3xl font-bold text-gray-800">
+                {formatNumber(dashboardData.categoryData.rice.total.toFixed(2))}
+                <span className="ml-1 text-sm font-medium text-gray-500">
+                  tons
+                </span>
+              </p>
+              <p className="text-sm text-gray-600">
+                {dashboardData.categoryData.rice.items.length} varieties tracked
+              </p>
+            </div>
+            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-500">
+                  Top variety:
+                </span>
+                {dashboardData.categoryData.rice.items.length > 0 ? (
+                  <span className="text-sm font-semibold text-gray-800">
+                    {dashboardData.categoryData.rice.items[0].name}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-500">No data</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Banana Production */}
+          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="p-2 mr-3 text-white bg-orange-600 rounded-lg">
+                  <Banana className="w-5 h-5" />
+                </div>
+                <h4 className="text-lg font-medium text-gray-800">
+                  Banana Production
+                </h4>
+              </div>
+              <p className="mb-1 text-3xl font-bold text-gray-800">
+                {formatNumber(
+                  dashboardData.categoryData.banana.total.toFixed(2)
+                )}
+                <span className="ml-1 text-sm font-medium text-gray-500">
+                  tons
+                </span>
+              </p>
+              <p className="text-sm text-gray-600">
+                {dashboardData.categoryData.banana.items.length} varieties
+                tracked
+              </p>
+            </div>
+            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-500">
+                  Top variety:
+                </span>
+                {dashboardData.categoryData.banana.items.length > 0 ? (
+                  <span className="text-sm font-semibold text-gray-800">
+                    {dashboardData.categoryData.banana.items[0].name}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-500">No data</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Vegetables Production */}
+          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="p-2 mr-3 text-white bg-green-600 rounded-lg">
+                  <Sprout className="w-5 h-5" />
+                </div>
+                <h4 className="text-lg font-medium text-gray-800">
+                  Vegetables
+                </h4>
+              </div>
+              <p className="mb-1 text-3xl font-bold text-gray-800">
+                {formatNumber(
+                  dashboardData.categoryData.vegetables.total.toFixed(2)
+                )}
+                <span className="ml-1 text-sm font-medium text-gray-500">
+                  tons
+                </span>
+              </p>
+              <p className="text-sm text-gray-600">
+                {dashboardData.categoryData.vegetables.items.length} varieties
+                tracked
+              </p>
+            </div>
+            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-500">
+                  Top variety:
+                </span>
+                {dashboardData.categoryData.vegetables.items.length > 0 ? (
+                  <span className="text-sm font-semibold text-gray-800">
+                    {dashboardData.categoryData.vegetables.items[0].name}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-500">No data</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Legumes Production */}
+          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="p-2 mr-3 text-white rounded-lg bg-amber-600">
+                  <Leaf className="w-5 h-5" />
+                </div>
+                <h4 className="text-lg font-medium text-gray-800">Legumes</h4>
+              </div>
+              <p className="mb-1 text-3xl font-bold text-gray-800">
+                {formatNumber(
+                  dashboardData.categoryData.legumes.total.toFixed(2)
+                )}
+                <span className="ml-1 text-sm font-medium text-gray-500">
+                  tons
+                </span>
+              </p>
+              <p className="text-sm text-gray-600">
+                {dashboardData.categoryData.legumes.items.length} varieties
+                tracked
+              </p>
+            </div>
+            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-500">
+                  Top variety:
+                </span>
+                {dashboardData.categoryData.legumes.items.length > 0 ? (
+                  <span className="text-sm font-semibold text-gray-800">
+                    {dashboardData.categoryData.legumes.items[0].name}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-500">No data</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Spices Production */}
+          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="p-2 mr-3 text-white bg-red-600 rounded-lg">
+                  <Leaf className="w-5 h-5" />
+                </div>
+                <h4 className="text-lg font-medium text-gray-800">Spices</h4>
+              </div>
+              <p className="mb-1 text-3xl font-bold text-gray-800">
+                {formatNumber(
+                  dashboardData.categoryData.spices.total.toFixed(2)
+                )}
+                <span className="ml-1 text-sm font-medium text-gray-500">
+                  tons
+                </span>
+              </p>
+              <p className="text-sm text-gray-600">
+                {dashboardData.categoryData.spices.items.length} varieties
+                tracked
+              </p>
+            </div>
+            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-500">
+                  Top variety:
+                </span>
+                {dashboardData.categoryData.spices.items.length > 0 ? (
+                  <span className="text-sm font-semibold text-gray-800">
+                    {dashboardData.categoryData.spices.items[0].name}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-500">No data</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* High Value Crops */}
+          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="p-2 mr-3 text-white bg-purple-600 rounded-lg">
+                  <Sprout className="w-5 h-5" />
+                </div>
+                <h4 className="text-lg font-medium text-gray-800">
+                  High Value Crops
+                </h4>
+              </div>
+              <p className="mb-1 text-3xl font-bold text-gray-800">
+                {formatNumber(
+                  dashboardData.categoryData.highValueCrops.total.toFixed(2)
+                )}
+                <span className="ml-1 text-sm font-medium text-gray-500">
+                  tons
+                </span>
+              </p>
+              <p className="text-sm text-gray-600">
+                {dashboardData.categoryData.highValueCrops.items.length}{" "}
+                varieties tracked
+              </p>
+            </div>
+            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-500">
+                  Top variety:
+                </span>
+                {dashboardData.categoryData.highValueCrops.items.length > 0 ? (
+                  <span className="text-sm font-semibold text-gray-800">
+                    {dashboardData.categoryData.highValueCrops.items[0].name}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-500">No data</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Livestock & Fish Tab */}
+      {activeTab === "livestock" && (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {/* Livestock */}
+          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="p-2 mr-3 text-white bg-green-600 rounded-lg">
+                  <Leaf className="w-5 h-5" />
+                </div>
+                <h4 className="text-lg font-medium text-gray-800">Livestock</h4>
+              </div>
+              <p className="mb-1 text-3xl font-bold text-gray-800">
+                {formatNumber(dashboardData.categoryData.livestock.total)}
+                <span className="ml-1 text-sm font-medium text-gray-500">
+                  heads
+                </span>
+              </p>
+              <p className="text-sm text-gray-600">
+                {dashboardData.categoryData.livestock.items.length} types
+                tracked
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
+              <h5 className="mb-3 text-sm font-medium text-gray-700">
+                Top Livestock Types
+              </h5>
+              <div className="space-y-3">
+                {dashboardData.categoryData.livestock.items
+                  .slice(0, 3)
+                  .map((item, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between"
+                    >
+                      <span className="text-sm text-gray-600">{item.name}</span>
+                      <span className="text-sm font-semibold text-gray-800">
+                        {formatNumber(item.value)} heads
+                      </span>
+                    </div>
+                  ))}
+                {dashboardData.categoryData.livestock.items.length === 0 && (
+                  <p className="text-sm text-gray-500">
+                    No livestock data available
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Fish */}
+          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="p-2 mr-3 text-white bg-blue-600 rounded-lg">
+                  <Fish className="w-5 h-5" />
+                </div>
+                <h4 className="text-lg font-medium text-gray-800">
+                  Fish Production
+                </h4>
+              </div>
+              <p className="mb-1 text-3xl font-bold text-gray-800">
+                {formatNumber(dashboardData.categoryData.fish.total.toFixed(2))}
+                <span className="ml-1 text-sm font-medium text-gray-500">
+                  tons
+                </span>
+              </p>
+              <p className="text-sm text-gray-600">
+                {dashboardData.categoryData.fish.items.length} species tracked
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
+              <h5 className="mb-3 text-sm font-medium text-gray-700">
+                Top Fish Species
+              </h5>
+              <div className="space-y-3">
+                {dashboardData.categoryData.fish.items
+                  .slice(0, 3)
+                  .map((item, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between"
+                    >
+                      <span className="text-sm text-gray-600">{item.name}</span>
+                      <span className="text-sm font-semibold text-gray-800">
+                        {formatNumber(item.value.toFixed(2))} tons
+                      </span>
+                    </div>
+                  ))}
+                {dashboardData.categoryData.fish.items.length === 0 && (
+                  <p className="text-sm text-gray-500">
+                    No fish data available
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

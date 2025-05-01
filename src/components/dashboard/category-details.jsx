@@ -4,241 +4,153 @@ export default function CategoryDetails({ categoryData }) {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
+  // Function to get custom color for each category
+  const getCategoryColor = (category) => {
+    const colors = {
+      rice: {
+        bg: "bg-green-50",
+        border: "border-green-100",
+        textTitle: "text-green-800",
+        textTotal: "text-green-700",
+      },
+      banana: {
+        bg: "bg-yellow-50",
+        border: "border-yellow-100",
+        textTitle: "text-yellow-800",
+        textTotal: "text-yellow-700",
+      },
+      vegetables: {
+        bg: "bg-orange-50",
+        border: "border-orange-100",
+        textTitle: "text-orange-800",
+        textTotal: "text-orange-700",
+      },
+      legumes: {
+        bg: "bg-emerald-50",
+        border: "border-emerald-100",
+        textTitle: "text-emerald-800",
+        textTotal: "text-emerald-700",
+      },
+      spices: {
+        bg: "bg-red-50",
+        border: "border-red-100",
+        textTitle: "text-red-800",
+        textTotal: "text-red-700",
+      },
+      fish: {
+        bg: "bg-blue-50",
+        border: "border-blue-100",
+        textTitle: "text-blue-800",
+        textTotal: "text-blue-700",
+      },
+      highValueCrops: {
+        bg: "bg-purple-50",
+        border: "border-purple-100",
+        textTitle: "text-purple-800",
+        textTotal: "text-purple-700",
+      },
+      livestock: {
+        bg: "bg-indigo-50",
+        border: "border-indigo-100",
+        textTitle: "text-indigo-800",
+        textTotal: "text-indigo-700",
+      },
+    };
+
+    return (
+      colors[category] || {
+        bg: "bg-gray-50",
+        border: "border-gray-100",
+        textTitle: "text-gray-800",
+        textTotal: "text-gray-700",
+      }
+    );
+  };
+
   return (
-    <div className="mb-8 transition-all duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md rounded-xl">
-      <div className="p-6">
-        <h4 className="mb-6 text-lg font-semibold text-gray-800">
-          Detailed Category Totals
-        </h4>
+    <div className="mb-10">
+      <h3 className="px-1 mb-4 text-xl font-semibold text-gray-800">
+        Detailed Category Totals
+      </h3>
+      <div className="overflow-hidden bg-white border border-gray-100 shadow-lg rounded-xl">
+        <div className="p-6">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Rice Section */}
+            {Object.entries(categoryData).map(([category, data]) => {
+              const colors = getCategoryColor(category);
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Rice Section */}
-          <div className="p-4 border border-gray-100 rounded-lg bg-gray-50">
-            <h5 className="mb-3 text-base font-semibold text-gray-800">
-              Rice Varieties
-            </h5>
-            <div className="space-y-2">
-              {categoryData.rice.items.map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">{item.name}</span>
-                  <span className="text-sm font-medium text-gray-800">
-                    {formatNumber(item.value.toFixed(2))} tons
-                  </span>
-                </div>
-              ))}
-              <div className="pt-2 mt-2 border-t border-gray-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">
-                    Total Rice
-                  </span>
-                  <span className="text-sm font-bold text-gray-900">
-                    {formatNumber(categoryData.rice.total.toFixed(2))} tons
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Banana Section */}
-          <div className="p-4 border border-gray-100 rounded-lg bg-gray-50">
-            <h5 className="mb-3 text-base font-semibold text-gray-800">
-              Banana Varieties
-            </h5>
-            <div className="space-y-2">
-              {categoryData.banana.items.map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">{item.name}</span>
-                  <span className="text-sm font-medium text-gray-800">
-                    {formatNumber(item.value.toFixed(2))} tons
-                  </span>
-                </div>
-              ))}
-              <div className="pt-2 mt-2 border-t border-gray-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">
-                    Total Banana
-                  </span>
-                  <span className="text-sm font-bold text-gray-900">
-                    {formatNumber(categoryData.banana.total.toFixed(2))} tons
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Vegetables Section */}
-          <div className="p-4 border border-gray-100 rounded-lg bg-gray-50">
-            <h5 className="mb-3 text-base font-semibold text-gray-800">
-              Vegetables
-            </h5>
-            <div className="space-y-2">
-              {categoryData.vegetables && categoryData.vegetables.items ? (
-                categoryData.vegetables.items.map((item, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between"
+              return (
+                <div
+                  key={category}
+                  className={`p-5 border rounded-xl ${colors.border} ${colors.bg} transition-all hover:shadow-md`}
+                >
+                  <h5
+                    className={`mb-4 text-base font-semibold ${colors.textTitle}`}
                   >
-                    <span className="text-sm text-gray-600">{item.name}</span>
-                    <span className="text-sm font-medium text-gray-800">
-                      {formatNumber(item.value.toFixed(2))} tons
-                    </span>
+                    {category === "rice"
+                      ? "Rice Varieties"
+                      : category === "banana"
+                      ? "Banana Varieties"
+                      : category === "vegetables"
+                      ? "Vegetables"
+                      : category === "legumes"
+                      ? "Legumes"
+                      : category === "spices"
+                      ? "Spices"
+                      : category === "fish"
+                      ? "Fish & Seafood"
+                      : category === "highValueCrops"
+                      ? "High Value Crops"
+                      : category === "livestock"
+                      ? "Livestock & Poultry"
+                      : category}
+                  </h5>
+
+                  <div className="space-y-2">
+                    {data.items.length > 0 ? (
+                      data.items.map((item, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between"
+                        >
+                          <span className="text-sm text-gray-700">
+                            {item.name}
+                          </span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {formatNumber(
+                              item.value.toFixed(
+                                category === "livestock" ? 0 : 2
+                              )
+                            )}
+                            {category === "livestock" ? " heads" : " tons"}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm text-gray-500">
+                        No data available
+                      </div>
+                    )}
+
+                    <div className="pt-3 mt-3 border-t border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`text-sm font-medium ${colors.textTotal}`}
+                        >
+                          Total
+                        </span>
+                        <span className="text-sm font-bold text-gray-900">
+                          {formatNumber(
+                            data.total.toFixed(category === "livestock" ? 0 : 2)
+                          )}
+                          {category === "livestock" ? " heads" : " tons"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                ))
-              ) : (
-                <div className="text-sm text-gray-500">
-                  No vegetable data available
                 </div>
-              )}
-              <div className="pt-2 mt-2 border-t border-gray-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">
-                    Total Vegetables
-                  </span>
-                  <span className="text-sm font-bold text-gray-900">
-                    {formatNumber(
-                      (categoryData.vegetables?.total || 0).toFixed(2)
-                    )}{" "}
-                    tons
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Legumes Section */}
-          <div className="p-4 border border-gray-100 rounded-lg bg-gray-50">
-            <h5 className="mb-3 text-base font-semibold text-gray-800">
-              Legumes
-            </h5>
-            <div className="space-y-2">
-              {categoryData.legumes.items.map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">{item.name}</span>
-                  <span className="text-sm font-medium text-gray-800">
-                    {formatNumber(item.value.toFixed(2))} tons
-                  </span>
-                </div>
-              ))}
-              <div className="pt-2 mt-2 border-t border-gray-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">
-                    Total Legumes
-                  </span>
-                  <span className="text-sm font-bold text-gray-900">
-                    {formatNumber(categoryData.legumes.total.toFixed(2))} tons
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Spices Section */}
-          <div className="p-4 border border-gray-100 rounded-lg bg-gray-50">
-            <h5 className="mb-3 text-base font-semibold text-gray-800">
-              Spices
-            </h5>
-            <div className="space-y-2">
-              {categoryData.spices.items.map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">{item.name}</span>
-                  <span className="text-sm font-medium text-gray-800">
-                    {formatNumber(item.value.toFixed(2))} tons
-                  </span>
-                </div>
-              ))}
-              <div className="pt-2 mt-2 border-t border-gray-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">
-                    Total Spices
-                  </span>
-                  <span className="text-sm font-bold text-gray-900">
-                    {formatNumber(categoryData.spices.total.toFixed(2))} tons
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Fish Section */}
-          <div className="p-4 border border-gray-100 rounded-lg bg-gray-50">
-            <h5 className="mb-3 text-base font-semibold text-gray-800">
-              Fish & Seafood
-            </h5>
-            <div className="space-y-2">
-              {categoryData.fish.items.map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">{item.name}</span>
-                  <span className="text-sm font-medium text-gray-800">
-                    {formatNumber(item.value.toFixed(2))} tons
-                  </span>
-                </div>
-              ))}
-              <div className="pt-2 mt-2 border-t border-gray-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">
-                    Total Fish
-                  </span>
-                  <span className="text-sm font-bold text-gray-900">
-                    {formatNumber(categoryData.fish.total.toFixed(2))} tons
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* High Value Crops Section */}
-          <div className="p-4 border border-gray-100 rounded-lg bg-gray-50">
-            <h5 className="mb-3 text-base font-semibold text-gray-800">
-              High Value Crops
-            </h5>
-            <div className="space-y-2">
-              {categoryData.highValueCrops.items.map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">{item.name}</span>
-                  <span className="text-sm font-medium text-gray-800">
-                    {formatNumber(item.value.toFixed(2))} tons
-                  </span>
-                </div>
-              ))}
-              <div className="pt-2 mt-2 border-t border-gray-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">
-                    Total HVC
-                  </span>
-                  <span className="text-sm font-bold text-gray-900">
-                    {formatNumber(categoryData.highValueCrops.total.toFixed(2))}{" "}
-                    tons
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Livestock Section */}
-          <div className="p-4 border border-gray-100 rounded-lg bg-gray-50">
-            <h5 className="mb-3 text-base font-semibold text-gray-800">
-              Livestock & Poultry
-            </h5>
-            <div className="space-y-2">
-              {categoryData.livestock.items.map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">{item.name}</span>
-                  <span className="text-sm font-medium text-gray-800">
-                    {formatNumber(item.value)} heads
-                  </span>
-                </div>
-              ))}
-              <div className="pt-2 mt-2 border-t border-gray-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">
-                    Total Livestock
-                  </span>
-                  <span className="text-sm font-bold text-gray-900">
-                    {formatNumber(categoryData.livestock.total)} heads
-                  </span>
-                </div>
-              </div>
-            </div>
+              );
+            })}
           </div>
         </div>
       </div>

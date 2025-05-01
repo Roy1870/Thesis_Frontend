@@ -521,9 +521,56 @@ function processHighValueCropsData(highValueCrops = []) {
   };
 }
 
-// Main function to process all raw data
-export function processRawData(rawData) {
+// Update the main processRawData function to handle sorting
+// Add this function right before the return statement in processRawData
+
+// Add sorting functionality to the processed data
+function sortProcessedData(data, sortField, sortOrder) {
+  if (!sortField || !data || !Array.isArray(data)) return data;
+
+  return [...data].sort((a, b) => {
+    let valueA = a[sortField];
+    let valueB = b[sortField];
+
+    // Handle nested properties using dot notation (e.g., "farmer.name")
+    if (sortField.includes(".")) {
+      const parts = sortField.split(".");
+      valueA = parts.reduce(
+        (obj, key) => (obj && obj[key] !== undefined ? obj[key] : null),
+        a
+      );
+      valueB = parts.reduce(
+        (obj, key) => (obj && obj[key] !== undefined ? obj[key] : null),
+        b
+      );
+    }
+
+    // Handle numeric values
+    if (typeof valueA === "number" && typeof valueB === "number") {
+      return sortOrder === "asc" ? valueA - valueB : valueB - valueA;
+    }
+
+    // Handle dates
+    if (valueA instanceof Date && valueB instanceof Date) {
+      return sortOrder === "asc" ? valueA - valueB : valueB - valueA;
+    }
+
+    // Convert to string for default comparison
+    const strA = String(valueA || "").toLowerCase();
+    const strB = String(valueB || "").toLowerCase();
+
+    return sortOrder === "asc"
+      ? strA.localeCompare(strB)
+      : strB.localeCompare(strA);
+  });
+}
+
+// Update the processRawData function to apply sorting to all relevant arrays
+export function processRawData(rawData, filters = {}) {
   try {
+    // Extract filter parameters
+    const { year: selectedYear, month: selectedMonth } = filters;
+
     // Process data for each category
     const categoryData = {
       livestock: processLivestockData(rawData.livestock),
@@ -535,6 +582,37 @@ export function processRawData(rawData) {
       fish: processFishData(rawData.crops, rawData.operators),
       highValueCrops: processHighValueCropsData(rawData.highValueCrops),
     };
+
+    // Add year and month data to items for filtering
+    Object.keys(categoryData).forEach((category) => {
+      if (categoryData[category] && categoryData[category].items) {
+        categoryData[category].items = categoryData[category].items.map(
+          (item) => {
+            return {
+              ...item,
+              // Add a flag to indicate this item has been processed
+              processed: true,
+            };
+          }
+        );
+      }
+    });
+
+    // Apply sorting to category items if specified in filters
+    if (filters.sortField && filters.sortOrder) {
+      Object.keys(categoryData).forEach((category) => {
+        if (
+          categoryData[category] &&
+          Array.isArray(categoryData[category].items)
+        ) {
+          categoryData[category].items = sortProcessedData(
+            categoryData[category].items,
+            filters.sortField,
+            filters.sortOrder
+          );
+        }
+      });
+    }
 
     // Calculate total production across all categories
     const totalProduction = Object.values(categoryData).reduce(
@@ -569,62 +647,52 @@ export function processRawData(rawData) {
       Dec: 0,
     };
 
+    // Helper function to add production to monthly data with date filtering
+    const addToMonthlyData = (item, production, dateField) => {
+      if (!item[dateField] || isNaN(production) || production <= 0) return;
+
+      const harvestDate = new Date(item[dateField]);
+      if (isNaN(harvestDate.getTime())) return;
+
+      // Apply year filter if specified
+      if (selectedYear !== "All" && selectedYear !== undefined) {
+        const itemYear = harvestDate.getFullYear();
+        if (itemYear !== Number(selectedYear)) return;
+      }
+
+      const month = harvestDate.toLocaleString("en-US", { month: "short" });
+      monthlyProductionMap[month] =
+        (monthlyProductionMap[month] || 0) + production;
+    };
+
     // Add rice production to monthly data
     rawData.rice.forEach((rice) => {
-      if (rice.harvest_date) {
-        const harvestDate = new Date(rice.harvest_date);
-        const month = harvestDate.toLocaleString("en-US", { month: "short" });
-        const production = Number.parseFloat(
-          rice.production || rice.yield_amount || 0
-        );
-        if (!isNaN(production) && production > 0) {
-          monthlyProductionMap[month] =
-            (monthlyProductionMap[month] || 0) + production;
-        }
-      }
+      const production = Number.parseFloat(
+        rice.production || rice.yield_amount || 0
+      );
+      addToMonthlyData(rice, production, "harvest_date");
     });
 
     // Add crop production to monthly data
     rawData.crops.forEach((crop) => {
-      if (crop.harvest_date) {
-        const harvestDate = new Date(crop.harvest_date);
-        const month = harvestDate.toLocaleString("en-US", { month: "short" });
-        const production = Number.parseFloat(
-          crop.yield_amount || crop.production || crop.quantity || 0
-        );
-        if (!isNaN(production) && production > 0) {
-          monthlyProductionMap[month] =
-            (monthlyProductionMap[month] || 0) + production;
-        }
-      }
+      const production = Number.parseFloat(
+        crop.yield_amount || crop.production || crop.quantity || 0
+      );
+      addToMonthlyData(crop, production, "harvest_date");
     });
 
     // Add high value crops to monthly data
     rawData.highValueCrops.forEach((crop) => {
-      if (crop.harvest_date) {
-        const harvestDate = new Date(crop.harvest_date);
-        const month = harvestDate.toLocaleString("en-US", { month: "short" });
-        const production = Number.parseFloat(
-          crop.yield_amount || crop.production || crop.quantity || 0
-        );
-        if (!isNaN(production) && production > 0) {
-          monthlyProductionMap[month] =
-            (monthlyProductionMap[month] || 0) + production;
-        }
-      }
+      const production = Number.parseFloat(
+        crop.yield_amount || crop.production || crop.quantity || 0
+      );
+      addToMonthlyData(crop, production, "harvest_date");
     });
 
     // Add fish production to monthly data
     rawData.operators.forEach((operator) => {
-      if (operator.date_of_harvest) {
-        const harvestDate = new Date(operator.date_of_harvest);
-        const month = harvestDate.toLocaleString("en-US", { month: "short" });
-        const production = Number.parseFloat(operator.production_kg || 0);
-        if (!isNaN(production) && production > 0) {
-          monthlyProductionMap[month] =
-            (monthlyProductionMap[month] || 0) + production;
-        }
-      }
+      const production = Number.parseFloat(operator.production_kg || 0);
+      addToMonthlyData(operator, production, "date_of_harvest");
     });
 
     // Convert monthly production to array for chart
@@ -647,12 +715,62 @@ export function processRawData(rawData) {
       production: monthlyProductionMap[month] || 0,
     }));
 
+    // Apply sorting to monthly production if needed
+    if (filters.sortField === "month") {
+      monthlyProduction.sort((a, b) => {
+        const monthIndex = (month) => monthOrder.indexOf(month);
+        return filters.sortOrder === "asc"
+          ? monthIndex(a.name) - monthIndex(b.name)
+          : monthIndex(b.name) - monthIndex(a.name);
+      });
+    } else if (filters.sortField === "production") {
+      monthlyProduction.sort((a, b) => {
+        return filters.sortOrder === "asc"
+          ? a.production - b.production
+          : b.production - a.production;
+      });
+    }
+
     // Process data for production by barangay
     const barangayProductionMap = {};
 
-    // Add all sources of production to barangay map
-    const addToBarangayMap = (item, production) => {
+    // Add all sources of production to barangay map with date filtering
+    const addToBarangayMap = (item, production, dateField) => {
       if (isNaN(production) || production <= 0) return;
+
+      // Apply date filtering if specified
+      if (dateField && (selectedYear !== "All" || selectedMonth !== "All")) {
+        if (!item[dateField]) return;
+
+        const itemDate = new Date(item[dateField]);
+        if (isNaN(itemDate.getTime())) return;
+
+        // Apply year filter
+        if (selectedYear !== "All") {
+          const itemYear = itemDate.getFullYear();
+          if (itemYear !== Number(selectedYear)) return;
+        }
+
+        // Apply month filter
+        if (selectedMonth !== "All") {
+          const monthNames = [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
+          ];
+          const itemMonth = monthNames[itemDate.getMonth()];
+          if (itemMonth !== selectedMonth) return;
+        }
+      }
 
       const barangay = item.barangay || "Unknown";
       barangayProductionMap[barangay] =
@@ -666,7 +784,7 @@ export function processRawData(rawData) {
       const production = Number.parseFloat(
         rice.production || rice.yield_amount || 0
       );
-      addToBarangayMap(rice, production);
+      addToBarangayMap(rice, production, "harvest_date");
     }
 
     // Crop production
@@ -675,7 +793,7 @@ export function processRawData(rawData) {
       const production = Number.parseFloat(
         crop.yield_amount || crop.production || crop.quantity || 0
       );
-      addToBarangayMap(crop, production);
+      addToBarangayMap(crop, production, "harvest_date");
     }
 
     // High value crop production
@@ -684,28 +802,46 @@ export function processRawData(rawData) {
       const production = Number.parseFloat(
         crop.yield_amount || crop.production || crop.quantity || 0
       );
-      addToBarangayMap(crop, production);
+      addToBarangayMap(crop, production, "harvest_date");
     }
 
     // Livestock production
     for (let i = 0; i < rawData.livestock.length; i++) {
       const livestock = rawData.livestock[i];
       const quantity = Number.parseInt(livestock.quantity || 0);
-      addToBarangayMap(livestock, quantity);
+      addToBarangayMap(livestock, quantity, "created_at");
     }
 
     // Operator production
     for (let i = 0; i < rawData.operators.length; i++) {
       const operator = rawData.operators[i];
       const production = Number.parseFloat(operator.production_kg || 0);
-      addToBarangayMap(operator, production);
+      addToBarangayMap(operator, production, "date_of_harvest");
     }
 
     // Convert barangay production to array for chart
-    const productionByBarangay = Object.entries(barangayProductionMap)
+    let productionByBarangay = Object.entries(barangayProductionMap)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 8); // Top 8 barangays
+
+    // Apply custom sorting to barangay data if needed
+    if (filters.sortField === "barangay") {
+      productionByBarangay = sortProcessedData(
+        productionByBarangay,
+        "name",
+        filters.sortOrder
+      );
+    } else if (
+      filters.sortField === "production" ||
+      filters.sortField === "value"
+    ) {
+      productionByBarangay = sortProcessedData(
+        productionByBarangay,
+        "value",
+        filters.sortOrder
+      );
+    }
 
     // Get top performing crops
     const allItems = [];
@@ -722,56 +858,130 @@ export function processRawData(rawData) {
     });
 
     // Sort by value and take top 5
-    const topPerformingItems = allItems
+    let topPerformingItems = allItems
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
 
-    // Calculate total area
+    // Apply custom sorting to top performers if needed
+    if (filters.sortField && filters.sortOrder) {
+      if (filters.sortField === "category") {
+        topPerformingItems = sortProcessedData(
+          topPerformingItems,
+          "category",
+          filters.sortOrder
+        );
+      } else {
+        topPerformingItems = sortProcessedData(
+          topPerformingItems,
+          filters.sortField,
+          filters.sortOrder
+        );
+      }
+    }
+
+    // Calculate total area with date filtering
     let totalArea = 0;
+
+    // Helper function to add area with date filtering
+    const addToTotalArea = (item, area, dateField) => {
+      if (isNaN(area) || area <= 0) return;
+
+      // Apply date filtering if specified
+      if (dateField && (selectedYear !== "All" || selectedMonth !== "All")) {
+        if (!item[dateField]) return;
+
+        const itemDate = new Date(item[dateField]);
+        if (isNaN(itemDate.getTime())) return;
+
+        // Apply year filter
+        if (selectedYear !== "All") {
+          const itemYear = itemDate.getFullYear();
+          if (itemYear !== Number(selectedYear)) return;
+        }
+
+        // Apply month filter
+        if (selectedMonth !== "All") {
+          const monthNames = [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
+          ];
+          const itemMonth = monthNames[itemDate.getMonth()];
+          if (itemMonth !== selectedMonth) return;
+        }
+      }
+
+      totalArea += area;
+    };
 
     // Add rice area
     rawData.rice.forEach((rice) => {
       const area = Number.parseFloat(rice.area_harvested || rice.area || 0);
-      if (!isNaN(area) && area > 0) {
-        totalArea += area;
-      }
+      addToTotalArea(rice, area, "harvest_date");
     });
 
     // Add crop area
     rawData.crops.forEach((crop) => {
       const area = Number.parseFloat(crop.area_hectare || crop.area || 0);
-      if (!isNaN(area) && area > 0) {
-        totalArea += area;
-      }
+      addToTotalArea(crop, area, "harvest_date");
     });
 
     // Add high value crop area
     rawData.highValueCrops.forEach((crop) => {
       const area = Number.parseFloat(crop.area_hectare || crop.area || 0);
-      if (!isNaN(area) && area > 0) {
-        totalArea += area;
-      }
+      addToTotalArea(crop, area, "harvest_date");
     });
 
     // Add operator area
     rawData.operators.forEach((operator) => {
       const area = Number.parseFloat(operator.productive_area_sqm || 0) / 10000; // Convert sqm to hectares
-      if (!isNaN(area) && area > 0) {
-        totalArea += area;
-      }
+      addToTotalArea(operator, area, "date_of_harvest");
     });
 
-    // Calculate production trend (year over year)
+    // Calculate production trend (year over year) with proper filtering
     const currentYear = new Date().getFullYear();
     const lastYear = currentYear - 1;
     let currentYearProduction = 0;
     let lastYearProduction = 0;
 
-    // Function to add to yearly production
+    // Function to add to yearly production with month filtering
     const addToYearlyProduction = (date, production) => {
       if (!date || isNaN(production) || production <= 0) return;
 
-      const year = new Date(date).getFullYear();
+      const itemDate = new Date(date);
+      if (isNaN(itemDate.getTime())) return;
+
+      const year = itemDate.getFullYear();
+
+      // Apply month filter if specified
+      if (selectedMonth !== "All") {
+        const monthNames = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+        const itemMonth = itemDate.getMonth();
+        if (monthNames[itemMonth] !== selectedMonth) return;
+      }
+
       if (year === currentYear) {
         currentYearProduction += production;
       } else if (year === lastYear) {
@@ -824,8 +1034,43 @@ export function processRawData(rawData) {
           100
         : 0;
 
-    // Prepare recent harvests data
+    // Prepare recent harvests data with proper filtering
     const allHarvests = [];
+
+    // Helper function to add harvest with date filtering
+    const addToHarvests = (item, harvestData, dateField) => {
+      if (!item[dateField]) return;
+
+      const harvestDate = new Date(item[dateField]);
+      if (isNaN(harvestDate.getTime())) return;
+      // Apply year filter
+      if (selectedYear !== "All") {
+        const itemYear = harvestDate.getFullYear();
+        if (itemYear !== Number(selectedYear)) return;
+      }
+
+      // Apply month filter
+      if (selectedMonth !== "All") {
+        const monthNames = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+        const itemMonth = monthNames[harvestDate.getMonth()];
+        if (itemMonth !== selectedMonth) return;
+      }
+
+      allHarvests.push(harvestData);
+    };
 
     // Add rice harvests
     rawData.rice.forEach((rice) => {
@@ -833,7 +1078,7 @@ export function processRawData(rawData) {
         rice.production || rice.yield_amount || 0
       );
       if (production > 0) {
-        allHarvests.push({
+        const harvestData = {
           id: rice.id || Math.random().toString(),
           farmer_id: rice.farmer_id,
           farmer_name: rice.farmer_name,
@@ -851,7 +1096,8 @@ export function processRawData(rawData) {
             rice.harvest_date || rice.created_at || new Date()
           ),
           barangay: rice.barangay,
-        });
+        };
+        addToHarvests(rice, harvestData, "harvest_date");
       }
     });
 
@@ -861,7 +1107,7 @@ export function processRawData(rawData) {
         crop.yield_amount || crop.production || crop.quantity || 0
       );
       if (yield_amount > 0) {
-        allHarvests.push({
+        const harvestData = {
           id: crop.id || Math.random().toString(),
           farmer_id: crop.farmer_id,
           farmer_name: crop.farmer_name,
@@ -879,7 +1125,8 @@ export function processRawData(rawData) {
             crop.harvest_date || crop.created_at || new Date()
           ),
           barangay: crop.barangay,
-        });
+        };
+        addToHarvests(crop, harvestData, "harvest_date");
       }
     });
 
@@ -889,7 +1136,7 @@ export function processRawData(rawData) {
         crop.yield_amount || crop.production || crop.quantity || 0
       );
       if (yield_amount > 0) {
-        allHarvests.push({
+        const harvestData = {
           id: crop.id || Math.random().toString(),
           farmer_id: crop.farmer_id,
           farmer_name: crop.farmer_name,
@@ -907,7 +1154,8 @@ export function processRawData(rawData) {
             crop.harvest_date || crop.created_at || new Date()
           ),
           barangay: crop.barangay,
-        });
+        };
+        addToHarvests(crop, harvestData, "harvest_date");
       }
     });
 
@@ -915,7 +1163,7 @@ export function processRawData(rawData) {
     rawData.operators.forEach((operator) => {
       const production = Number.parseFloat(operator.production_kg || 0);
       if (production > 0) {
-        allHarvests.push({
+        const harvestData = {
           id: operator.id || Math.random().toString(),
           farmer_id: operator.farmer_id,
           farmer_name: operator.farmer_name,
@@ -934,48 +1182,201 @@ export function processRawData(rawData) {
             operator.date_of_harvest || operator.created_at || new Date()
           ),
           barangay: operator.barangay,
-        });
+        };
+        addToHarvests(operator, harvestData, "date_of_harvest");
       }
     });
 
     // Sort harvests by date (most recent first) and take top 5
-    const recentHarvests = allHarvests
+    let recentHarvests = allHarvests
       .sort((a, b) => b.harvest_date - a.harvest_date)
       .slice(0, 5);
 
-    // Process farmer type distribution
+    // Apply custom sorting to recent harvests if needed
+    if (filters.sortField && filters.sortOrder) {
+      if (
+        filters.sortField === "date" ||
+        filters.sortField === "harvest_date"
+      ) {
+        recentHarvests = sortProcessedData(
+          recentHarvests,
+          "harvest_date",
+          filters.sortOrder
+        );
+      } else if (filters.sortField === "farmer") {
+        recentHarvests = sortProcessedData(
+          recentHarvests,
+          "farmer_name",
+          filters.sortOrder
+        );
+      } else if (filters.sortField === "crop") {
+        recentHarvests = sortProcessedData(
+          recentHarvests,
+          "crop_type",
+          filters.sortOrder
+        );
+      } else {
+        recentHarvests = sortProcessedData(
+          recentHarvests,
+          filters.sortField,
+          filters.sortOrder
+        );
+      }
+    }
+
+    // Process farmer type distribution with proper filtering
     const farmerTypeCount = {
       Raiser: 0,
       Operator: 0,
       Grower: 0,
     };
 
-    // Create lookup sets for faster checking
-    const livestockFarmerIds = new Set(
+    // Create sets for faster farmer ID lookups
+    const allLivestockFarmerIds = new Set(
       rawData.livestock.map((record) => record.farmer_id)
     );
-
-    const operatorFarmerIds = new Set(
+    const allOperatorFarmerIds = new Set(
       rawData.operators.map((record) => record.farmer_id)
     );
-
-    const cropFarmerIds = new Set([
+    const allCropFarmerIds = new Set([
       ...rawData.crops.map((record) => record.farmer_id),
       ...rawData.rice.map((record) => record.farmer_id),
       ...rawData.highValueCrops.map((record) => record.farmer_id),
     ]);
 
-    // Count farmers by type using the lookup sets
+    // Count farmers by type using the lookup sets - always use the full dataset for "All" filters
     rawData.farmers.forEach((farmer) => {
-      if (livestockFarmerIds.has(farmer.farmer_id)) farmerTypeCount.Raiser++;
-      if (operatorFarmerIds.has(farmer.farmer_id)) farmerTypeCount.Operator++;
-      if (cropFarmerIds.has(farmer.farmer_id)) farmerTypeCount.Grower++;
+      if (allLivestockFarmerIds.has(farmer.farmer_id)) farmerTypeCount.Raiser++;
+      if (allOperatorFarmerIds.has(farmer.farmer_id))
+        farmerTypeCount.Operator++;
+      if (allCropFarmerIds.has(farmer.farmer_id)) farmerTypeCount.Grower++;
     });
 
     // Convert to array for chart
-    const farmerTypeDistribution = Object.entries(farmerTypeCount)
+    let farmerTypeDistribution = Object.entries(farmerTypeCount)
       .map(([name, value]) => ({ name, value }))
       .filter((item) => item.value > 0);
+
+    // Apply custom sorting to farmer type distribution if needed
+    if (filters.sortField === "farmerType") {
+      farmerTypeDistribution = sortProcessedData(
+        farmerTypeDistribution,
+        "name",
+        filters.sortOrder
+      );
+    } else if (filters.sortField === "count" || filters.sortField === "value") {
+      farmerTypeDistribution = sortProcessedData(
+        farmerTypeDistribution,
+        "value",
+        filters.sortOrder
+      );
+    }
+
+    // For "All" filters, use the total number of farmers
+    let totalFarmersCount = rawData.farmers.length;
+
+    // Create sets to hold farmer IDs for each category
+    const livestockFarmerIds = new Set();
+    const operatorFarmerIds = new Set();
+    const cropFarmerIds = new Set();
+
+    // Populate the sets with farmer IDs that match the selected filters
+    rawData.livestock.forEach((livestock) => {
+      const createdAt = new Date(livestock.created_at);
+      const itemYear = createdAt.getFullYear();
+      const monthNames = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+      const itemMonth = monthNames[createdAt.getMonth()];
+
+      if (
+        (selectedYear === "All" || itemYear === Number(selectedYear)) &&
+        (selectedMonth === "All" || itemMonth === selectedMonth)
+      ) {
+        livestockFarmerIds.add(livestock.farmer_id);
+      }
+    });
+
+    rawData.operators.forEach((operator) => {
+      const dateOfHarvest = new Date(operator.date_of_harvest);
+      const itemYear = dateOfHarvest.getFullYear();
+      const monthNames = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+      const itemMonth = monthNames[dateOfHarvest.getMonth()];
+
+      if (
+        (selectedYear === "All" || itemYear === Number(selectedYear)) &&
+        (selectedMonth === "All" || itemMonth === selectedMonth)
+      ) {
+        operatorFarmerIds.add(operator.farmer_id);
+      }
+    });
+    [...rawData.crops, ...rawData.rice, ...rawData.highValueCrops].forEach(
+      (crop) => {
+        const harvestDate = new Date(crop.harvest_date || crop.created_at);
+        const itemYear = harvestDate.getFullYear();
+        const monthNames = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+        const itemMonth = monthNames[harvestDate.getMonth()];
+
+        if (
+          (selectedYear === "All" || itemYear === Number(selectedYear)) &&
+          (selectedMonth === "All" || itemMonth === selectedMonth)
+        ) {
+          cropFarmerIds.add(crop.farmer_id);
+        }
+      }
+    );
+
+    // For specific filters, count farmers with activity in the selected period
+    if (selectedYear !== "All" || selectedMonth !== "All") {
+      // Create a set of all farmer IDs that have activity in the selected period
+      const activeFarmerIds = new Set([
+        ...Array.from(livestockFarmerIds),
+        ...Array.from(operatorFarmerIds),
+        ...Array.from(cropFarmerIds),
+      ]);
+
+      // If we have active farmers, use that count
+      if (activeFarmerIds.size > 0) {
+        totalFarmersCount = activeFarmerIds.size;
+      }
+    }
 
     // Return processed dashboard data
     return {
@@ -986,7 +1387,7 @@ export function processRawData(rawData) {
       topPerformingItems,
       recentHarvests,
       productionTrend,
-      totalFarmers: rawData.farmers.length,
+      totalFarmers: totalFarmersCount,
       totalArea,
       farmerTypeDistribution,
       categoryData,
