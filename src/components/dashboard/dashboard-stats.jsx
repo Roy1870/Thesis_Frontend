@@ -43,10 +43,105 @@ export default function DashboardStats({ dashboardData }) {
     "Grower, Raiser & Operator": "#795548",
   };
 
+  // Get top categories dynamically based on production values
+  const getTopCategories = () => {
+    const categories = Object.entries(dashboardData.categoryData)
+      .map(([key, data]) => ({
+        key,
+        name: getCategoryName(key),
+        total: data.total,
+        unit: key === "livestock" ? "heads" : "tons",
+      }))
+      .filter((cat) => cat.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 4); // Get top 4 categories
+
+    return categories;
+  };
+
+  // Helper function to get category name for display
+  const getCategoryName = (category) => {
+    const categoryNames = {
+      livestock: "Livestock & Poultry",
+      rice: "Rice",
+      banana: "Banana",
+      legumes: "Legumes",
+      spices: "Spices",
+      fish: "Fish",
+      vegetables: "Vegetables",
+      highValueCrops: "High Value Crops",
+    };
+
+    return categoryNames[category] || category;
+  };
+
+  // Helper function to get category icon with correct color
+  const getCategoryIcon = (category) => {
+    switch (category) {
+      case "rice":
+        return (
+          <div className="p-1.5 mr-2 text-green-600 bg-green-50 rounded-md">
+            <Wheat className="w-4 h-4" />
+          </div>
+        );
+      case "livestock":
+        return (
+          <div className="p-1.5 mr-2 text-purple-600 bg-purple-50 rounded-md">
+            <Leaf className="w-4 h-4" />
+          </div>
+        );
+      case "fish":
+        return (
+          <div className="p-1.5 mr-2 text-blue-600 bg-blue-50 rounded-md">
+            <Fish className="w-4 h-4" />
+          </div>
+        );
+      case "banana":
+        return (
+          <div className="p-1.5 mr-2 text-yellow-600 bg-yellow-50 rounded-md">
+            <Banana className="w-4 h-4" />
+          </div>
+        );
+      case "vegetables":
+        return (
+          <div className="p-1.5 mr-2 text-orange-600 bg-orange-50 rounded-md">
+            <Sprout className="w-4 h-4" />
+          </div>
+        );
+      case "legumes":
+        return (
+          <div className="p-1.5 mr-2 text-emerald-600 bg-emerald-50 rounded-md">
+            <Leaf className="w-4 h-4" />
+          </div>
+        );
+      case "spices":
+        return (
+          <div className="p-1.5 mr-2 text-red-600 bg-red-50 rounded-md">
+            <Leaf className="w-4 h-4" />
+          </div>
+        );
+      case "highValueCrops":
+        return (
+          <div className="p-1.5 mr-2 text-amber-600 bg-amber-50 rounded-md">
+            <Sprout className="w-4 h-4" />
+          </div>
+        );
+      default:
+        return (
+          <div className="p-1.5 mr-2 text-gray-600 bg-gray-50 rounded-md">
+            <Leaf className="w-4 h-4" />
+          </div>
+        );
+    }
+  };
+
   // Dummy rawData for fallback
   const rawData = {
     farmers: [],
   };
+
+  // Get top categories
+  const topCategories = getTopCategories();
 
   return (
     <div className="mb-10">
@@ -79,7 +174,7 @@ export default function DashboardStats({ dashboardData }) {
           <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
             <div className="p-6">
               <div className="flex items-center mb-4">
-                <div className="p-2 mr-3 text-white bg-green-600 rounded-lg">
+                <div className="p-2 mr-3 text-white rounded-lg bg-emerald-600">
                   <Sprout className="w-5 h-5" />
                 </div>
                 <h4 className="text-lg font-medium text-gray-800">
@@ -88,75 +183,35 @@ export default function DashboardStats({ dashboardData }) {
               </div>
 
               <div className="space-y-4">
-                {/* Rice */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="p-1.5 mr-2 text-yellow-600 bg-yellow-100 rounded-md">
-                      <Wheat className="w-4 h-4" />
+                {/* Dynamically render top categories */}
+                {topCategories.map((category, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="flex items-center">
+                      {getCategoryIcon(category.key)}
+                      <span className="text-sm font-medium text-gray-700">
+                        {category.name}
+                      </span>
                     </div>
-                    <span className="text-sm font-medium text-gray-700">
-                      Rice
+                    <span className="text-sm font-semibold text-gray-800">
+                      {formatNumber(
+                        category.key === "livestock"
+                          ? category.total
+                          : category.total.toFixed(2)
+                      )}{" "}
+                      {category.unit}
                     </span>
                   </div>
-                  <span className="text-sm font-semibold text-gray-800">
-                    {formatNumber(
-                      dashboardData.categoryData.rice.total.toFixed(2)
-                    )}{" "}
-                    tons
-                  </span>
-                </div>
+                ))}
 
-                {/* Banana */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="p-1.5 mr-2 text-orange-600 bg-orange-100 rounded-md">
-                      <Banana className="w-4 h-4" />
-                    </div>
-                    <span className="text-sm font-medium text-gray-700">
-                      Banana
-                    </span>
-                  </div>
-                  <span className="text-sm font-semibold text-gray-800">
-                    {formatNumber(
-                      dashboardData.categoryData.banana.total.toFixed(2)
-                    )}{" "}
-                    tons
-                  </span>
-                </div>
-
-                {/* Livestock */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="p-1.5 mr-2 text-green-600 bg-green-100 rounded-md">
-                      <Leaf className="w-4 h-4" />
-                    </div>
-                    <span className="text-sm font-medium text-gray-700">
-                      Livestock
-                    </span>
-                  </div>
-                  <span className="text-sm font-semibold text-gray-800">
-                    {formatNumber(dashboardData.categoryData.livestock.total)}{" "}
-                    heads
-                  </span>
-                </div>
-
-                {/* Fish */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="p-1.5 mr-2 text-blue-600 bg-blue-100 rounded-md">
-                      <Fish className="w-4 h-4" />
-                    </div>
-                    <span className="text-sm font-medium text-gray-700">
-                      Fish
-                    </span>
-                  </div>
-                  <span className="text-sm font-semibold text-gray-800">
-                    {formatNumber(
-                      dashboardData.categoryData.fish.total.toFixed(2)
-                    )}{" "}
-                    tons
-                  </span>
-                </div>
+                {/* If we have fewer than 4 categories with data, fill with empty entries */}
+                {topCategories.length === 0 && (
+                  <p className="text-sm text-gray-500">
+                    No production data available
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -257,7 +312,7 @@ export default function DashboardStats({ dashboardData }) {
           <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
             <div className="p-6">
               <div className="flex items-center mb-4">
-                <div className="p-2 mr-3 text-white bg-yellow-600 rounded-lg">
+                <div className="p-2 mr-3 text-white bg-green-600 rounded-lg">
                   <Wheat className="w-5 h-5" />
                 </div>
                 <h4 className="text-lg font-medium text-gray-800">
@@ -294,7 +349,7 @@ export default function DashboardStats({ dashboardData }) {
           <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
             <div className="p-6">
               <div className="flex items-center mb-4">
-                <div className="p-2 mr-3 text-white bg-orange-600 rounded-lg">
+                <div className="p-2 mr-3 text-white bg-yellow-600 rounded-lg">
                   <Banana className="w-5 h-5" />
                 </div>
                 <h4 className="text-lg font-medium text-gray-800">
@@ -334,7 +389,7 @@ export default function DashboardStats({ dashboardData }) {
           <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
             <div className="p-6">
               <div className="flex items-center mb-4">
-                <div className="p-2 mr-3 text-white bg-green-600 rounded-lg">
+                <div className="p-2 mr-3 text-white bg-orange-600 rounded-lg">
                   <Sprout className="w-5 h-5" />
                 </div>
                 <h4 className="text-lg font-medium text-gray-800">
@@ -374,7 +429,7 @@ export default function DashboardStats({ dashboardData }) {
           <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
             <div className="p-6">
               <div className="flex items-center mb-4">
-                <div className="p-2 mr-3 text-white rounded-lg bg-amber-600">
+                <div className="p-2 mr-3 text-white rounded-lg bg-emerald-600">
                   <Leaf className="w-5 h-5" />
                 </div>
                 <h4 className="text-lg font-medium text-gray-800">Legumes</h4>
@@ -450,7 +505,7 @@ export default function DashboardStats({ dashboardData }) {
           <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
             <div className="p-6">
               <div className="flex items-center mb-4">
-                <div className="p-2 mr-3 text-white bg-purple-600 rounded-lg">
+                <div className="p-2 mr-3 text-white rounded-lg bg-amber-600">
                   <Sprout className="w-5 h-5" />
                 </div>
                 <h4 className="text-lg font-medium text-gray-800">
@@ -495,7 +550,7 @@ export default function DashboardStats({ dashboardData }) {
           <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
             <div className="p-6">
               <div className="flex items-center mb-4">
-                <div className="p-2 mr-3 text-white bg-green-600 rounded-lg">
+                <div className="p-2 mr-3 text-white bg-purple-600 rounded-lg">
                   <Leaf className="w-5 h-5" />
                 </div>
                 <h4 className="text-lg font-medium text-gray-800">Livestock</h4>

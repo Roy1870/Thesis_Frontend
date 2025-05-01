@@ -44,16 +44,16 @@ export default function CategoryDetails({ categoryData }) {
         textTotal: "text-blue-700",
       },
       highValueCrops: {
+        bg: "bg-amber-50",
+        border: "border-amber-100",
+        textTitle: "text-amber-800",
+        textTotal: "text-amber-700",
+      },
+      livestock: {
         bg: "bg-purple-50",
         border: "border-purple-100",
         textTitle: "text-purple-800",
         textTotal: "text-purple-700",
-      },
-      livestock: {
-        bg: "bg-indigo-50",
-        border: "border-indigo-100",
-        textTitle: "text-indigo-800",
-        textTotal: "text-indigo-700",
       },
     };
 

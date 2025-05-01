@@ -12,8 +12,9 @@ import { useRefreshStore } from "./shared-store";
 
 // Import analytics components
 import AnalyticsHeader from "./analytics/analytics-header";
-import CategoryAnalytics from "./analytics/category-analytics";
 import { processRawData } from "./utils/data-processor";
+import CategoryComparisonChart from "./analytics/category-comparison-chart";
+import CategoryMetricsCarousel from "./analytics/category-metrics-carousel.jsx";
 
 function Analytics() {
   const [loading, setLoading] = useState(true);
@@ -34,6 +35,7 @@ function Analytics() {
     rice: [],
     highValueCrops: [],
   });
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const [analyticsData, setAnalyticsData] = useState({
     totalProduction: 0,
@@ -411,6 +413,102 @@ function Analytics() {
     return Array.from(years).sort((a, b) => b - a);
   };
 
+  // Add this helper function before the return statement to prepare data for the comparison chart
+  const prepareComparisonData = (data, year) => {
+    // Get all months for the selected year
+    const months = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+
+    // Create base data structure with months
+    const comparisonData = months.map((month) => ({
+      name: month,
+      rice: 0,
+      livestock: 0,
+      banana: 0,
+      vegetables: 0,
+      legumes: 0,
+      spices: 0,
+      fish: 0,
+      highValueCrops: 0,
+    }));
+
+    // Process rice data
+    data.rice.forEach((item) => {
+      const date = new Date(item.harvest_date);
+      if (date.getFullYear() === year) {
+        const monthIndex = date.getMonth();
+        const quantity = Number.parseFloat(item.quantity) || 0;
+        comparisonData[monthIndex].rice += quantity;
+      }
+    });
+
+    // Process crops data
+    data.crops.forEach((crop) => {
+      const date = new Date(crop.harvest_date);
+      if (date.getFullYear() === year) {
+        const monthIndex = date.getMonth();
+        const quantity = Number.parseFloat(crop.quantity) || 0;
+
+        // Categorize by crop type
+        if (crop.crop_type === "Banana") {
+          comparisonData[monthIndex].banana += quantity;
+        } else if (crop.crop_type === "Vegetables") {
+          comparisonData[monthIndex].vegetables += quantity;
+        } else if (crop.crop_type === "Legumes") {
+          comparisonData[monthIndex].legumes += quantity;
+        } else if (crop.crop_type === "Spices") {
+          comparisonData[monthIndex].spices += quantity;
+        }
+      }
+    });
+
+    // Process high value crops
+    data.highValueCrops.forEach((crop) => {
+      const date = new Date(crop.harvest_date);
+      if (date.getFullYear() === year) {
+        const monthIndex = date.getMonth();
+        const quantity = Number.parseFloat(crop.quantity) || 0;
+        comparisonData[monthIndex].highValueCrops += quantity;
+      }
+    });
+
+    // Process livestock data (convert to equivalent tons for comparison)
+    data.livestock.forEach((item) => {
+      const date = new Date(item.created_at);
+      if (date.getFullYear() === year) {
+        const monthIndex = date.getMonth();
+        const quantity = Number.parseFloat(item.quantity) || 0;
+        comparisonData[monthIndex].livestock += quantity;
+      }
+    });
+
+    // Process fish data from operators
+    data.operators.forEach((operator) => {
+      if (operator.category === "Fish") {
+        const date = new Date(operator.date_of_harvest || operator.created_at);
+        if (date.getFullYear() === year) {
+          const monthIndex = date.getMonth();
+          const quantity = Number.parseFloat(operator.production_volume) || 0;
+          comparisonData[monthIndex].fish += quantity;
+        }
+      }
+    });
+
+    return comparisonData;
+  };
+
   if (loading && Object.values(rawData).every((arr) => arr.length === 0)) {
     return (
       <div className="min-h-screen p-5 bg-[#F5F7F9] overflow-y-auto">
@@ -462,17 +560,49 @@ function Analytics() {
         onRefresh={handleRefresh}
       />
 
-      {/* Category-specific analytics */}
-      {categories.map((category) => (
-        <CategoryAnalytics
-          key={category.id}
-          category={category}
-          categoryData={analyticsData.categoryData[category.id]}
-          rawData={rawData}
-          availableYears={getAvailableYears()}
-          loading={loading}
-        />
-      ))}
+      {/* Category Metrics Carousel */}
+      <CategoryMetricsCarousel
+        categories={categories}
+        rawData={rawData}
+        loading={loading}
+      />
+
+      {/* Main comparison chart card */}
+      <div className="p-6 mb-8 bg-white shadow-sm rounded-xl">
+        <h2 className="mb-4 text-xl font-semibold text-gray-800">
+          Agricultural Production Comparison
+        </h2>
+        <p className="mb-6 text-gray-600">
+          Compare production trends across all agricultural categories
+        </p>
+
+        {/* Year selector */}
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          <span className="text-sm font-medium text-gray-600">
+            Filter by year:
+          </span>
+          <select
+            className="px-3 py-1 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500"
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number.parseInt(e.target.value))}
+          >
+            {getAvailableYears().map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* The comparison chart */}
+        <div className="h-[500px]">
+          <CategoryComparisonChart
+            data={prepareComparisonData(rawData, selectedYear)}
+            categories={categories}
+            loading={loading}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -502,8 +632,34 @@ function AnalyticsSkeleton() {
         </div>
       </div>
 
+      {/* Category Metrics Carousel Skeleton */}
+      <div className="p-6 mb-8 bg-white shadow-sm rounded-xl">
+        <div className="flex justify-between mb-6">
+          <div className="w-48 bg-gray-200 rounded h-7 animate-pulse"></div>
+          <div className="flex space-x-2">
+            <div className="w-24 h-8 bg-gray-200 rounded-lg animate-pulse"></div>
+            <div className="w-24 h-8 bg-gray-200 rounded-lg animate-pulse"></div>
+          </div>
+        </div>
+
+        <div className="h-12 mb-6 bg-gray-100 rounded-lg animate-pulse"></div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="p-5 rounded-lg bg-gray-50 animate-pulse">
+              <div className="flex justify-between mb-3">
+                <div className="w-24 h-4 bg-gray-200 rounded"></div>
+                <div className="w-6 h-6 bg-gray-200 rounded-full"></div>
+              </div>
+              <div className="w-16 h-8 mb-1 bg-gray-200 rounded"></div>
+              <div className="w-12 h-3 bg-gray-200 rounded"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Category Analytics Skeletons */}
-      {[1, 2, 3, 4].map((i) => (
+      {[1, 2].map((i) => (
         <div key={i} className="mb-8">
           <div className="flex items-center mb-4">
             <div className="w-10 h-10 mr-3 bg-gray-200 rounded-full animate-pulse"></div>
