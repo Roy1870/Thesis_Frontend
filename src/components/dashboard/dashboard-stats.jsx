@@ -50,7 +50,7 @@ export default function DashboardStats({ dashboardData }) {
         key,
         name: getCategoryName(key),
         total: data.total,
-        unit: key === "livestock" ? "heads" : "tons",
+        unit: key === "livestock" ? "heads" : key === "rice" ? "kg" : "tons",
       }))
       .filter((cat) => cat.total > 0)
       .sort((a, b) => b.total - a.total)
@@ -322,7 +322,7 @@ export default function DashboardStats({ dashboardData }) {
               <p className="mb-1 text-3xl font-bold text-gray-800">
                 {formatNumber(dashboardData.categoryData.rice.total.toFixed(2))}
                 <span className="ml-1 text-sm font-medium text-gray-500">
-                  tons
+                  kg
                 </span>
               </p>
               <p className="text-sm text-gray-600">

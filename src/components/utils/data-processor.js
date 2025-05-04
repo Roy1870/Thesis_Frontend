@@ -148,7 +148,7 @@ function processLivestockData(livestock = []) {
   };
 }
 
-// Process rice data
+// Process rice data - keep values in kg instead of converting to tons
 function processRiceData(riceData = []) {
   const varietyMap = {};
 
@@ -666,7 +666,7 @@ export function processRawData(rawData, filters = {}) {
         (monthlyProductionMap[month] || 0) + production;
     };
 
-    // Add rice production to monthly data
+    // Add rice production to monthly data - keep in kg
     rawData.rice.forEach((rice) => {
       const production = Number.parseFloat(
         rice.production || rice.yield_amount || 0
@@ -779,7 +779,7 @@ export function processRawData(rawData, filters = {}) {
     };
 
     // Process all data sources in parallel using batch processing
-    // Rice production
+    // Rice production - keep in kg
     for (let i = 0; i < rawData.rice.length; i++) {
       const rice = rawData.rice[i];
       const production = Number.parseFloat(
@@ -991,7 +991,7 @@ export function processRawData(rawData, filters = {}) {
     };
 
     // Process all data sources in parallel for yearly production
-    // Rice production
+    // Rice production - keep in kg
     for (let i = 0; i < rawData.rice.length; i++) {
       const rice = rawData.rice[i];
       const production = Number.parseFloat(
@@ -1073,7 +1073,7 @@ export function processRawData(rawData, filters = {}) {
       allHarvests.push(harvestData);
     };
 
-    // Add rice harvests
+    // Add rice harvests - keep in kg
     rawData.rice.forEach((rice) => {
       const production = Number.parseFloat(
         rice.production || rice.yield_amount || 0

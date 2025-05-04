@@ -278,9 +278,9 @@ export default function CategoryAnalytics({
               cropType.includes("tomato") ||
               cropValue.includes("tomato") ||
               cropType.includes("eggplant") ||
-              cropValue.includes("eggplant") ||
+              cropType.includes("eggplant") ||
               cropType.includes("cabbage") ||
-              cropValue.includes("cabbage")
+              cropType.includes("cabbage")
             );
           case "legumes":
             return (

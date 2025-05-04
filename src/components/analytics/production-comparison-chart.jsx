@@ -25,12 +25,16 @@ export default function ProductionComparisonChart({
   // Custom tooltip formatter
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
+      let displayUnit = unit;
+      if (label === "rice") {
+        displayUnit = "kg";
+      }
       return (
         <div className="p-3 bg-white border border-gray-100 rounded-lg shadow-md">
           <p className="mb-1 text-sm font-medium text-gray-600">{label}</p>
           <p className="text-base font-semibold text-green-700">
             {formatNumber(payload[0].value.toFixed(unit === "heads" ? 0 : 2))}{" "}
-            {unit}
+            {displayUnit}
           </p>
         </div>
       );

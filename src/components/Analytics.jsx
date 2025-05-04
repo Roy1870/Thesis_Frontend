@@ -7,7 +7,7 @@ import {
   operatorAPI,
   prefetchRouteData,
 } from "./services/api";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Calendar, BarChart3 } from "lucide-react";
 import { useRefreshStore } from "./shared-store";
 
 // Import analytics components
@@ -15,6 +15,7 @@ import AnalyticsHeader from "./analytics/analytics-header";
 import { processRawData } from "./utils/data-processor";
 import CategoryComparisonChart from "./analytics/category-comparison-chart";
 import CategoryMetricsCarousel from "./analytics/category-metrics-carousel.jsx";
+import BarangaySummary from "./analytics/barangay-summary";
 
 function Analytics() {
   const [loading, setLoading] = useState(true);
@@ -36,6 +37,7 @@ function Analytics() {
     highValueCrops: [],
   });
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [viewMode, setViewMode] = useState("monthly"); // "monthly" or "yearly"
 
   const [analyticsData, setAnalyticsData] = useState({
     totalProduction: 0,
@@ -444,13 +446,15 @@ function Analytics() {
       highValueCrops: 0,
     }));
 
-    // Process rice data
+    // Process rice data - keep in kg instead of converting to tons
     data.rice.forEach((item) => {
       const date = new Date(item.harvest_date);
       if (date.getFullYear() === year) {
         const monthIndex = date.getMonth();
-        const quantity = Number.parseFloat(item.quantity) || 0;
-        comparisonData[monthIndex].rice += quantity;
+        const production = Number.parseFloat(
+          item.production || item.yield_amount || 0
+        );
+        comparisonData[monthIndex].rice += production;
       }
     });
 
@@ -509,6 +513,129 @@ function Analytics() {
     return comparisonData;
   };
 
+  // Prepare data for yearly comparison chart
+  const prepareYearlyComparisonData = (data) => {
+    // Get available years from data but sort in ascending order (oldest first)
+    const years = getAvailableYears().sort((a, b) => a - b);
+
+    // Create base data structure with years
+    const yearlyData = years.map((year) => ({
+      name: year.toString(),
+      rice: 0,
+      livestock: 0,
+      banana: 0,
+      vegetables: 0,
+      legumes: 0,
+      spices: 0,
+      fish: 0,
+      highValueCrops: 0,
+    }));
+
+    // Process rice data - keep in kg instead of converting to tons
+    data.rice.forEach((item) => {
+      if (item.harvest_date) {
+        const year = new Date(item.harvest_date).getFullYear();
+        const yearIndex = years.indexOf(year);
+        if (yearIndex !== -1) {
+          const production = Number.parseFloat(
+            item.production || item.yield_amount || 0
+          );
+          yearlyData[yearIndex].rice += production;
+        }
+      }
+    });
+
+    // Process crops data
+    data.crops.forEach((crop) => {
+      if (crop.harvest_date) {
+        const year = new Date(crop.harvest_date).getFullYear();
+        const yearIndex = years.indexOf(year);
+        if (yearIndex !== -1) {
+          const production = Number.parseFloat(
+            crop.yield_amount || crop.production || crop.quantity || 0
+          );
+
+          // Categorize by crop type
+          const cropType = (crop.crop_type || "").toLowerCase();
+          const cropValue = (crop.crop_value || "").toLowerCase();
+
+          if (cropType.includes("banana") || cropValue.includes("banana")) {
+            yearlyData[yearIndex].banana += production;
+          } else if (
+            cropType.includes("vegetable") ||
+            cropValue.includes("vegetable") ||
+            cropType.includes("tomato") ||
+            cropValue.includes("tomato") ||
+            cropType.includes("eggplant") ||
+            cropValue.includes("eggplant") ||
+            cropType.includes("cabbage") ||
+            cropValue.includes("cabbage")
+          ) {
+            yearlyData[yearIndex].vegetables += production;
+          } else if (
+            cropType.includes("legume") ||
+            cropValue.includes("legume") ||
+            cropType.includes("bean") ||
+            cropValue.includes("bean")
+          ) {
+            yearlyData[yearIndex].legumes += production;
+          } else if (
+            cropType.includes("spice") ||
+            cropValue.includes("spice")
+          ) {
+            yearlyData[yearIndex].spices += production;
+          }
+        }
+      }
+    });
+
+    // Process high value crops
+    data.highValueCrops.forEach((crop) => {
+      if (crop.harvest_date) {
+        const year = new Date(crop.harvest_date).getFullYear();
+        const yearIndex = years.indexOf(year);
+        if (yearIndex !== -1) {
+          const production = Number.parseFloat(
+            crop.yield_amount || crop.production || crop.quantity || 0
+          );
+          yearlyData[yearIndex].highValueCrops += production;
+        }
+      }
+    });
+
+    // Process livestock data
+    data.livestock.forEach((item) => {
+      if (item.created_at) {
+        const year = new Date(item.created_at).getFullYear();
+        const yearIndex = years.indexOf(year);
+        if (yearIndex !== -1) {
+          const quantity = Number.parseFloat(item.quantity || 0);
+          yearlyData[yearIndex].livestock += quantity;
+        }
+      }
+    });
+
+    // Process fish data from operators
+    data.operators.forEach((operator) => {
+      if (
+        operator.category === "Fish" &&
+        (operator.date_of_harvest || operator.created_at)
+      ) {
+        const date = new Date(operator.date_of_harvest || operator.created_at);
+        const year = date.getFullYear();
+        const yearIndex = years.indexOf(year);
+        if (yearIndex !== -1) {
+          const production = Number.parseFloat(
+            operator.production_kg || operator.production_volume || 0
+          );
+          yearlyData[yearIndex].fish += production;
+        }
+      }
+    });
+
+    return yearlyData;
+  };
+
   if (loading && Object.values(rawData).every((arr) => arr.length === 0)) {
     return (
       <div className="min-h-screen p-5 bg-[#F5F7F9] overflow-y-auto">
@@ -534,9 +661,9 @@ function Analytics() {
     );
   }
 
-  // Define categories for analytics
+  // Define categories for analytics - update rice unit to kg
   const categories = [
-    { id: "rice", name: "Rice", icon: "🌾", unit: "tons" },
+    { id: "rice", name: "Rice", icon: "🌾", unit: "kg" },
     { id: "livestock", name: "Livestock & Poultry", icon: "🐄", unit: "heads" },
     { id: "banana", name: "Banana", icon: "🍌", unit: "tons" },
     { id: "vegetables", name: "Vegetables", icon: "🥕", unit: "tons" },
@@ -567,42 +694,89 @@ function Analytics() {
         loading={loading}
       />
 
-      {/* Main comparison chart card */}
+      {/* Combined Agricultural Production Comparison */}
       <div className="p-6 mb-8 bg-white shadow-sm rounded-xl">
-        <h2 className="mb-4 text-xl font-semibold text-gray-800">
-          Agricultural Production Comparison
-        </h2>
-        <p className="mb-6 text-gray-600">
-          Compare production trends across all agricultural categories
-        </p>
+        <div className="flex flex-wrap items-center justify-between mb-4">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800">
+              Agricultural Production Comparison
+            </h2>
+            <p className="text-gray-600">
+              {viewMode === "monthly"
+                ? "Compare monthly production trends across categories"
+                : "Compare yearly production trends across categories"}
+            </p>
+          </div>
 
-        {/* Year selector */}
-        <div className="flex flex-wrap items-center gap-2 mb-6">
-          <span className="text-sm font-medium text-gray-600">
-            Filter by year:
-          </span>
-          <select
-            className="px-3 py-1 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500"
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(Number.parseInt(e.target.value))}
-          >
-            {getAvailableYears().map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
+          {/* View mode toggle */}
+          <div className="flex items-center p-1 mt-2 bg-gray-100 rounded-lg sm:mt-0">
+            <button
+              onClick={() => setViewMode("monthly")}
+              className={`flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                viewMode === "monthly"
+                  ? "bg-white text-green-700 shadow-sm"
+                  : "text-gray-600 hover:text-gray-800"
+              }`}
+            >
+              <Calendar className="w-4 h-4 mr-1.5" />
+              Monthly
+            </button>
+            <button
+              onClick={() => setViewMode("yearly")}
+              className={`flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                viewMode === "yearly"
+                  ? "bg-white text-green-700 shadow-sm"
+                  : "text-gray-600 hover:text-gray-800"
+              }`}
+            >
+              <BarChart3 className="w-4 h-4 mr-1.5" />
+              Yearly
+            </button>
+          </div>
         </div>
+
+        {/* Year selector - only show for monthly view */}
+        {viewMode === "monthly" && (
+          <div className="flex flex-wrap items-center gap-2 mb-6">
+            <span className="text-sm font-medium text-gray-600">
+              Filter by year:
+            </span>
+            <select
+              className="px-3 py-1 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number.parseInt(e.target.value))}
+            >
+              {getAvailableYears().map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* The comparison chart */}
         <div className="h-[500px]">
           <CategoryComparisonChart
-            data={prepareComparisonData(rawData, selectedYear)}
+            data={
+              viewMode === "monthly"
+                ? prepareComparisonData(rawData, selectedYear)
+                : prepareYearlyComparisonData(rawData)
+            }
             categories={categories}
             loading={loading}
+            xAxisDataKey="name"
+            showLegend={true}
           />
         </div>
       </div>
+
+      {/* Barangay Summary Section */}
+      <BarangaySummary
+        rawData={rawData}
+        categories={categories}
+        loading={loading}
+      />
     </div>
   );
 }

@@ -122,7 +122,11 @@ export default function CategoryDetails({ categoryData }) {
                                 category === "livestock" ? 0 : 2
                               )
                             )}
-                            {category === "livestock" ? " heads" : " tons"}
+                            {category === "livestock"
+                              ? " heads"
+                              : category === "rice"
+                              ? " kg"
+                              : " tons"}
                           </span>
                         </div>
                       ))
@@ -143,7 +147,11 @@ export default function CategoryDetails({ categoryData }) {
                           {formatNumber(
                             data.total.toFixed(category === "livestock" ? 0 : 2)
                           )}
-                          {category === "livestock" ? " heads" : " tons"}
+                          {category === "livestock"
+                            ? " heads"
+                            : category === "rice"
+                            ? " kg"
+                            : " tons"}
                         </span>
                       </div>
                     </div>

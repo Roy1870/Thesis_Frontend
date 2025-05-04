@@ -144,7 +144,11 @@ export default function CategoryBreakdown({ categoryData }) {
                           )}
                         </span>
                         <span className="ml-2 text-sm text-gray-500">
-                          {category === "livestock" ? "heads" : "tons"}
+                          {category === "livestock"
+                            ? "heads"
+                            : category === "rice"
+                            ? "kg"
+                            : "tons"}
                         </span>
                       </div>
                       <div className="mt-1 text-xs text-gray-500">
