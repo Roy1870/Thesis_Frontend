@@ -847,7 +847,7 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                 {selectedCropType !== "High Value Crops" && (
                   <div className="mb-4">
                     <label className="block mb-1 text-sm font-medium text-gray-700">
-                      Crop <span className="text-red-500">*</span>
+                      Crop Type <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="crop_type"
@@ -972,7 +972,7 @@ const CropsTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                     </div>
                     <div className="mb-4">
                       <label className="block mb-1 text-sm font-medium text-gray-700">
-                        Quantity <span className="text-red-500">*</span>
+                        Quantity (kg) <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="number"

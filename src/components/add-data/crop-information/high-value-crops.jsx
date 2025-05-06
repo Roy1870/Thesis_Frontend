@@ -9,13 +9,14 @@ const HighValueCrops = ({
     <>
       <div>
         <label className="block mb-1 text-sm font-medium text-gray-700">
-          Month
+          Month <span className="text-red-500">*</span>
         </label>
         <select
           name="month"
           value={formData.month}
           onChange={handleInputChange}
           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+          required
         >
           <option value="">Select Month</option>
           <option value="January">January</option>
@@ -35,13 +36,14 @@ const HighValueCrops = ({
 
       <div>
         <label className="block mb-1 text-sm font-medium text-gray-700">
-          High Value Crop
+          High Value Crop <span className="text-red-500">*</span>
         </label>
         <select
           name="high_value_crop"
           value={formData.high_value_crop}
           onChange={handleInputChange}
           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+          required
         >
           <option value="">Select High Value Crop</option>
           {highValueCropOptions.map((crop) => (
@@ -68,7 +70,7 @@ const HighValueCrops = ({
 
       <div>
         <label className="block mb-1 text-sm font-medium text-gray-700">
-          Area (hectare)
+          Area (hectare) <span className="text-red-500">*</span>
         </label>
         <input
           type="number"
@@ -79,12 +81,13 @@ const HighValueCrops = ({
           step="0.01"
           placeholder="Enter Area in Hectares"
           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+          required
         />
       </div>
 
       <div>
         <label className="block mb-1 text-sm font-medium text-gray-700">
-          Quantity (kg)
+          Quantity (kg) <span className="text-red-500">*</span>
         </label>
         <input
           type="number"
@@ -93,18 +96,20 @@ const HighValueCrops = ({
           onChange={handleInputChange}
           placeholder="Enter quantity"
           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+          required
         />
       </div>
 
       <div>
         <label className="block mb-1 text-sm font-medium text-gray-700">
-          Cropping Intensity
+          Cropping Intensity <span className="text-red-500">*</span>
         </label>
         <select
           name="cropping_intensity"
           value={formData.cropping_intensity || ""}
           onChange={handleInputChange}
           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+          required
         >
           <option value="">Select Cropping Intensity</option>
           <option value="year_round">Year Round</option>

@@ -1,7 +1,27 @@
 export default function CategoryDetails({ categoryData }) {
-  // Helper function to format numbers with commas
-  const formatNumber = (num) => {
-    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  // Helper function to format numbers with commas and handle kg/tons conversion
+  const formatNumber = (num, convertToTons = false) => {
+    // Handle null, undefined or NaN values
+    if (num === null || num === undefined || isNaN(num)) {
+      return "0.00";
+    }
+
+    // Parse the number if it's a string
+    const numValue = typeof num === "string" ? Number.parseFloat(num) : num;
+
+    // If we need to convert to tons and the value is >= 1000kg
+    if (convertToTons && numValue >= 1000) {
+      return (numValue / 1000)
+        .toFixed(2)
+        .toString()
+        .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    // Otherwise format with appropriate decimal places
+    return numValue
+      .toFixed(2)
+      .toString()
+      .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
   // Function to get custom color for each category
@@ -117,16 +137,11 @@ export default function CategoryDetails({ categoryData }) {
                             {item.name}
                           </span>
                           <span className="text-sm font-medium text-gray-900">
-                            {formatNumber(
-                              item.value.toFixed(
-                                category === "livestock" ? 0 : 2
-                              )
-                            )}
                             {category === "livestock"
-                              ? " heads"
-                              : category === "rice"
-                              ? " kg"
-                              : " tons"}
+                              ? formatNumber(item.value || 0)
+                              : item.value < 1000
+                              ? `${formatNumber(item.value || 0, false)} kg`
+                              : `${formatNumber(item.value || 0, true)} tons`}
                           </span>
                         </div>
                       ))
@@ -144,14 +159,11 @@ export default function CategoryDetails({ categoryData }) {
                           Total
                         </span>
                         <span className="text-sm font-bold text-gray-900">
-                          {formatNumber(
-                            data.total.toFixed(category === "livestock" ? 0 : 2)
-                          )}
                           {category === "livestock"
-                            ? " heads"
-                            : category === "rice"
-                            ? " kg"
-                            : " tons"}
+                            ? formatNumber(data.total || 0)
+                            : data.total < 1000
+                            ? `${formatNumber(data.total || 0, false)} kg`
+                            : `${formatNumber(data.total || 0, true)} tons`}
                         </span>
                       </div>
                     </div>

@@ -19,7 +19,7 @@ const VegetableDetails = ({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block mb-1 text-sm font-medium text-gray-700">
-                  Vegetable Type
+                  Vegetable Type <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={vegetable.vegetable_type}
@@ -31,6 +31,7 @@ const VegetableDetails = ({
                     )
                   }
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                  required
                 >
                   <option value="">Select Vegetable Type</option>
                   <option value="Tomato">Tomato</option>
@@ -76,7 +77,7 @@ const VegetableDetails = ({
 
               <div>
                 <label className="block mb-1 text-sm font-medium text-gray-700">
-                  Quantity (kg)
+                  Quantity (kg) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -90,6 +91,7 @@ const VegetableDetails = ({
                   }
                   placeholder="Enter quantity"
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                  required
                 />
               </div>
             </div>

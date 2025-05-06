@@ -81,7 +81,7 @@ const FarmerInformation = ({
 
           <div>
             <label className="block mb-1 text-sm font-medium text-gray-700">
-              Facebook/Email <span className="text-red-500">*</span>
+              Facebook/Email
             </label>
             <input
               type="text"
@@ -90,7 +90,6 @@ const FarmerInformation = ({
               onChange={handleInputChange}
               placeholder="Enter Facebook or Email"
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-              required
             />
           </div>
 

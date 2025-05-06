@@ -1,30 +1,33 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import axios from "axios";
-import { CameraIcon, CheckCircleIcon, XCircleIcon } from "lucide-react";
+import {
+  CheckCircleIcon,
+  XCircleIcon,
+  EyeIcon,
+  EyeOffIcon,
+} from "lucide-react";
 
 const Profile = () => {
-  // Remove phone_number and address from the userData state
-  // Remove formData state completely since we're not using phone_number and address
   const [error, setError] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [newProfilePicture, setNewProfilePicture] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState(false);
-  const fileInputRef = useRef(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Form state
-  // Remove the formData state and handleInputChange function since we don't need them anymore
+  // Form state for user data updates
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
 
   const getAuthToken = () => localStorage.getItem("authToken");
 
-  // Remove the useEffect that fetches user data and replace it with direct localStorage access
-  // Remove the loading state since we're not fetching data anymore
-  // Update the userData state initialization to use localStorage values directly
-
-  // Replace the useState and useEffect for userData and loading with:
+  // Initialize user data from localStorage
   const [userData, setUserData] = useState(() => {
     // Get user data directly from localStorage (same source as sidebar)
     const userName = localStorage.getItem("userName") || "User";
@@ -41,83 +44,97 @@ const Profile = () => {
     };
   });
 
-  // Remove the loading state
-  // Remove the fetchUserProfile function
-  // Remove the loading check in the render function
+  // Handle form input changes
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value,
+    });
+  };
 
-  // Update the storeAndUpdateProfile function to only handle profile picture updates
-  const storeAndUpdateProfile = async (newProfilePic) => {
-    const formData = new FormData();
+  // Start editing mode
+  const startEditing = () => {
+    setFormData({
+      name: userData.name,
+      email: userData.email,
+      password: "",
+      confirmPassword: "",
+    });
+    setIsEditing(true);
+  };
+
+  // Update user profile with new data
+  const updateUserProfile = async (updatedData) => {
     const token = getAuthToken();
-
-    formData.append("email", userData.email || "default@example.com");
-
-    if (newProfilePic) {
-      formData.append("profile_picture", newProfilePic);
-    }
 
     try {
       const response = await axios.post(
         "https://thesis-backend-tau.vercel.app/api/api/user/profile",
-        formData,
+        updatedData,
         {
           headers: {
-            "Content-Type": "multipart/form-data",
+            "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
         }
       );
 
+      // Update local storage with new values
+      if (updatedData.name) {
+        localStorage.setItem("userName", updatedData.name);
+      }
+
+      if (updatedData.email) {
+        localStorage.setItem("userEmail", updatedData.email);
+      }
+
+      // Update state with new values
       setUserData({
         ...userData,
-        profile_picture: response.data.profile.profile_picture,
+        name: updatedData.name || userData.name,
+        email: updatedData.email || userData.email,
       });
 
       return response.data;
     } catch (err) {
-      console.error("Failed to update profile picture:", err);
-      setError("Failed to update profile picture");
+      console.error("Failed to update profile:", err);
+      setError("Failed to update profile");
       throw err;
     }
   };
 
-  // Remove the formData state and handleInputChange function since we don't need them anymore
-
-  // Update the handleSubmit function to remove phone_number and address
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaveSuccess(false);
     setSaveError(false);
 
-    const formDataObj = new FormData();
+    // Validate form data
+    if (formData.password && formData.password !== formData.confirmPassword) {
+      setSaveError(true);
+      setError("Passwords do not match");
+      setTimeout(() => setSaveError(false), 3000);
+      return;
+    }
 
-    if (newProfilePicture) {
-      formDataObj.append("profile_picture", newProfilePicture);
+    // Prepare data for API
+    const updateData = {
+      name: formData.name,
+      email: formData.email,
+    };
+
+    // Only include password if it was provided
+    if (formData.password) {
+      updateData.password = formData.password;
     }
 
     try {
-      const token = getAuthToken();
-      const response = await axios.post(
-        "https://thesis-backend-tau.vercel.app/api/api/user/profile",
-        formDataObj,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      setUserData({
-        ...userData,
-        profile_picture: response.data.profile.profile_picture,
-      });
+      await updateUserProfile(updateData);
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
       setIsEditing(false);
-      setNewProfilePicture(null);
-      setPreviewUrl(null);
     } catch (err) {
       console.error("Failed to update profile:", err);
       setSaveError(true);
@@ -125,28 +142,18 @@ const Profile = () => {
     }
   };
 
-  const handleProfilePictureChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setNewProfilePicture(file);
-      setPreviewUrl(URL.createObjectURL(file));
-    }
-  };
-
-  const triggerFileInput = () => {
-    fileInputRef.current.click();
-  };
-
-  // Update the cancelEdit function to remove formData reset
+  // Cancel editing
   const cancelEdit = () => {
     setIsEditing(false);
-    setNewProfilePicture(null);
-    setPreviewUrl(null);
+    setFormData({
+      name: userData.name,
+      email: userData.email,
+      password: "",
+      confirmPassword: "",
+    });
   };
 
-  // Remove the loading check in the render function
-  // Replace:
-  // With just the error check:
+  // Error display
   if (error && !userData.name) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 text-red-600">
@@ -181,7 +188,9 @@ const Profile = () => {
         {saveError && (
           <div className="flex items-center p-4 mb-6 text-red-700 bg-red-100 border border-red-400 rounded-lg">
             <XCircleIcon className="w-5 h-5 mr-2" />
-            <span>Failed to update profile. Please try again.</span>
+            <span>
+              {error || "Failed to update profile. Please try again."}
+            </span>
           </div>
         )}
 
@@ -190,45 +199,26 @@ const Profile = () => {
           <div className="md:col-span-1">
             <div className="p-6 bg-white rounded-lg shadow-sm">
               <div className="flex flex-col items-center">
-                <div className="relative group">
-                  <div className="relative w-32 h-32 mb-4 overflow-hidden rounded-full">
-                    {previewUrl || userData.profile_picture ? (
-                      <img
-                        src={previewUrl || userData.profile_picture}
-                        alt="Profile"
-                        className="object-cover w-full h-full"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                            userData.name
-                          )}&background=6A9C89&color=fff&size=128`;
-                        }}
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center w-full h-full text-3xl text-white bg-[#6A9C89] rounded-full">
-                        {userData.name
-                          ? userData.name.charAt(0).toUpperCase()
-                          : "U"}
-                      </div>
-                    )}
-
-                    {isEditing && (
-                      <div
-                        className="absolute inset-0 flex items-center justify-center transition-opacity bg-black bg-opacity-50 opacity-0 cursor-pointer group-hover:opacity-100"
-                        onClick={triggerFileInput}
-                      >
-                        <CameraIcon className="w-8 h-8 text-white" />
-                      </div>
-                    )}
-                  </div>
-
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleProfilePictureChange}
-                    className="hidden"
-                    accept="image/*"
-                  />
+                <div className="relative w-32 h-32 mb-4 overflow-hidden rounded-full">
+                  {userData.profile_picture ? (
+                    <img
+                      src={userData.profile_picture || "/placeholder.svg"}
+                      alt="Profile"
+                      className="object-cover w-full h-full"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                          userData.name
+                        )}&background=6A9C89&color=fff&size=128`;
+                      }}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center w-full h-full text-3xl text-white bg-[#6A9C89] rounded-full">
+                      {userData.name
+                        ? userData.name.charAt(0).toUpperCase()
+                        : "U"}
+                    </div>
+                  )}
                 </div>
 
                 <h2 className="text-xl font-semibold text-gray-800">
@@ -262,7 +252,7 @@ const Profile = () => {
 
                 {!isEditing ? (
                   <button
-                    onClick={() => setIsEditing(true)}
+                    onClick={startEditing}
                     className="px-4 py-2 text-sm font-medium text-white transition-colors rounded-md bg-[#6A9C89] hover:bg-[#5A8C79] focus:outline-none focus:ring-2 focus:ring-[#6A9C89] focus:ring-offset-2"
                   >
                     Edit Profile
@@ -288,46 +278,105 @@ const Profile = () => {
 
               <form id="profile-form" onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                  {/* Name Field - Read Only */}
+                  {/* Name Field */}
                   <div>
                     <label className="block mb-2 text-sm font-medium text-gray-700">
                       Name
                     </label>
                     <input
                       type="text"
-                      value={userData.name}
-                      disabled
-                      className="w-full px-4 py-2 text-gray-700 bg-gray-100 border border-gray-300 rounded-md focus:outline-none"
+                      name="name"
+                      value={isEditing ? formData.name : userData.name}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className={`w-full px-4 py-2 text-gray-700 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#6A9C89] ${
+                        !isEditing ? "bg-gray-100" : "bg-white"
+                      }`}
                     />
                   </div>
 
-                  {/* Email Field - Read Only */}
+                  {/* Email Field */}
                   <div>
                     <label className="block mb-2 text-sm font-medium text-gray-700">
                       Email
                     </label>
                     <input
                       type="email"
-                      value={userData.email}
-                      disabled
-                      className="w-full px-4 py-2 text-gray-700 bg-gray-100 border border-gray-300 rounded-md focus:outline-none"
+                      name="email"
+                      value={isEditing ? formData.email : userData.email}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className={`w-full px-4 py-2 text-gray-700 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#6A9C89] ${
+                        !isEditing ? "bg-gray-100" : "bg-white"
+                      }`}
                     />
                   </div>
                 </div>
 
                 {isEditing && (
-                  <div className="mt-6">
-                    <p className="mb-2 text-sm text-gray-600">
-                      To update your profile picture, click on your avatar or
-                      the button below.
+                  <div className="mt-6 space-y-6">
+                    <h4 className="text-lg font-medium text-gray-800">
+                      Change Password
+                    </h4>
+                    <p className="text-sm text-gray-600">
+                      Leave blank if you don't want to change your password
                     </p>
-                    <button
-                      type="button"
-                      onClick={triggerFileInput}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 transition-colors bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
-                    >
-                      Change Profile Picture
-                    </button>
+
+                    {/* Password Field */}
+                    <div className="relative">
+                      <label className="block mb-2 text-sm font-medium text-gray-700">
+                        New Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          name="password"
+                          value={formData.password}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-2 text-gray-700 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#6A9C89]"
+                        />
+                        <button
+                          type="button"
+                          className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? (
+                            <EyeOffIcon className="w-5 h-5" />
+                          ) : (
+                            <EyeIcon className="w-5 h-5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Confirm Password Field */}
+                    <div className="relative">
+                      <label className="block mb-2 text-sm font-medium text-gray-700">
+                        Confirm New Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showConfirmPassword ? "text" : "password"}
+                          name="confirmPassword"
+                          value={formData.confirmPassword}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-2 text-gray-700 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#6A9C89]"
+                        />
+                        <button
+                          type="button"
+                          className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500"
+                          onClick={() =>
+                            setShowConfirmPassword(!showConfirmPassword)
+                          }
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOffIcon className="w-5 h-5" />
+                          ) : (
+                            <EyeIcon className="w-5 h-5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </form>

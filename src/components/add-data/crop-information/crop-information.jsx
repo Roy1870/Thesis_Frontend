@@ -41,13 +41,14 @@ const CropInformation = ({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block mb-1 text-sm font-medium text-gray-700">
-              Crop Type
+              Crop Type <span className="text-red-500">*</span>
             </label>
             <select
               name="crop_type"
               value={formData.crop_type}
               onChange={(e) => handleSelectChange("crop_type", e.target.value)}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+              required
             >
               <option value="">Select Crop Type</option>
               <option value="Rice">Rice</option>
@@ -73,7 +74,7 @@ const CropInformation = ({
               <>
                 <div>
                   <label className="block mb-1 text-sm font-medium text-gray-700">
-                    Area (hectare)
+                    Area (hectare) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -84,18 +85,20 @@ const CropInformation = ({
                     step="0.01"
                     placeholder="Enter Area in Hectares"
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                    required
                   />
                 </div>
 
                 <div>
                   <label className="block mb-1 text-sm font-medium text-gray-700">
-                    Cropping Intensity
+                    Cropping Intensity <span className="text-red-500">*</span>
                   </label>
                   <select
                     name="cropping_intensity"
                     value={formData.cropping_intensity || ""}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                    required
                   >
                     <option value="">Select Cropping Intensity</option>
                     <option value="year_round">Year Round</option>

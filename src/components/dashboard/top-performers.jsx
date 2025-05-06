@@ -1,7 +1,22 @@
 export default function TopPerformers({ topPerformingItems }) {
-  // Helper function to format numbers with commas
-  const formatNumber = (num) => {
-    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  // Helper function to format numbers with commas and handle kg/tons conversion
+  const formatNumber = (num, convertToTons = false) => {
+    // Parse the number if it's a string
+    const numValue = typeof num === "string" ? Number.parseFloat(num) : num;
+
+    // If we need to convert to tons and the value is >= 1000kg
+    if (convertToTons && numValue >= 1000) {
+      return (numValue / 1000)
+        .toFixed(2)
+        .toString()
+        .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    // Otherwise format with appropriate decimal places
+    return numValue
+      .toFixed(2)
+      .toString()
+      .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
   // Get category name for display
@@ -70,10 +85,19 @@ export default function TopPerformers({ topPerformingItems }) {
                   </div>
                   <div className="mt-2">
                     <div className="text-2xl font-bold text-gray-900">
-                      {formatNumber(item.value.toFixed(2))}
+                      {item.category !== "livestock" && item.value < 1000
+                        ? formatNumber(item.value.toFixed(2), false)
+                        : formatNumber(
+                            item.value.toFixed(2),
+                            item.category !== "livestock"
+                          )}
                     </div>
                     <div className="mb-3 text-sm text-gray-600">
-                      {item.category === "livestock" ? "heads" : "metric tons"}
+                      {item.category === "livestock"
+                        ? "heads"
+                        : item.category !== "livestock" && item.value < 1000
+                        ? "kg"
+                        : "metric tons"}
                     </div>
                   </div>
                   <div className="w-full h-2.5 overflow-hidden bg-gray-100 rounded-full">

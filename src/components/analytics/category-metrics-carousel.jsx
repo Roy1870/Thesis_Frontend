@@ -172,7 +172,7 @@ export default function CategoryMetricsCarousel({
       {
         name: "Total Production",
         value: totalYield.toFixed(2),
-        unit: "tons",
+        unit: "kg",
         icon: <BarChart3 className="w-6 h-6 text-green-600" />,
         color: "bg-green-50 border-green-100",
         textColor: "text-green-700",
@@ -364,7 +364,7 @@ export default function CategoryMetricsCarousel({
       {
         name: "Total Production",
         value: totalProduction.toFixed(2),
-        unit: "tons",
+        unit: "kg",
         icon: <BarChart3 className="w-6 h-6 text-yellow-600" />,
         color: "bg-yellow-50 border-yellow-100",
         textColor: "text-yellow-700",
@@ -453,7 +453,7 @@ export default function CategoryMetricsCarousel({
       {
         name: "Total Production",
         value: totalProduction.toFixed(2),
-        unit: "tons",
+        unit: "kg",
         icon: <BarChart3 className="w-6 h-6 text-orange-600" />,
         color: "bg-orange-50 border-orange-100",
         textColor: "text-orange-700",
@@ -537,7 +537,7 @@ export default function CategoryMetricsCarousel({
       {
         name: "Total Production",
         value: totalProduction.toFixed(2),
-        unit: "tons",
+        unit: "kg",
         icon: <BarChart3 className="w-6 h-6 text-emerald-600" />,
         color: "bg-emerald-50 border-emerald-100",
         textColor: "text-emerald-700",
@@ -621,7 +621,7 @@ export default function CategoryMetricsCarousel({
       {
         name: "Total Production",
         value: totalProduction.toFixed(2),
-        unit: "tons",
+        unit: "kg",
         icon: <BarChart3 className="w-6 h-6 text-red-600" />,
         color: "bg-red-50 border-red-100",
         textColor: "text-red-700",
@@ -831,7 +831,7 @@ export default function CategoryMetricsCarousel({
       {
         name: "Total Production",
         value: totalProduction.toFixed(2),
-        unit: "tons",
+        unit: "kg",
         icon: <BarChart3 className="w-6 h-6 text-amber-600" />,
         color: "bg-amber-50 border-amber-100",
         textColor: "text-amber-700",

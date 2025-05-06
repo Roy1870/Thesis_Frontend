@@ -12,9 +12,24 @@ import {
 } from "lucide-react";
 
 export default function DashboardStats({ dashboardData }) {
-  // Helper function to format numbers with commas
-  const formatNumber = (num) => {
-    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  // Helper function to format numbers with commas and handle kg/tons conversion
+  const formatNumber = (num, convertToTons = false) => {
+    // Parse the number if it's a string
+    const numValue = typeof num === "string" ? Number.parseFloat(num) : num;
+
+    // If we need to convert to tons and the value is >= 1000kg
+    if (convertToTons && numValue >= 1000) {
+      return (numValue / 1000)
+        .toFixed(2)
+        .toString()
+        .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    // Otherwise format with appropriate decimal places
+    return numValue
+      .toFixed(2)
+      .toString()
+      .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
   // Helper function to format percentage
@@ -26,11 +41,7 @@ export default function DashboardStats({ dashboardData }) {
   const [activeTab, setActiveTab] = useState("overview");
 
   // Define the tabs
-  const tabs = [
-    { id: "overview", label: "Overview" },
-    { id: "crops", label: "Crops" },
-    { id: "livestock", label: "Livestock & Fish" },
-  ];
+  const tabs = [{ id: "overview", label: "Overview" }];
 
   // Colors for farmer type distribution
   const farmerTypeColors = {
@@ -143,13 +154,13 @@ export default function DashboardStats({ dashboardData }) {
   // Get top categories
   const topCategories = getTopCategories();
 
+  // Get barangay data
+  const barangayData = dashboardData.productionByBarangay || [];
+
   return (
     <div className="mb-10">
       {/* Tabs */}
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-semibold text-gray-800">
-          Production Statistics
-        </h3>
         <div className="flex p-1 bg-gray-100 rounded-lg">
           {tabs.map((tab) => (
             <button
@@ -196,12 +207,19 @@ export default function DashboardStats({ dashboardData }) {
                       </span>
                     </div>
                     <span className="text-sm font-semibold text-gray-800">
-                      {formatNumber(
-                        category.key === "livestock"
-                          ? category.total
-                          : category.total.toFixed(2)
-                      )}{" "}
-                      {category.unit}
+                      {category.key !== "livestock" && category.total < 1000
+                        ? formatNumber(category.total.toFixed(2), false)
+                        : formatNumber(
+                            category.key === "livestock"
+                              ? category.total
+                              : category.total.toFixed(2),
+                            category.key !== "livestock"
+                          )}{" "}
+                      {category.key === "livestock"
+                        ? "heads"
+                        : category.key !== "livestock" && category.total < 1000
+                        ? "kg"
+                        : "tons"}
                     </span>
                   </div>
                 ))}
@@ -297,344 +315,6 @@ export default function DashboardStats({ dashboardData }) {
                 ) : (
                   <p className="text-sm text-gray-500">
                     No farmer type data available
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Crops Tab */}
-      {activeTab === "crops" && (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {/* Rice Production */}
-          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
-            <div className="p-6">
-              <div className="flex items-center mb-4">
-                <div className="p-2 mr-3 text-white bg-green-600 rounded-lg">
-                  <Wheat className="w-5 h-5" />
-                </div>
-                <h4 className="text-lg font-medium text-gray-800">
-                  Rice Production
-                </h4>
-              </div>
-              <p className="mb-1 text-3xl font-bold text-gray-800">
-                {formatNumber(dashboardData.categoryData.rice.total.toFixed(2))}
-                <span className="ml-1 text-sm font-medium text-gray-500">
-                  kg
-                </span>
-              </p>
-              <p className="text-sm text-gray-600">
-                {dashboardData.categoryData.rice.items.length} varieties tracked
-              </p>
-            </div>
-            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">
-                  Top variety:
-                </span>
-                {dashboardData.categoryData.rice.items.length > 0 ? (
-                  <span className="text-sm font-semibold text-gray-800">
-                    {dashboardData.categoryData.rice.items[0].name}
-                  </span>
-                ) : (
-                  <span className="text-sm text-gray-500">No data</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Banana Production */}
-          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
-            <div className="p-6">
-              <div className="flex items-center mb-4">
-                <div className="p-2 mr-3 text-white bg-yellow-600 rounded-lg">
-                  <Banana className="w-5 h-5" />
-                </div>
-                <h4 className="text-lg font-medium text-gray-800">
-                  Banana Production
-                </h4>
-              </div>
-              <p className="mb-1 text-3xl font-bold text-gray-800">
-                {formatNumber(
-                  dashboardData.categoryData.banana.total.toFixed(2)
-                )}
-                <span className="ml-1 text-sm font-medium text-gray-500">
-                  tons
-                </span>
-              </p>
-              <p className="text-sm text-gray-600">
-                {dashboardData.categoryData.banana.items.length} varieties
-                tracked
-              </p>
-            </div>
-            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">
-                  Top variety:
-                </span>
-                {dashboardData.categoryData.banana.items.length > 0 ? (
-                  <span className="text-sm font-semibold text-gray-800">
-                    {dashboardData.categoryData.banana.items[0].name}
-                  </span>
-                ) : (
-                  <span className="text-sm text-gray-500">No data</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Vegetables Production */}
-          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
-            <div className="p-6">
-              <div className="flex items-center mb-4">
-                <div className="p-2 mr-3 text-white bg-orange-600 rounded-lg">
-                  <Sprout className="w-5 h-5" />
-                </div>
-                <h4 className="text-lg font-medium text-gray-800">
-                  Vegetables
-                </h4>
-              </div>
-              <p className="mb-1 text-3xl font-bold text-gray-800">
-                {formatNumber(
-                  dashboardData.categoryData.vegetables.total.toFixed(2)
-                )}
-                <span className="ml-1 text-sm font-medium text-gray-500">
-                  tons
-                </span>
-              </p>
-              <p className="text-sm text-gray-600">
-                {dashboardData.categoryData.vegetables.items.length} varieties
-                tracked
-              </p>
-            </div>
-            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">
-                  Top variety:
-                </span>
-                {dashboardData.categoryData.vegetables.items.length > 0 ? (
-                  <span className="text-sm font-semibold text-gray-800">
-                    {dashboardData.categoryData.vegetables.items[0].name}
-                  </span>
-                ) : (
-                  <span className="text-sm text-gray-500">No data</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Legumes Production */}
-          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
-            <div className="p-6">
-              <div className="flex items-center mb-4">
-                <div className="p-2 mr-3 text-white rounded-lg bg-emerald-600">
-                  <Leaf className="w-5 h-5" />
-                </div>
-                <h4 className="text-lg font-medium text-gray-800">Legumes</h4>
-              </div>
-              <p className="mb-1 text-3xl font-bold text-gray-800">
-                {formatNumber(
-                  dashboardData.categoryData.legumes.total.toFixed(2)
-                )}
-                <span className="ml-1 text-sm font-medium text-gray-500">
-                  tons
-                </span>
-              </p>
-              <p className="text-sm text-gray-600">
-                {dashboardData.categoryData.legumes.items.length} varieties
-                tracked
-              </p>
-            </div>
-            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">
-                  Top variety:
-                </span>
-                {dashboardData.categoryData.legumes.items.length > 0 ? (
-                  <span className="text-sm font-semibold text-gray-800">
-                    {dashboardData.categoryData.legumes.items[0].name}
-                  </span>
-                ) : (
-                  <span className="text-sm text-gray-500">No data</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Spices Production */}
-          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
-            <div className="p-6">
-              <div className="flex items-center mb-4">
-                <div className="p-2 mr-3 text-white bg-red-600 rounded-lg">
-                  <Leaf className="w-5 h-5" />
-                </div>
-                <h4 className="text-lg font-medium text-gray-800">Spices</h4>
-              </div>
-              <p className="mb-1 text-3xl font-bold text-gray-800">
-                {formatNumber(
-                  dashboardData.categoryData.spices.total.toFixed(2)
-                )}
-                <span className="ml-1 text-sm font-medium text-gray-500">
-                  tons
-                </span>
-              </p>
-              <p className="text-sm text-gray-600">
-                {dashboardData.categoryData.spices.items.length} varieties
-                tracked
-              </p>
-            </div>
-            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">
-                  Top variety:
-                </span>
-                {dashboardData.categoryData.spices.items.length > 0 ? (
-                  <span className="text-sm font-semibold text-gray-800">
-                    {dashboardData.categoryData.spices.items[0].name}
-                  </span>
-                ) : (
-                  <span className="text-sm text-gray-500">No data</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* High Value Crops */}
-          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
-            <div className="p-6">
-              <div className="flex items-center mb-4">
-                <div className="p-2 mr-3 text-white rounded-lg bg-amber-600">
-                  <Sprout className="w-5 h-5" />
-                </div>
-                <h4 className="text-lg font-medium text-gray-800">
-                  High Value Crops
-                </h4>
-              </div>
-              <p className="mb-1 text-3xl font-bold text-gray-800">
-                {formatNumber(
-                  dashboardData.categoryData.highValueCrops.total.toFixed(2)
-                )}
-                <span className="ml-1 text-sm font-medium text-gray-500">
-                  tons
-                </span>
-              </p>
-              <p className="text-sm text-gray-600">
-                {dashboardData.categoryData.highValueCrops.items.length}{" "}
-                varieties tracked
-              </p>
-            </div>
-            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">
-                  Top variety:
-                </span>
-                {dashboardData.categoryData.highValueCrops.items.length > 0 ? (
-                  <span className="text-sm font-semibold text-gray-800">
-                    {dashboardData.categoryData.highValueCrops.items[0].name}
-                  </span>
-                ) : (
-                  <span className="text-sm text-gray-500">No data</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Livestock & Fish Tab */}
-      {activeTab === "livestock" && (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {/* Livestock */}
-          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
-            <div className="p-6">
-              <div className="flex items-center mb-4">
-                <div className="p-2 mr-3 text-white bg-purple-600 rounded-lg">
-                  <Leaf className="w-5 h-5" />
-                </div>
-                <h4 className="text-lg font-medium text-gray-800">Livestock</h4>
-              </div>
-              <p className="mb-1 text-3xl font-bold text-gray-800">
-                {formatNumber(dashboardData.categoryData.livestock.total)}
-                <span className="ml-1 text-sm font-medium text-gray-500">
-                  heads
-                </span>
-              </p>
-              <p className="text-sm text-gray-600">
-                {dashboardData.categoryData.livestock.items.length} types
-                tracked
-              </p>
-            </div>
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
-              <h5 className="mb-3 text-sm font-medium text-gray-700">
-                Top Livestock Types
-              </h5>
-              <div className="space-y-3">
-                {dashboardData.categoryData.livestock.items
-                  .slice(0, 3)
-                  .map((item, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between"
-                    >
-                      <span className="text-sm text-gray-600">{item.name}</span>
-                      <span className="text-sm font-semibold text-gray-800">
-                        {formatNumber(item.value)} heads
-                      </span>
-                    </div>
-                  ))}
-                {dashboardData.categoryData.livestock.items.length === 0 && (
-                  <p className="text-sm text-gray-500">
-                    No livestock data available
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Fish */}
-          <div className="overflow-hidden bg-white border border-gray-100 shadow-md rounded-xl">
-            <div className="p-6">
-              <div className="flex items-center mb-4">
-                <div className="p-2 mr-3 text-white bg-blue-600 rounded-lg">
-                  <Fish className="w-5 h-5" />
-                </div>
-                <h4 className="text-lg font-medium text-gray-800">
-                  Fish Production
-                </h4>
-              </div>
-              <p className="mb-1 text-3xl font-bold text-gray-800">
-                {formatNumber(dashboardData.categoryData.fish.total.toFixed(2))}
-                <span className="ml-1 text-sm font-medium text-gray-500">
-                  tons
-                </span>
-              </p>
-              <p className="text-sm text-gray-600">
-                {dashboardData.categoryData.fish.items.length} species tracked
-              </p>
-            </div>
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
-              <h5 className="mb-3 text-sm font-medium text-gray-700">
-                Top Fish Species
-              </h5>
-              <div className="space-y-3">
-                {dashboardData.categoryData.fish.items
-                  .slice(0, 3)
-                  .map((item, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between"
-                    >
-                      <span className="text-sm text-gray-600">{item.name}</span>
-                      <span className="text-sm font-semibold text-gray-800">
-                        {formatNumber(item.value.toFixed(2))} tons
-                      </span>
-                    </div>
-                  ))}
-                {dashboardData.categoryData.fish.items.length === 0 && (
-                  <p className="text-sm text-gray-500">
-                    No fish data available
                   </p>
                 )}
               </div>

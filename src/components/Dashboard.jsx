@@ -704,10 +704,25 @@ export default function Dashboard() {
   );
 }
 
-// Helper function to format numbers with commas
-function formatNumber(num) {
-  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
+// Helper function to format numbers with commas and handle kg/tons conversion
+const formatNumber = (num, convertToTons = false) => {
+  // Parse the number if it's a string
+  const numValue = typeof num === "string" ? Number.parseFloat(num) : num;
+
+  // If we need to convert to tons and the value is >= 1000kg
+  if (convertToTons && numValue >= 1000) {
+    return (numValue / 1000)
+      .toFixed(2)
+      .toString()
+      .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  // Otherwise format with appropriate decimal places
+  return numValue
+    .toFixed(2)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+};
 
 // Dashboard skeleton component for loading state
 function DashboardSkeleton() {

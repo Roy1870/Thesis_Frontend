@@ -27,7 +27,7 @@ const RiceDetails = ({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block mb-1 text-sm font-medium text-gray-700">
-                  Area Type
+                  Area Type <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={rice.area_type}
@@ -39,6 +39,7 @@ const RiceDetails = ({
                     )
                   }
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                  required
                 >
                   <option value="">Select Area Type</option>
                   <option value="Irrigated">Irrigated</option>
@@ -48,7 +49,7 @@ const RiceDetails = ({
 
               <div>
                 <label className="block mb-1 text-sm font-medium text-gray-700">
-                  Seed Type
+                  Seed Type <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={rice.seed_type}
@@ -60,6 +61,7 @@ const RiceDetails = ({
                     )
                   }
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                  required
                 >
                   <option value="">Select Seed Type</option>
                   <option value="Hybrid">Hybrid</option>
@@ -70,7 +72,7 @@ const RiceDetails = ({
 
               <div>
                 <label className="block mb-1 text-sm font-medium text-gray-700">
-                  Area Harvested (ha)
+                  Area Harvested (ha) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -90,12 +92,13 @@ const RiceDetails = ({
                   }}
                   placeholder="Enter area harvested"
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                  required
                 />
               </div>
 
               <div>
                 <label className="block mb-1 text-sm font-medium text-gray-700">
-                  Production (mt)
+                  Production (kg) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -115,6 +118,7 @@ const RiceDetails = ({
                   }}
                   placeholder="Enter production"
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                  required
                 />
               </div>
 

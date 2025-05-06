@@ -19,7 +19,7 @@ const BananaDetails = ({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block mb-1 text-sm font-medium text-gray-700">
-                  Banana Type
+                  Banana Type <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={banana.banana_type}
@@ -31,6 +31,7 @@ const BananaDetails = ({
                     )
                   }
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                  required
                 >
                   <option value="">Select Banana Type</option>
                   <option value="Lakatan">Lakatan</option>
@@ -43,7 +44,7 @@ const BananaDetails = ({
 
               <div>
                 <label className="block mb-1 text-sm font-medium text-gray-700">
-                  Quantity (kg)
+                  Quantity (kg) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -57,6 +58,7 @@ const BananaDetails = ({
                   }
                   placeholder="Enter quantity"
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                  required
                 />
               </div>
             </div>

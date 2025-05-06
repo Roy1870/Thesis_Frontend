@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { operatorAPI } from "../services/api";
+import LocationMap from "../add-data/location-map";
 
 const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
   const [operatorData, setOperatorData] = useState([]);
@@ -11,8 +12,12 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
   const [operatorModalLoading, setOperatorModalLoading] = useState(false);
   const [operatorLoading, setOperatorLoading] = useState(true);
   const [viewingRemarks, setViewingRemarks] = useState(null);
+  const [showOperatorMap, setShowOperatorMap] = useState(false);
+  const operatorMapRef = useRef(null);
+  const operatorMarkerRef = useRef(null);
+  const operatorMapInstanceRef = useRef(null);
 
-  // Form state - removed operational_status
+  // Form state
   const [formValues, setFormValues] = useState({
     fishpond_location: "",
     cultured_species: "",
@@ -22,8 +27,234 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
     production_kg: "",
     date_of_harvest: "",
     remarks: "",
-    geotagged_photo_url: "",
+    operator_location_longitude: "",
+    operator_location_latitude: "",
   });
+
+  // Function to handle CORS issues when making API requests
+  const fetchWithCorsProxy = async (url, options = {}) => {
+    try {
+      // Try direct fetch first (many modern browsers allow this now)
+      try {
+        const directResponse = await fetch(url, {
+          ...options,
+          headers: {
+            ...options.headers,
+            "User-Agent": "Agricultural Inventory App",
+          },
+        });
+
+        if (directResponse.ok) {
+          return directResponse;
+        }
+      } catch (directError) {
+        console.log("Direct fetch failed, trying alternatives...");
+      }
+
+      // Try multiple CORS proxies in sequence
+      const corsProxies = [
+        "https://corsproxy.io/?",
+        "https://api.allorigins.win/raw?url=",
+        "https://cors-anywhere.herokuapp.com/",
+      ];
+
+      let lastError = null;
+
+      for (const proxy of corsProxies) {
+        try {
+          const response = await fetch(proxy + url, {
+            ...options,
+            headers: {
+              ...options.headers,
+              "X-Requested-With": "XMLHttpRequest",
+            },
+          });
+
+          if (response.ok) {
+            return response;
+          }
+        } catch (error) {
+          lastError = error;
+          console.log(`Proxy ${proxy} failed, trying next...`);
+        }
+      }
+
+      throw lastError || new Error("All proxies failed");
+    } catch (error) {
+      console.error("Error fetching with CORS proxies:", error);
+      throw error;
+    }
+  };
+
+  // Fix the fetchLocationName function to preserve all form values
+  const fetchLocationName = async (
+    latitude,
+    longitude,
+    locationField = "fishpond_location"
+  ) => {
+    try {
+      // Try OpenStreetMap's Nominatim API first
+      try {
+        const response = await fetchWithCorsProxy(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+          {
+            headers: {
+              Accept: "application/json",
+              "User-Agent": "Agricultural Inventory App",
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+
+          // Extract relevant location information
+          let locationName = "";
+
+          if (data.display_name) {
+            const addressParts = [];
+
+            if (data.address) {
+              if (data.address.water) addressParts.push(data.address.water);
+              if (data.address.hamlet) addressParts.push(data.address.hamlet);
+              if (data.address.village) addressParts.push(data.address.village);
+              if (data.address.town) addressParts.push(data.address.town);
+              if (data.address.city) addressParts.push(data.address.city);
+              if (data.address.municipality)
+                addressParts.push(data.address.municipality);
+              if (data.address.county) addressParts.push(data.address.county);
+              if (data.address.state) addressParts.push(data.address.state);
+            }
+
+            locationName =
+              addressParts.length > 0
+                ? addressParts.join(", ")
+                : data.display_name.split(",").slice(0, 3).join(",");
+
+            setFormValues((prevValues) => ({
+              ...prevValues,
+              [locationField]: locationName,
+            }));
+            return;
+          }
+        }
+      } catch (nominatimError) {
+        console.error("Nominatim error:", nominatimError);
+      }
+
+      // Fallback to BigDataCloud API if Nominatim fails
+      try {
+        const response = await fetchWithCorsProxy(
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`,
+          {
+            headers: {
+              Accept: "application/json",
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+
+          const locationParts = [];
+          if (data.locality) locationParts.push(data.locality);
+          if (data.city) locationParts.push(data.city);
+          if (data.principalSubdivision)
+            locationParts.push(data.principalSubdivision);
+
+          const locationName =
+            locationParts.length > 0
+              ? locationParts.join(", ")
+              : `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+
+          setFormValues((prevValues) => ({
+            ...prevValues,
+            [locationField]: locationName,
+          }));
+          return;
+        }
+      } catch (bigDataCloudError) {
+        console.error("BigDataCloud error:", bigDataCloudError);
+      }
+
+      // If all APIs fail, use coordinates
+      throw new Error("Could not retrieve location name from any service");
+    } catch (error) {
+      console.error("Error fetching location name:", error);
+
+      // Fallback to coordinates
+      setFormValues((prevValues) => ({
+        ...prevValues,
+        [locationField]: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+      }));
+    }
+  };
+
+  // Fix the getOperatorCurrentLocation function to preserve all form values
+  const getOperatorCurrentLocation = () => {
+    return new Promise((resolve, reject) => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords;
+
+            setFormValues((prevValues) => ({
+              ...prevValues,
+              operator_location_latitude: latitude.toFixed(6),
+              operator_location_longitude: longitude.toFixed(6),
+            }));
+
+            // Update map view and marker if map is initialized
+            if (operatorMapInstanceRef.current && operatorMarkerRef.current) {
+              operatorMarkerRef.current.setLatLng([latitude, longitude]);
+              operatorMapInstanceRef.current.setView([latitude, longitude], 15);
+            }
+
+            // Fetch location name based on coordinates
+            try {
+              await fetchLocationName(latitude, longitude, "fishpond_location");
+              resolve();
+            } catch (error) {
+              console.error("Error fetching location name:", error);
+              resolve(); // Still resolve the promise even if location name fetch fails
+            }
+          },
+          (error) => {
+            console.error("Error getting location:", error);
+
+            let errorMessage = "Unable to retrieve your location.";
+
+            switch (error.code) {
+              case error.PERMISSION_DENIED:
+                errorMessage +=
+                  " Location permission denied. Please check your browser settings.";
+                break;
+              case error.POSITION_UNAVAILABLE:
+                errorMessage += " Location information is unavailable.";
+                break;
+              case error.TIMEOUT:
+                errorMessage += " The request to get location timed out.";
+                break;
+              default:
+                errorMessage += " An unknown error occurred.";
+            }
+
+            alert(errorMessage);
+            reject(error);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0,
+          }
+        );
+      } else {
+        const errorMessage = "Geolocation is not supported by this browser.";
+        alert(errorMessage);
+        reject(new Error(errorMessage));
+      }
+    });
+  };
 
   useEffect(() => {
     if (farmerId) {
@@ -89,7 +320,8 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       production_kg: "",
       date_of_harvest: "",
       remarks: "",
-      geotagged_photo_url: "",
+      operator_location_longitude: "",
+      operator_location_latitude: "",
     });
     setIsOperatorModalVisible(true);
   };
@@ -107,7 +339,8 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       production_kg: operator.production_kg || "",
       date_of_harvest: operator.date_of_harvest || "",
       remarks: operator.remarks || "",
-      geotagged_photo_url: operator.geotagged_photo_url || "",
+      operator_location_latitude: operator.operator_location_latitude || "",
+      operator_location_longitude: operator.operator_location_longitude || "",
     });
 
     setIsOperatorModalVisible(true);
@@ -124,7 +357,8 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
       production_kg: "",
       date_of_harvest: "",
       remarks: "",
-      geotagged_photo_url: "",
+      operator_location_latitude: "",
+      operator_location_longitude: "",
     });
   };
 
@@ -172,14 +406,16 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
             production_kg: formValues.production_kg,
             date_of_harvest: formValues.date_of_harvest,
             remarks: formValues.remarks,
-            geotagged_photo_url: formValues.geotagged_photo_url,
+            operator_location_longitude:
+              formValues.operator_location_longitude || "",
+            operator_location_latitude:
+              formValues.operator_location_latitude || "",
           },
         ],
       };
 
       if (isEditingOperator && currentOperator) {
         // Update existing operator
-
         await operatorAPI.updateOperator(
           currentOperator.farmer_id || currentOperator.id,
           FarmersData
@@ -187,7 +423,6 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
         alert("Operator data updated successfully.");
       } else {
         // Add new operator
-
         await operatorAPI.addOperator(FarmersData);
         alert("Operator data added successfully.");
       }
@@ -211,7 +446,8 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
         production_kg: "",
         date_of_harvest: "",
         remarks: "",
-        geotagged_photo_url: "",
+        operator_location_latitude: "",
+        operator_location_longitude: "",
       });
     } catch (error) {
       console.error("Error submitting operator form:", error);
@@ -335,6 +571,28 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
 
   return (
     <>
+      <style jsx>{`
+        .map-container {
+          width: 100%;
+          height: 300px;
+          border-radius: 0.375rem;
+          position: relative;
+          overflow: hidden;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .map-coordinates {
+          position: absolute;
+          bottom: 10px;
+          left: 10px;
+          background: rgba(255, 255, 255, 0.9);
+          padding: 8px 12px;
+          border-radius: 4px;
+          font-size: 12px;
+          z-index: 1000;
+          box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
+          border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+      `}</style>
       <div className="mt-4 bg-white rounded-lg shadow-sm">
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center">
@@ -481,22 +739,66 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
             </div>
 
             <div className="p-4 sm:p-6">
+              <div className="mb-3 sm:mb-4">
+                <label className="block mb-1 text-sm font-medium text-gray-700">
+                  Fishpond Location <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="fishpond_location"
+                  value={formValues.fishpond_location}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="Enter fishpond location"
+                  required
+                />
+              </div>
+
+              <LocationMap
+                showMap={showOperatorMap}
+                formData={formValues}
+                setFormData={setFormValues}
+                mapRef={operatorMapRef}
+                markerRef={operatorMarkerRef}
+                mapInstanceRef={operatorMapInstanceRef}
+                fetchLocationName={fetchLocationName}
+                getCurrentLocation={getOperatorCurrentLocation}
+                setShowMap={setShowOperatorMap}
+                coordinateField="operator_location"
+                locationField="fishpond_location"
+              />
+
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 sm:gap-4">
                 <div className="mb-3 sm:mb-4">
                   <label className="block mb-1 text-sm font-medium text-gray-700">
-                    Fishpond Location <span className="text-red-500">*</span>
+                    Location Longitude
                   </label>
                   <input
-                    type="text"
-                    name="fishpond_location"
-                    value={formValues.fishpond_location}
+                    type="number"
+                    name="operator_location_longitude"
+                    value={formValues.operator_location_longitude}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-                    placeholder="Enter fishpond location"
-                    required
+                    placeholder="Enter longitude"
                   />
                 </div>
 
+                <div className="mb-3 sm:mb-4">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Location Latitude
+                  </label>
+                  <input
+                    type="number"
+                    name="operator_location_latitude"
+                    value={formValues.operator_location_latitude}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="Enter latitude"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 sm:gap-4">
                 <div className="mb-3 sm:mb-4">
                   <label className="block mb-1 text-sm font-medium text-gray-700">
                     Cultured Species <span className="text-red-500">*</span>
@@ -610,20 +912,6 @@ const OperatorTab = ({ farmerId, farmerData, colors, onDataChange }) => {
                     <option value="operational">Operational</option>
                     <option value="non-operational">Non-operational</option>
                   </select>
-                </div>
-
-                <div className="col-span-1 mb-3 md:col-span-2 sm:mb-4">
-                  <label className="block mb-1 text-sm font-medium text-gray-700">
-                    Geotagged Photo URL
-                  </label>
-                  <input
-                    type="text"
-                    name="geotagged_photo_url"
-                    value={formValues.geotagged_photo_url}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-                    placeholder="Enter photo URL"
-                  />
                 </div>
               </div>
             </div>

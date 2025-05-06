@@ -54,29 +54,6 @@ export default function AnalyticsHeader({
           )
         )}
       </div>
-
-      {/* Production Trend Indicator */}
-      <div className="inline-flex flex-wrap items-center p-3 mt-4 transition-all duration-200 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md">
-        <Activity className="w-5 h-5 mr-2 text-[#6A9C89]" />
-        <span className="mr-2 text-sm font-medium">
-          Overall Production Trend:
-        </span>
-        <div
-          className={`flex items-center ${
-            productionTrend >= 0 ? "text-green-600" : "text-red-600"
-          }`}
-        >
-          {productionTrend >= 0 ? (
-            <ArrowUp className="w-4 h-4 mr-1" />
-          ) : (
-            <ArrowDown className="w-4 h-4 mr-1" />
-          )}
-          <span className="font-semibold">
-            {Math.abs(productionTrend).toFixed(1)}%
-          </span>
-          <span className="ml-1 text-sm text-gray-600">from previous year</span>
-        </div>
-      </div>
     </div>
   );
 }

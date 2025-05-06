@@ -10,9 +10,24 @@ import {
 } from "lucide-react";
 
 export default function CategoryBreakdown({ categoryData }) {
-  // Helper function to format numbers with commas
-  const formatNumber = (num) => {
-    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  // Helper function to format numbers with commas and handle kg/tons conversion
+  const formatNumber = (num, convertToTons = false) => {
+    // Parse the number if it's a string
+    const numValue = typeof num === "string" ? Number.parseFloat(num) : num;
+
+    // If we need to convert to tons and the value is >= 1000kg
+    if (convertToTons && numValue >= 1000) {
+      return (numValue / 1000)
+        .toFixed(2)
+        .toString()
+        .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    // Otherwise format with appropriate decimal places
+    return numValue
+      .toFixed(2)
+      .toString()
+      .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
   // Get category name, icon and color for display
@@ -139,14 +154,17 @@ export default function CategoryBreakdown({ categoryData }) {
                     <div className="mb-4">
                       <div className="flex items-baseline">
                         <span className="text-2xl font-bold text-gray-900">
-                          {formatNumber(
-                            data.total.toFixed(category === "livestock" ? 0 : 2)
-                          )}
+                          {category !== "livestock" && data.total < 1000
+                            ? formatNumber(data.total.toFixed(2), false)
+                            : formatNumber(
+                                data.total.toFixed(2),
+                                category !== "livestock"
+                              )}
                         </span>
                         <span className="ml-2 text-sm text-gray-500">
                           {category === "livestock"
                             ? "heads"
-                            : category === "rice"
+                            : category !== "livestock" && data.total < 1000
                             ? "kg"
                             : "tons"}
                         </span>
@@ -168,11 +186,12 @@ export default function CategoryBreakdown({ categoryData }) {
                               {item.name}
                             </span>
                             <span className="text-sm font-semibold text-gray-900">
-                              {formatNumber(
-                                item.value.toFixed(
-                                  category === "livestock" ? 0 : 2
-                                )
-                              )}
+                              {category !== "livestock" && item.value < 1000
+                                ? formatNumber(item.value.toFixed(2), false)
+                                : formatNumber(
+                                    item.value.toFixed(2),
+                                    category !== "livestock"
+                                  )}
                             </span>
                           </div>
                           <div className="w-full h-2 overflow-hidden bg-gray-100 rounded-full">

@@ -101,7 +101,7 @@ const OperatorInformation = ({
 
           <div>
             <label className="block mb-1 text-sm font-medium text-gray-700">
-              Productive Area (sqm)
+              Productive Area (sqm) <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
@@ -110,12 +110,13 @@ const OperatorInformation = ({
               onChange={handleInputChange}
               placeholder="Enter productive area"
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+              required
             />
           </div>
 
           <div>
             <label className="block mb-1 text-sm font-medium text-gray-700">
-              Stocking Density
+              Stocking Density <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
@@ -124,6 +125,7 @@ const OperatorInformation = ({
               onChange={handleInputChange}
               placeholder="Enter stocking density"
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+              required
               min="0"
               step="1"
             />
@@ -131,7 +133,7 @@ const OperatorInformation = ({
 
           <div>
             <label className="block mb-1 text-sm font-medium text-gray-700">
-              Date of Stocking
+              Date of Stocking <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
@@ -139,12 +141,13 @@ const OperatorInformation = ({
               value={formData.date_of_stocking}
               onChange={handleInputChange}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+              required
             />
           </div>
 
           <div>
             <label className="block mb-1 text-sm font-medium text-gray-700">
-              Production (kg)
+              Production (kg) <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
@@ -153,12 +156,13 @@ const OperatorInformation = ({
               onChange={handleInputChange}
               placeholder="Enter production"
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+              required
             />
           </div>
 
           <div>
             <label className="block mb-1 text-sm font-medium text-gray-700">
-              Date of Harvest
+              Date of Harvest <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
@@ -166,6 +170,7 @@ const OperatorInformation = ({
               value={formData.date_of_harvest}
               onChange={handleInputChange}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+              required
             />
           </div>
 
