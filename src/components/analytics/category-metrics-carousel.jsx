@@ -25,6 +25,11 @@ export default function CategoryMetricsCarousel({
   const [metrics, setMetrics] = useState([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
+  // Date range filter states
+  const [useRangeFilter, setUseRangeFilter] = useState(false);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
   // Extract available years from data
   useEffect(() => {
     const years = new Set();
@@ -76,6 +81,17 @@ export default function CategoryMetricsCarousel({
 
     // Convert Set to sorted array
     setAvailableYears(Array.from(years).sort((a, b) => b - a));
+
+    // Set default date range
+    if (!startDate) {
+      const defaultStartDate = new Date(currentYear, 0, 1);
+      setStartDate(defaultStartDate.toISOString().split("T")[0]);
+    }
+
+    if (!endDate) {
+      const defaultEndDate = new Date();
+      setEndDate(defaultEndDate.toISOString().split("T")[0]);
+    }
   }, [rawData]);
 
   // Update metrics when active index or selected year changes
@@ -85,7 +101,15 @@ export default function CategoryMetricsCarousel({
     const activeCategory = categories[activeIndex];
     const newMetrics = prepareCategoryMetrics(activeCategory);
     setMetrics(newMetrics);
-  }, [activeIndex, selectedYear, rawData, categories]);
+  }, [
+    activeIndex,
+    selectedYear,
+    startDate,
+    endDate,
+    useRangeFilter,
+    rawData,
+    categories,
+  ]);
 
   // Prepare category-specific metrics
   const prepareCategoryMetrics = (category) => {
@@ -111,13 +135,33 @@ export default function CategoryMetricsCarousel({
     }
   };
 
+  // Helper function to check if a date is within the selected range
+  const isDateInRange = (dateString) => {
+    if (!dateString) return false;
+
+    if (useRangeFilter && startDate && endDate) {
+      const date = new Date(dateString);
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+
+      // Set time to midnight for accurate date comparison
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+
+      return date >= start && date <= end;
+    } else {
+      // If not using range filter, use the year filter
+      const date = new Date(dateString);
+      return date.getFullYear() === selectedYear;
+    }
+  };
+
   // Helper functions to prepare metrics for each category
   const prepareRiceMetrics = () => {
-    // Filter rice data for the selected year
-    const yearData = rawData.rice.filter((item) => {
+    // Filter rice data based on selected filter type
+    const filteredData = rawData.rice.filter((item) => {
       if (!item.harvest_date) return false;
-      const harvestYear = new Date(item.harvest_date).getFullYear();
-      return harvestYear === selectedYear;
+      return isDateInRange(item.harvest_date);
     });
 
     // Calculate average yield per hectare
@@ -126,7 +170,7 @@ export default function CategoryMetricsCarousel({
     const varietiesMap = {};
     const barangayMap = {};
 
-    yearData.forEach((item) => {
+    filteredData.forEach((item) => {
       const yield_amount = Number.parseFloat(
         item.production || item.yield_amount || 0
       );
@@ -187,7 +231,7 @@ export default function CategoryMetricsCarousel({
       },
       {
         name: "Farmers",
-        value: new Set(yearData.map((item) => item.farmer_id)).size,
+        value: new Set(filteredData.map((item) => item.farmer_id)).size,
         unit: "count",
         icon: <Users className="w-6 h-6 text-green-600" />,
         color: "bg-green-50 border-green-100",
@@ -209,11 +253,10 @@ export default function CategoryMetricsCarousel({
   };
 
   const prepareLivestockMetrics = () => {
-    // Filter livestock data for the selected year
-    const yearData = rawData.livestock.filter((item) => {
+    // Filter livestock data based on selected filter type
+    const filteredData = rawData.livestock.filter((item) => {
       if (!item.created_at) return false;
-      const createdYear = new Date(item.created_at).getFullYear();
-      return createdYear === selectedYear;
+      return isDateInRange(item.created_at);
     });
 
     // Calculate metrics
@@ -222,7 +265,7 @@ export default function CategoryMetricsCarousel({
     const farmersMap = {};
     const barangayMap = {};
 
-    yearData.forEach((item) => {
+    filteredData.forEach((item) => {
       const quantity = Number.parseInt(item.quantity || 0);
       totalHeads += quantity;
 
@@ -307,12 +350,11 @@ export default function CategoryMetricsCarousel({
   };
 
   const prepareBananaMetrics = () => {
-    // Filter banana data for the selected year
-    const yearData = rawData.crops.filter((item) => {
+    // Filter banana data based on selected filter type
+    const filteredData = rawData.crops.filter((item) => {
       if (!item.harvest_date) return false;
-      const harvestYear = new Date(item.harvest_date).getFullYear();
       return (
-        harvestYear === selectedYear &&
+        isDateInRange(item.harvest_date) &&
         ((item.crop_type && item.crop_type.toLowerCase().includes("banana")) ||
           (item.crop_value && item.crop_value.toLowerCase().includes("banana")))
       );
@@ -325,7 +367,7 @@ export default function CategoryMetricsCarousel({
     const farmersMap = {};
     const barangayMap = {};
 
-    yearData.forEach((item) => {
+    filteredData.forEach((item) => {
       const production = Number.parseFloat(
         item.yield_amount || item.production || item.quantity || 0
       );
@@ -401,12 +443,11 @@ export default function CategoryMetricsCarousel({
   };
 
   const prepareVegetablesMetrics = () => {
-    // Filter vegetables data for the selected year
-    const yearData = rawData.crops.filter((item) => {
+    // Filter vegetables data based on selected filter type
+    const filteredData = rawData.crops.filter((item) => {
       if (!item.harvest_date) return false;
-      const harvestYear = new Date(item.harvest_date).getFullYear();
       return (
-        harvestYear === selectedYear &&
+        isDateInRange(item.harvest_date) &&
         ((item.crop_type &&
           item.crop_type.toLowerCase().includes("vegetable")) ||
           (item.crop_value &&
@@ -420,7 +461,7 @@ export default function CategoryMetricsCarousel({
     const typesMap = {};
     const farmersMap = {};
 
-    yearData.forEach((item) => {
+    filteredData.forEach((item) => {
       const production = Number.parseFloat(
         item.yield_amount || item.production || item.quantity || 0
       );
@@ -490,12 +531,11 @@ export default function CategoryMetricsCarousel({
   };
 
   const prepareLegumesMetrics = () => {
-    // Similar structure to other crop metrics
-    const yearData = rawData.crops.filter((item) => {
+    // Filter legumes data based on selected filter type
+    const filteredData = rawData.crops.filter((item) => {
       if (!item.harvest_date) return false;
-      const harvestYear = new Date(item.harvest_date).getFullYear();
       return (
-        harvestYear === selectedYear &&
+        isDateInRange(item.harvest_date) &&
         ((item.crop_type && item.crop_type.toLowerCase().includes("legume")) ||
           (item.crop_value && item.crop_value.toLowerCase().includes("legume")))
       );
@@ -506,7 +546,7 @@ export default function CategoryMetricsCarousel({
     const typesMap = {};
     const farmersMap = {};
 
-    yearData.forEach((item) => {
+    filteredData.forEach((item) => {
       const production = Number.parseFloat(
         item.yield_amount || item.production || item.quantity || 0
       );
@@ -574,12 +614,11 @@ export default function CategoryMetricsCarousel({
   };
 
   const prepareSpicesMetrics = () => {
-    // Similar structure to other crop metrics
-    const yearData = rawData.crops.filter((item) => {
+    // Filter spices data based on selected filter type
+    const filteredData = rawData.crops.filter((item) => {
       if (!item.harvest_date) return false;
-      const harvestYear = new Date(item.harvest_date).getFullYear();
       return (
-        harvestYear === selectedYear &&
+        isDateInRange(item.harvest_date) &&
         ((item.crop_type && item.crop_type.toLowerCase().includes("spice")) ||
           (item.crop_value && item.crop_value.toLowerCase().includes("spice")))
       );
@@ -590,7 +629,7 @@ export default function CategoryMetricsCarousel({
     const typesMap = {};
     const farmersMap = {};
 
-    yearData.forEach((item) => {
+    filteredData.forEach((item) => {
       const production = Number.parseFloat(
         item.yield_amount || item.production || item.quantity || 0
       );
@@ -658,27 +697,22 @@ export default function CategoryMetricsCarousel({
   };
 
   const prepareFishMetrics = () => {
-    // Filter fish data for the selected year
-    // The issue is here - we need to check all possible sources of fish data
-
+    // Filter fish data based on selected filter type
     // First, check for fish in crops data
     const fishCrops = rawData.crops.filter((item) => {
       if (!item.harvest_date) return false;
-      const harvestYear = new Date(item.harvest_date).getFullYear();
       return (
-        harvestYear === selectedYear &&
+        isDateInRange(item.harvest_date) &&
         ((item.crop_type && item.crop_type.toLowerCase().includes("fish")) ||
           (item.crop_value && item.crop_value.toLowerCase().includes("fish")))
       );
     });
 
     // Then, check for fish in operators data
-    // The key issue: we were filtering by operator.category === "Fish" but the data might not have this exact format
     const fishOperators = rawData.operators.filter((item) => {
       if (!item.date_of_harvest) return false;
-      const harvestYear = new Date(item.date_of_harvest).getFullYear();
       return (
-        harvestYear === selectedYear &&
+        isDateInRange(item.date_of_harvest) &&
         ((item.category && item.category.toLowerCase().includes("fish")) ||
           (item.cultured_species &&
             item.cultured_species.toLowerCase().includes("fish")) ||
@@ -688,7 +722,7 @@ export default function CategoryMetricsCarousel({
     });
 
     // Combine all fish data
-    const yearData = [...fishCrops, ...fishOperators];
+    const filteredData = [...fishCrops, ...fishOperators];
 
     // Calculate metrics
     let totalProduction = 0;
@@ -785,11 +819,10 @@ export default function CategoryMetricsCarousel({
   };
 
   const prepareHighValueCropsMetrics = () => {
-    // Filter high value crops data for the selected year
-    const yearData = rawData.highValueCrops.filter((item) => {
+    // Filter high value crops data based on selected filter type
+    const filteredData = rawData.highValueCrops.filter((item) => {
       if (!item.harvest_date) return false;
-      const harvestYear = new Date(item.harvest_date).getFullYear();
-      return harvestYear === selectedYear;
+      return isDateInRange(item.harvest_date);
     });
 
     // Calculate metrics
@@ -798,7 +831,7 @@ export default function CategoryMetricsCarousel({
     const typesMap = {};
     const farmersMap = {};
 
-    yearData.forEach((item) => {
+    filteredData.forEach((item) => {
       const production = Number.parseFloat(
         item.yield_amount || item.production || item.quantity || 0
       );
@@ -909,6 +942,17 @@ export default function CategoryMetricsCarousel({
     }
   };
 
+  // Format date for display
+  const formatDateForDisplay = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
   return (
     <div className="p-6 mb-8 bg-white shadow-sm rounded-xl">
       {/* Header with filter */}
@@ -926,20 +970,22 @@ export default function CategoryMetricsCarousel({
             {isFilterOpen ? "Hide Filters" : "Show Filters"}
           </button>
 
-          <div className="relative">
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="py-2 pr-3 text-sm bg-white border border-gray-200 rounded-lg appearance-none cursor-pointer pl-9 focus:outline-none focus:ring-2 focus:ring-green-500"
-            >
-              {availableYears.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-            <Calendar className="absolute w-4 h-4 text-gray-500 transform -translate-y-1/2 left-3 top-1/2" />
-          </div>
+          {!useRangeFilter && (
+            <div className="relative">
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="py-2 pr-3 text-sm bg-white border border-gray-200 rounded-lg appearance-none cursor-pointer pl-9 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                {availableYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+              <Calendar className="absolute w-4 h-4 text-gray-500 transform -translate-y-1/2 left-3 top-1/2" />
+            </div>
+          )}
         </div>
       </div>
 
@@ -953,24 +999,69 @@ export default function CategoryMetricsCarousel({
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="block mb-1 text-xs font-medium text-gray-500">
-                  Year
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {availableYears.slice(0, 5).map((year) => (
-                    <button
-                      key={year}
-                      onClick={() => setSelectedYear(year)}
-                      className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-                        selectedYear === year
-                          ? "bg-green-600 text-white"
-                          : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-100"
-                      }`}
-                    >
-                      {year}
-                    </button>
-                  ))}
+                <div className="flex items-center mb-3">
+                  <input
+                    type="checkbox"
+                    id="useRangeFilter"
+                    checked={useRangeFilter}
+                    onChange={() => setUseRangeFilter(!useRangeFilter)}
+                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                  />
+                  <label
+                    htmlFor="useRangeFilter"
+                    className="ml-2 text-sm font-medium text-gray-700"
+                  >
+                    Use Date Range Filter
+                  </label>
                 </div>
+
+                {useRangeFilter ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block mb-1 text-xs font-medium text-gray-500">
+                        From Date
+                      </label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1 text-xs font-medium text-gray-500">
+                        To Date
+                      </label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block mb-1 text-xs font-medium text-gray-500">
+                      Year
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {availableYears.slice(0, 5).map((year) => (
+                        <button
+                          key={year}
+                          onClick={() => setSelectedYear(year)}
+                          className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+                            selectedYear === year
+                              ? "bg-green-600 text-white"
+                              : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-100"
+                          }`}
+                        >
+                          {year}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -995,6 +1086,15 @@ export default function CategoryMetricsCarousel({
                 </div>
               </div>
             </div>
+
+            {/* Display selected date range */}
+            {useRangeFilter && startDate && endDate && (
+              <div className="p-2 mt-3 text-sm text-blue-700 rounded-md bg-blue-50">
+                <span className="font-medium">Selected Range:</span>{" "}
+                {formatDateForDisplay(startDate)} to{" "}
+                {formatDateForDisplay(endDate)}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1021,7 +1121,11 @@ export default function CategoryMetricsCarousel({
             </h3>
           </div>
           <p className="text-sm text-gray-600">
-            Performance metrics for {selectedYear}
+            {useRangeFilter
+              ? `Performance metrics from ${formatDateForDisplay(
+                  startDate
+                )} to ${formatDateForDisplay(endDate)}`
+              : `Performance metrics for ${selectedYear}`}
           </p>
         </div>
 
@@ -1052,7 +1156,12 @@ export default function CategoryMetricsCarousel({
               </h3>
               <p className="max-w-md text-gray-500">
                 There is no data available for {categories[activeIndex]?.name}{" "}
-                in {selectedYear}. Try selecting a different year or category.
+                {useRangeFilter
+                  ? `between ${formatDateForDisplay(
+                      startDate
+                    )} and ${formatDateForDisplay(endDate)}`
+                  : `in ${selectedYear}`}
+                . Try selecting a different time period or category.
               </p>
             </div>
           ) : (

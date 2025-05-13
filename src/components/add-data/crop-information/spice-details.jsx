@@ -41,8 +41,32 @@ const SpiceDetails = ({
                   <option value="Lemongrass">Lemongrass</option>
                   <option value="Garlic">Garlic</option>
                   <option value="Onion">Onion</option>
+                  <option value="Other Crop (specify)">
+                    Other Crop (specify)
+                  </option>
                 </select>
               </div>
+
+              {spice.spices_type === "Other Crop (specify)" && (
+                <div>
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Specify Other Spice
+                  </label>
+                  <input
+                    type="text"
+                    value={spice.other_spice || ""}
+                    onChange={(e) =>
+                      handleAdditionalSpiceChange(
+                        index,
+                        "other_spice",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Specify spice type"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block mb-1 text-sm font-medium text-gray-700">

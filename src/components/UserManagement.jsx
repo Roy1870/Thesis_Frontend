@@ -35,8 +35,6 @@ const UserManagement = () => {
   const [formValues, setFormValues] = useState({
     name: "",
     email: "",
-    password: "",
-    password_confirmation: "",
     role: "collector",
   });
   const [formErrors, setFormErrors] = useState({});
@@ -374,8 +372,6 @@ const UserManagement = () => {
     setFormValues({
       name: "",
       email: "",
-      password: "",
-      password_confirmation: "",
       role: "collector",
     });
     setFormErrors({});
@@ -402,11 +398,6 @@ const UserManagement = () => {
     if (!formValues.email) errors.email = "Email is required";
     else if (!/\S+@\S+\.\S+/.test(formValues.email))
       errors.email = "Email is invalid";
-    if (!formValues.password) errors.password = "Password is required";
-    if (!formValues.password_confirmation)
-      errors.password_confirmation = "Please confirm password";
-    else if (formValues.password !== formValues.password_confirmation)
-      errors.password_confirmation = "Passwords do not match";
     if (!formValues.role) errors.role = "User role is required";
 
     setFormErrors(errors);
@@ -437,20 +428,38 @@ const UserManagement = () => {
       // Show background refreshing state
       setRefreshing(true);
 
-      // Include role in the request
+      // Set default password
+      const defaultPassword = "Password123";
+
+      // Include role and default password in the request
       const userData = {
         ...formValues,
+        password: defaultPassword,
+        password_confirmation: defaultPassword,
       };
 
-      await userAPI.createUser(userData, signal);
+      // Send the request using our API service
+      const response = await userAPI.createUser(userData, signal);
 
-      showToast("User added successfully.", "success");
+      if (response && response.error) {
+        // Handle validation errors from the server
+        if (response.error.errors) {
+          const serverErrors = {};
+          Object.keys(response.error.errors).forEach((key) => {
+            serverErrors[key] = response.error.errors[key][0];
+          });
+          setFormErrors(serverErrors);
+          setRefreshing(false);
+          return;
+        }
+        throw new Error(response.error.message || "Failed to add user");
+      }
+
+      showToast("User added successfully with default password.", "success");
       setIsModalVisible(false);
       setFormValues({
         name: "",
         email: "",
-        password: "",
-        password_confirmation: "",
         role: "collector",
       });
 
@@ -953,55 +962,12 @@ const UserManagement = () => {
                     </div>
 
                     <div className="mb-4">
-                      <label
-                        htmlFor="password"
-                        className="block text-sm font-medium text-gray-700"
-                      >
-                        Password
-                      </label>
-                      <input
-                        type="password"
-                        name="password"
-                        id="password"
-                        value={formValues.password}
-                        onChange={handleInputChange}
-                        className={`mt-1 block w-full py-2 px-3 border ${
-                          formErrors.password
-                            ? "border-red-300"
-                            : "border-gray-300"
-                        } rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm`}
-                      />
-                      {formErrors.password && (
-                        <p className="mt-1 text-sm text-red-600">
-                          {formErrors.password}
+                      <div className="p-3 text-sm text-blue-700 rounded-md bg-blue-50">
+                        <p>A default password will be assigned to this user.</p>
+                        <p className="mt-1 font-medium">
+                          Password: Password123
                         </p>
-                      )}
-                    </div>
-
-                    <div className="mb-4">
-                      <label
-                        htmlFor="password_confirmation"
-                        className="block text-sm font-medium text-gray-700"
-                      >
-                        Confirm Password
-                      </label>
-                      <input
-                        type="password"
-                        name="password_confirmation"
-                        id="password_confirmation"
-                        value={formValues.password_confirmation}
-                        onChange={handleInputChange}
-                        className={`mt-1 block w-full py-2 px-3 border ${
-                          formErrors.password_confirmation
-                            ? "border-red-300"
-                            : "border-gray-300"
-                        } rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm`}
-                      />
-                      {formErrors.password_confirmation && (
-                        <p className="mt-1 text-sm text-red-600">
-                          {formErrors.password_confirmation}
-                        </p>
-                      )}
+                      </div>
                     </div>
 
                     <div className="mb-4">

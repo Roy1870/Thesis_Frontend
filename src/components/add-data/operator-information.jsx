@@ -96,8 +96,25 @@ const OperatorInformation = ({
               <option value="Shrimp">Shrimp</option>
               <option value="Prawn">Prawn</option>
               <option value="Mudcrab">Mudcrab</option>
+              <option value="Other (specify)">Other (specify)</option>
             </select>
           </div>
+
+          {formData.cultured_species === "Other (specify)" && (
+            <div>
+              <label className="block mb-1 text-sm font-medium text-gray-700">
+                Specify Other Species
+              </label>
+              <input
+                type="text"
+                name="other_cultured_species"
+                value={formData.other_cultured_species || ""}
+                onChange={handleInputChange}
+                placeholder="Specify species"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+          )}
 
           <div>
             <label className="block mb-1 text-sm font-medium text-gray-700">

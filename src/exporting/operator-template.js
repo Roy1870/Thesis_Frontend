@@ -200,13 +200,12 @@ export const createOperatorReport = async (
 
   // Add data rows - exactly 15 rows as shown in the image
   let rowIndex = 11;
+  let counter = 1;
 
-  // Create exactly 15 rows, either with data or empty
-  for (let i = 0; i < 15; i++) {
+  // Add rows only for actual data
+  filteredData.forEach((operator, i) => {
     // Set row height to match image exactly
     worksheet.getRow(rowIndex).height = 25;
-
-    const operator = i < filteredData.length ? filteredData[i] : null;
 
     // Format dates if operator exists
     const stockingDate = operator?.date_of_stocking
@@ -226,7 +225,7 @@ export const createOperatorReport = async (
       : "";
 
     // Add row data
-    worksheet.getCell(`A${rowIndex}`).value = i + 1; // Always number from 1-15
+    worksheet.getCell(`A${rowIndex}`).value = counter;
     worksheet.getCell(`B${rowIndex}`).value = operator?.farmer_name || "";
     worksheet.getCell(`C${rowIndex}`).value = operator?.fishpond_location || "";
     worksheet.getCell(`D${rowIndex}`).value = operator?.cultured_species || "";
@@ -293,7 +292,8 @@ export const createOperatorReport = async (
     }
 
     rowIndex++;
-  }
+    counter++;
+  });
 
   // Add total row with modern styling
   worksheet.getCell(`A${rowIndex}`).value = "TOTAL";

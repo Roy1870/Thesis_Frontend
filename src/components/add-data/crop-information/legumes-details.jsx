@@ -39,8 +39,32 @@ const LegumesDetails = ({
                   <option value="Soybean">Soybean</option>
                   <option value="Cowpea">Cowpea</option>
                   <option value="Pigeon Pea">Pigeon Pea</option>
+                  <option value="Other Crop (specify)">
+                    Other Crop (specify)
+                  </option>
                 </select>
               </div>
+
+              {legume.legumes_type === "Other Crop (specify)" && (
+                <div>
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Specify Other Legume
+                  </label>
+                  <input
+                    type="text"
+                    value={legume.other_legume || ""}
+                    onChange={(e) =>
+                      handleAdditionalLegumesChange(
+                        index,
+                        "other_legume",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Specify legume type"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block mb-1 text-sm font-medium text-gray-700">

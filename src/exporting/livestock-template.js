@@ -492,7 +492,7 @@ export async function createLivestockReport(
     const key = `${animalType}_${subcategory}`;
 
     // Ensure quantity is properly parsed as a number
-    const quantity = parseInt(record.quantity || 0, 10);
+    const quantity = Number.parseInt(record.quantity || 0, 10);
 
     // Add to existing count or set new count for this farmer
     const farmer = farmerMap.get(farmerId);
@@ -549,24 +549,6 @@ export async function createLivestockReport(
 
     rowNum++;
   });
-
-  // Add empty rows to complete the table (25 rows total)
-  const totalRows = 25;
-  const currentRows = rowNum - 1;
-
-  for (let i = 0; i < totalRows - currentRows; i++) {
-    const emptyRow = worksheet.addRow(Array(29).fill(""));
-
-    // Style empty row
-    emptyRow.eachCell((cell) => {
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-    });
-  }
 
   // Now add the totals row at the bottom after all data and empty rows
   const totalsRowData = Array(29).fill("");

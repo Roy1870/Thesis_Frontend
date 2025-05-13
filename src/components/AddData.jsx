@@ -58,7 +58,7 @@ const AddData = () => {
     },
   ]);
   const [additionalSpiceDetails, setAdditionalSpiceDetails] = useState([
-    { spices_type: "", quantity: "" },
+    { spices_type: "", quantity: "", other_spice: "" },
   ]);
   const [additionalLegumesDetails, setAdditionalLegumesDetails] = useState([
     { legumes_type: "", quantity: "" },
@@ -698,7 +698,7 @@ const AddData = () => {
   const handleAddAdditionalSpice = () => {
     setAdditionalSpiceDetails([
       ...additionalSpiceDetails,
-      { spices_type: "", quantity: "" },
+      { spices_type: "", quantity: "", other_spice: "" },
     ]);
   };
 
@@ -927,8 +927,16 @@ const AddData = () => {
           if (values.crop_type === "Spices") {
             additionalSpiceDetails.forEach((spice) => {
               if (spice.spices_type && spice.quantity) {
+                let cropValue = spice.spices_type;
+                if (
+                  spice.spices_type === "Other Crop (specify)" &&
+                  spice.other_spice
+                ) {
+                  cropValue = spice.other_spice;
+                }
+
                 const productionData = {
-                  crop: spice.spices_type,
+                  crop: cropValue,
                   quantity: spice.quantity,
                 };
 
@@ -1193,7 +1201,9 @@ const AddData = () => {
             ave_yield: "",
           },
         ]);
-        setAdditionalSpiceDetails([{ spices_type: "", quantity: "" }]);
+        setAdditionalSpiceDetails([
+          { spices_type: "", quantity: "", other_spice: "" },
+        ]);
         setAdditionalLegumesDetails([{ legumes_type: "", quantity: "" }]);
         setAdditionalBananaDetails([{ banana_type: "", quantity: "" }]);
         setAdditionalVegetableDetails([

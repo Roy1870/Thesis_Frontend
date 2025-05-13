@@ -36,8 +36,30 @@ const RaiserInformation = ({ animals, handleAnimalChange, addAnimal }) => {
                   <option value="Quail">Quail</option>
                   <option value="Turkey">Turkey</option>
                   <option value="Rabbit">Rabbit</option>
+                  <option value="Other (specify)">Other (specify)</option>
                 </select>
               </div>
+
+              {animal.animal_type === "Other (specify)" && (
+                <div>
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Specify Other Animal
+                  </label>
+                  <input
+                    type="text"
+                    value={animal.other_animal_type || ""}
+                    onChange={(e) =>
+                      handleAnimalChange(
+                        index,
+                        "other_animal_type",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Specify animal type"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block mb-1 text-sm font-medium text-gray-700">
@@ -50,7 +72,10 @@ const RaiserInformation = ({ animals, handleAnimalChange, addAnimal }) => {
                   }
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
                   required
-                  disabled={!animal.animal_type}
+                  disabled={
+                    !animal.animal_type ||
+                    animal.animal_type === "Other (specify)"
+                  }
                 >
                   <option value="">Select Subcategory</option>
                   {animal.animal_type === "Cattle" && (
@@ -108,8 +133,33 @@ const RaiserInformation = ({ animals, handleAnimalChange, addAnimal }) => {
                       <option value="Doe">Doe</option>
                     </>
                   )}
+                  {animal.animal_type === "Other (specify)" && (
+                    <option value="Other">Other</option>
+                  )}
                 </select>
               </div>
+
+              {animal.animal_type === "Other (specify)" &&
+                animal.subcategory === "Other" && (
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Specify Other Subcategory
+                    </label>
+                    <input
+                      type="text"
+                      value={animal.other_subcategory || ""}
+                      onChange={(e) =>
+                        handleAnimalChange(
+                          index,
+                          "other_subcategory",
+                          e.target.value
+                        )
+                      }
+                      placeholder="Specify subcategory"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+                    />
+                  </div>
+                )}
 
               <div>
                 <label className="block mb-1 text-sm font-medium text-gray-700">

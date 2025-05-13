@@ -51,8 +51,25 @@ const HighValueCrops = ({
               {crop}
             </option>
           ))}
+          <option value="Other Crop (specify)">Other Crop (specify)</option>
         </select>
       </div>
+
+      {formData.high_value_crop === "Other Crop (specify)" && (
+        <div>
+          <label className="block mb-1 text-sm font-medium text-gray-700">
+            Specify Other Crop
+          </label>
+          <input
+            type="text"
+            name="other_high_value_crop"
+            value={formData.other_high_value_crop || ""}
+            onChange={handleInputChange}
+            placeholder="Specify crop type"
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+          />
+        </div>
+      )}
 
       <div>
         <label className="block mb-1 text-sm font-medium text-gray-700">
@@ -117,8 +134,25 @@ const HighValueCrops = ({
           <option value="seasonal">Seasonal</option>
           <option value="annually">Annually</option>
           <option value="twice_a_month">Twice a Month</option>
+          <option value="other">Other (specify)</option>
         </select>
       </div>
+
+      {formData.cropping_intensity === "other" && (
+        <div>
+          <label className="block mb-1 text-sm font-medium text-gray-700">
+            Specify Other Cropping Intensity
+          </label>
+          <input
+            type="text"
+            name="other_cropping_intensity"
+            value={formData.other_cropping_intensity || ""}
+            onChange={handleInputChange}
+            placeholder="Specify cropping intensity"
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500"
+          />
+        </div>
+      )}
     </>
   );
 };

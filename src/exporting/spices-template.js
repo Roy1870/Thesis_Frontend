@@ -359,32 +359,6 @@ export const createSpicesReport = async (
     counter++;
   });
 
-  // Add empty rows to reach 35 rows
-  while (counter <= 35) {
-    worksheet.getCell(`A${rowIndex}`).value = counter;
-
-    // Add borders to all cells in the row
-    for (let col = 1; col <= 17; col++) {
-      const cell = worksheet.getCell(rowIndex, col);
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-
-      // Set background color for the row (light orange)
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FFCC99" }, // Light orange
-      };
-    }
-
-    rowIndex++;
-    counter++;
-  }
-
   // Add total row
   worksheet.getCell(`A${rowIndex}`).value = "TOTAL";
   worksheet.getCell(`A${rowIndex}`).font = { bold: true };

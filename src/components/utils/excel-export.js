@@ -62,7 +62,6 @@ export const exportDataToExcel = async (
   try {
     // Make sure ExcelJS is loaded
     if (!window.ExcelJS) {
-      showToast("ExcelJS library not loaded. Please try again.", "error");
       return;
     }
 
@@ -462,11 +461,8 @@ export const exportDataToExcel = async (
       `${dataType}_export_${new Date().toISOString().split("T")[0]}.xlsx`,
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
-
-    showToast("Export completed successfully", "success");
   } catch (error) {
     console.error("Export error:", error);
-    showToast(`Export failed: ${error.message}`, "error");
   }
 };
 

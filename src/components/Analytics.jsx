@@ -39,6 +39,11 @@ function Analytics() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [viewMode, setViewMode] = useState("monthly"); // "monthly" or "yearly"
 
+  // Date range filter states
+  const [useRangeFilter, setUseRangeFilter] = useState(false);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
   const [analyticsData, setAnalyticsData] = useState({
     totalProduction: 0,
     cropProduction: [],
@@ -72,6 +77,14 @@ function Analytics() {
 
     // Initial data fetch
     fetchAllData(signal, true);
+
+    // Set default date range
+    const currentYear = new Date().getFullYear();
+    const defaultStartDate = new Date(currentYear, 0, 1);
+    const defaultEndDate = new Date();
+
+    setStartDate(defaultStartDate.toISOString().split("T")[0]);
+    setEndDate(defaultEndDate.toISOString().split("T")[0]);
 
     return () => {
       controller.abort();
@@ -415,8 +428,29 @@ function Analytics() {
     return Array.from(years).sort((a, b) => b - a);
   };
 
+  // Helper function to check if a date is within the selected range
+  const isDateInRange = (dateString) => {
+    if (!dateString) return false;
+
+    if (useRangeFilter && startDate && endDate) {
+      const date = new Date(dateString);
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+
+      // Set time to midnight for accurate date comparison
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+
+      return date >= start && date <= end;
+    } else {
+      // If not using range filter, use the year filter
+      const date = new Date(dateString);
+      return date.getFullYear() === selectedYear;
+    }
+  };
+
   // Add this helper function before the return statement to prepare data for the comparison chart
-  const prepareComparisonData = (data, year) => {
+  const prepareComparisonData = (data) => {
     // Get all months for the selected year
     const months = [
       "January",
@@ -448,20 +482,37 @@ function Analytics() {
 
     // Process rice data - keep in kg instead of converting to tons
     data.rice.forEach((item) => {
-      const date = new Date(item.harvest_date);
-      if (date.getFullYear() === year) {
+      if (!item.harvest_date) return;
+
+      if (useRangeFilter) {
+        if (!isDateInRange(item.harvest_date)) return;
+
+        const date = new Date(item.harvest_date);
         const monthIndex = date.getMonth();
         const production = Number.parseFloat(
           item.production || item.yield_amount || 0
         );
         comparisonData[monthIndex].rice += production;
+      } else {
+        const date = new Date(item.harvest_date);
+        if (date.getFullYear() === selectedYear) {
+          const monthIndex = date.getMonth();
+          const production = Number.parseFloat(
+            item.production || item.yield_amount || 0
+          );
+          comparisonData[monthIndex].rice += production;
+        }
       }
     });
 
     // Process crops data
     data.crops.forEach((crop) => {
-      const date = new Date(crop.harvest_date);
-      if (date.getFullYear() === year) {
+      if (!crop.harvest_date) return;
+
+      if (useRangeFilter) {
+        if (!isDateInRange(crop.harvest_date)) return;
+
+        const date = new Date(crop.harvest_date);
         const monthIndex = date.getMonth();
         const quantity = Number.parseFloat(crop.quantity) || 0;
 
@@ -475,37 +526,89 @@ function Analytics() {
         } else if (crop.crop_type === "Spices") {
           comparisonData[monthIndex].spices += quantity;
         }
+      } else {
+        const date = new Date(crop.harvest_date);
+        if (date.getFullYear() === selectedYear) {
+          const monthIndex = date.getMonth();
+          const quantity = Number.parseFloat(crop.quantity) || 0;
+
+          // Categorize by crop type
+          if (crop.crop_type === "Banana") {
+            comparisonData[monthIndex].banana += quantity;
+          } else if (crop.crop_type === "Vegetables") {
+            comparisonData[monthIndex].vegetables += quantity;
+          } else if (crop.crop_type === "Legumes") {
+            comparisonData[monthIndex].legumes += quantity;
+          } else if (crop.crop_type === "Spices") {
+            comparisonData[monthIndex].spices += quantity;
+          }
+        }
       }
     });
 
     // Process high value crops
     data.highValueCrops.forEach((crop) => {
-      const date = new Date(crop.harvest_date);
-      if (date.getFullYear() === year) {
+      if (!crop.harvest_date) return;
+
+      if (useRangeFilter) {
+        if (!isDateInRange(crop.harvest_date)) return;
+
+        const date = new Date(crop.harvest_date);
         const monthIndex = date.getMonth();
         const quantity = Number.parseFloat(crop.quantity) || 0;
         comparisonData[monthIndex].highValueCrops += quantity;
+      } else {
+        const date = new Date(crop.harvest_date);
+        if (date.getFullYear() === selectedYear) {
+          const monthIndex = date.getMonth();
+          const quantity = Number.parseFloat(crop.quantity) || 0;
+          comparisonData[monthIndex].highValueCrops += quantity;
+        }
       }
     });
 
     // Process livestock data (convert to equivalent tons for comparison)
     data.livestock.forEach((item) => {
-      const date = new Date(item.created_at);
-      if (date.getFullYear() === year) {
+      if (!item.created_at) return;
+
+      if (useRangeFilter) {
+        if (!isDateInRange(item.created_at)) return;
+
+        const date = new Date(item.created_at);
         const monthIndex = date.getMonth();
         const quantity = Number.parseFloat(item.quantity) || 0;
         comparisonData[monthIndex].livestock += quantity;
+      } else {
+        const date = new Date(item.created_at);
+        if (date.getFullYear() === selectedYear) {
+          const monthIndex = date.getMonth();
+          const quantity = Number.parseFloat(item.quantity) || 0;
+          comparisonData[monthIndex].livestock += quantity;
+        }
       }
     });
 
     // Process fish data from operators
     data.operators.forEach((operator) => {
       if (operator.category === "Fish") {
-        const date = new Date(operator.date_of_harvest || operator.created_at);
-        if (date.getFullYear() === year) {
+        if (!operator.date_of_harvest && !operator.created_at) return;
+
+        const dateString = operator.date_of_harvest || operator.created_at;
+
+        if (useRangeFilter) {
+          if (!isDateInRange(dateString)) return;
+
+          const date = new Date(dateString);
           const monthIndex = date.getMonth();
           const quantity = Number.parseFloat(operator.production_volume) || 0;
           comparisonData[monthIndex].fish += quantity;
+        } else {
+          const date = new Date(dateString);
+          if (date.getFullYear() === selectedYear) {
+            const monthIndex = date.getMonth();
+            const quantity = Number.parseFloat(operator.production_volume) || 0;
+            comparisonData[monthIndex].fish += quantity;
+          }
         }
       }
     });
@@ -636,6 +739,17 @@ function Analytics() {
     return yearlyData;
   };
 
+  // Format date for display
+  const formatDateForDisplay = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
   if (loading && Object.values(rawData).every((arr) => arr.length === 0)) {
     return (
       <div className="min-h-screen p-5 bg-[#F5F7F9] overflow-y-auto">
@@ -735,23 +849,77 @@ function Analytics() {
           </div>
         </div>
 
-        {/* Year selector - only show for monthly view */}
+        {/* Date filters */}
         {viewMode === "monthly" && (
-          <div className="flex flex-wrap items-center gap-2 mb-6">
-            <span className="text-sm font-medium text-gray-600">
-              Filter by year:
-            </span>
-            <select
-              className="px-3 py-1 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500"
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number.parseInt(e.target.value))}
-            >
-              {getAvailableYears().map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
+          <div className="mb-6">
+            <div className="flex items-center mb-3">
+              <input
+                type="checkbox"
+                id="comparisonUseRangeFilter"
+                checked={useRangeFilter}
+                onChange={() => setUseRangeFilter(!useRangeFilter)}
+                className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+              />
+              <label
+                htmlFor="comparisonUseRangeFilter"
+                className="ml-2 text-sm font-medium text-gray-700"
+              >
+                Use Date Range Filter
+              </label>
+            </div>
+
+            {useRangeFilter ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center">
+                  <span className="mr-2 text-sm font-medium text-gray-600">
+                    From:
+                  </span>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="px-3 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div className="flex items-center">
+                  <span className="mr-2 text-sm font-medium text-gray-600">
+                    To:
+                  </span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="px-3 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+
+                {startDate && endDate && (
+                  <div className="ml-2 text-sm text-blue-600">
+                    {formatDateForDisplay(startDate)} -{" "}
+                    {formatDateForDisplay(endDate)}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-gray-600">
+                  Filter by year:
+                </span>
+                <select
+                  className="px-3 py-1 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500"
+                  value={selectedYear}
+                  onChange={(e) =>
+                    setSelectedYear(Number.parseInt(e.target.value))
+                  }
+                >
+                  {getAvailableYears().map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         )}
 
@@ -760,7 +928,7 @@ function Analytics() {
           <CategoryComparisonChart
             data={
               viewMode === "monthly"
-                ? prepareComparisonData(rawData, selectedYear)
+                ? prepareComparisonData(rawData)
                 : prepareYearlyComparisonData(rawData)
             }
             categories={categories}
