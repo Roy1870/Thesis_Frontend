@@ -2,8 +2,7 @@
 import axios from "axios";
 
 // Base API URL
-const API_BASE_URL = "http://localhost:8000/api/";
-
+const API_BASE_URL = "https://thesis-backend-tau.vercel.app/api/api";
 // Reduced cache TTL for faster updates
 const CACHE_TTL = 60000; // 1 minute in milliseconds (reduced from 5 minutes)
 const CACHE_TTL_CRITICAL = 120000; // 2 minutes for critical data (reduced from 10 minutes)
